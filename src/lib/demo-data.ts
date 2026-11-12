@@ -24,29 +24,44 @@ export const project = {
   initialEstimate: 8320000,
   /** How far the house is built: 0 plinth, 1 ground floor, 2 first floor, 3 second floor, 4 roof. */
   builtUpTo: 2,
+  /** Sample value, to be confirmed by Poetry. Consistent with milestone 10, "September 2027". */
+  handoverOn: "2027-09-30",
 };
 
-export const contacts = [
+/** What the site last reported. Sample values. */
+export const site = {
+  lastUpdatedOn: "2026-11-06",
+  lastUpdatedBy: "Suresh Gowda",
+  curing: { what: "The slab over the first floor", startedOn: "2026-11-06", days: 21 },
+};
+
+export type Contact = {
+  level: string;
+  name: string;
+  role: string;
+  phone: string;
+  /** @deprecated No response-time promises are made. Always empty; removed once the client home stops reading it. */
+  responds?: string;
+};
+
+export const contacts: Contact[] = [
   {
     level: "Your point of contact",
     name: "Kavya Reddy",
     role: "Client relations",
     phone: "+91 98450 01122",
-    responds: "Replies within one working day",
   },
   {
-    level: "If that doesn't resolve it",
+    level: "If that does not settle it",
     name: "Vikram Desai",
-    role: "Project head",
+    role: "Project Head",
     phone: "+91 98450 03344",
-    responds: "Replies within two working days",
   },
   {
-    level: "Final escalation",
+    level: "If you still need help",
     name: "Poetry Designs office",
     role: "Director's desk",
     phone: "+91 80 4000 5566",
-    responds: "Replies within three working days",
   },
 ];
 
@@ -65,6 +80,14 @@ export type Milestone = {
   letterNo?: string;
   letterIssuedOn?: string;
   expected?: string;
+  /** "YYYY-MM-DDTHH:mm" when she accepted the stage as finished. */
+  acceptedAt?: string;
+  /** "YYYY-MM-DDTHH:mm" when the Project Head raised the payment. */
+  raisedAt?: string;
+  /** Who raised it, by name. */
+  raisedBy?: string;
+  /** "YYYY-MM-DDTHH:mm" when she approved the payment. */
+  approvedAt?: string;
 };
 
 // Approved value is 87,10,000. The advance stays at 5% of the initial estimate;
@@ -90,6 +113,10 @@ export const milestones: Milestone[] = [
     paidOn: "2026-06-02",
     letterNo: "PD/DL/2026-27/0019",
     letterIssuedOn: "2026-05-25",
+    acceptedAt: "2026-05-24T19:15",
+    raisedAt: "2026-05-25T10:00",
+    raisedBy: "Vikram Desai",
+    approvedAt: "2026-05-25T18:40",
   },
   {
     id: 2,
@@ -102,6 +129,10 @@ export const milestones: Milestone[] = [
     paidOn: "2026-08-29",
     letterNo: "PD/DL/2026-27/0027",
     letterIssuedOn: "2026-08-20",
+    acceptedAt: "2026-08-19T20:30",
+    raisedAt: "2026-08-20T09:40",
+    raisedBy: "Vikram Desai",
+    approvedAt: "2026-08-20T21:02",
   },
   {
     id: 3,
@@ -112,6 +143,9 @@ export const milestones: Milestone[] = [
     status: "awaiting-approval",
     workCompletedOn: "2026-11-06",
     letterNo: "PD/DL/2026-27/0034",
+    raisedAt: "2026-11-07T10:15",
+    raisedBy: "Vikram Desai",
+    acceptedAt: "2026-11-07T19:42",
   },
   {
     id: 4,
@@ -196,6 +230,16 @@ export type Design = {
   kind: "Drawing" | "Specification";
   drawing: "plan" | "elevation" | "spec";
   sheet: string;
+  /** Where this design is marked on the drawing of the house. */
+  anchor: string;
+  /** Decide-by, said as a building event. Only on designs that are waiting. */
+  neededBefore?: string;
+  /** The date a decision is needed by. Only on designs that are waiting. */
+  decideBy?: string;
+  /** What a late decision would hold up: "to keep the second floor walls rising on 4 Dec". */
+  slips?: string;
+  /** The documents in a specification package, in order. */
+  documents?: string[];
   versions: DesignVersion[];
 };
 
@@ -206,6 +250,10 @@ export const designs: Design[] = [
     kind: "Drawing",
     drawing: "plan",
     sheet: "A-103",
+    anchor: "design:terrace-plan",
+    neededBefore: "before the second floor walls reach door height",
+    decideBy: "2026-11-20",
+    slips: "to keep the second floor walls rising on 4 Dec",
     versions: [
       {
         version: 1,
@@ -232,6 +280,11 @@ export const designs: Design[] = [
     kind: "Specification",
     drawing: "spec",
     sheet: "S-204",
+    anchor: "design:kitchen-spec",
+    neededBefore: "before electrical and plumbing work starts, expected April 2027",
+    decideBy: "2027-03-15",
+    slips: "to keep electrical and plumbing starting in April",
+    documents: ["Kitchen specification sheet", "Sink and hob data sheet", "Chimney data sheet"],
     versions: [
       {
         version: 1,
@@ -248,6 +301,7 @@ export const designs: Design[] = [
     kind: "Drawing",
     drawing: "elevation",
     sheet: "A-201",
+    anchor: "design:front-elevation",
     versions: [
       {
         version: 4,
@@ -266,6 +320,7 @@ export const designs: Design[] = [
     kind: "Drawing",
     drawing: "plan",
     sheet: "A-102",
+    anchor: "design:first-floor-plan",
     versions: [
       {
         version: 2,
@@ -283,6 +338,7 @@ export const designs: Design[] = [
     kind: "Drawing",
     drawing: "plan",
     sheet: "A-101",
+    anchor: "design:ground-floor-plan",
     versions: [
       {
         version: 3,
@@ -296,13 +352,22 @@ export const designs: Design[] = [
   },
 ];
 
-export type ChangeStatus = "pending" | "approved" | "declined";
+/** "declined" is kept for old saved decisions only; the client now asks for changes instead. */
+export type ChangeStatus = "pending" | "approved" | "changes-asked" | "declined";
+
+/** A revised specification sheet: one row per item, [what, as revised]. */
+export type RevisedSpec = { sheet: string; title: string; rows: [string, string][] };
 
 export type Change = {
   id: string;
   title: string;
   reason: "Added area" | "Beyond the allowance" | "Outside the agreement";
   raisedOn: string;
+  /** "YYYY-MM-DDTHH:mm", or a plain date for older changes. */
+  raisedAt: string;
+  /** Who raised it, by name. */
+  raisedBy: string;
+  revisedSpec: RevisedSpec;
   summary: string;
   /** How the price was worked out, in words the client can check. */
   working: string;
@@ -314,6 +379,12 @@ export type Change = {
   status: ChangeStatus;
   decidedOn?: string;
   addendum?: string;
+  /** Where this change is marked on the drawing of the house. */
+  anchor: string;
+  /** Short name used in sentences: "the jacuzzi". */
+  short: string;
+  /** Which payments the cost is added to, before GST. Must sum to cost. Sample split. */
+  lands: { milestoneId: number; amount: number }[];
 };
 
 export const changes: Change[] = [
@@ -322,6 +393,20 @@ export const changes: Change[] = [
     title: "Jacuzzi on the terrace",
     reason: "Outside the agreement",
     raisedOn: "2026-11-07",
+    raisedAt: "2026-11-07T16:10",
+    raisedBy: "Vikram Desai",
+    revisedSpec: {
+      sheet: "S-311",
+      title: "Terrace jacuzzi specification, revised",
+      rows: [
+        ["Unit", "Acrylic jacuzzi, 2.1 m by 2.1 m, with heater and filter"],
+        ["Seats", "Six, two of them loungers"],
+        ["Slab", "Terrace slab under the unit thickened to 150 mm, extra 12 mm bars at 150 mm"],
+        ["Waterproofing", "Two-coat polyurethane membrane, lapped 300 mm up the parapet"],
+        ["Plumbing", "25 mm supply and 75 mm drain lines, run to the rainwater outlet"],
+        ["Electrical", "Its own 32 A circuit with an earth leakage breaker"],
+      ],
+    },
     summary:
       "A six-seater jacuzzi on the second floor terrace. The slab under it needs extra steel, and the area needs its own waterproofing and plumbing lines.",
     working: "Jacuzzi unit and installation ₹1,65,000, slab strengthening ₹45,000, waterproofing and plumbing ₹30,000.",
@@ -330,12 +415,30 @@ export const changes: Change[] = [
     affects: "Second floor and roof slab, then Electrical and plumbing",
     validUntil: "2026-11-22",
     status: "pending",
+    anchor: "change:terrace-jacuzzi",
+    short: "the jacuzzi",
+    lands: [
+      { milestoneId: 4, amount: 45000 },
+      { milestoneId: 6, amount: 195000 },
+    ],
   },
   {
     id: "living-glazing",
     title: "Larger living room windows",
     reason: "Beyond the allowance",
     raisedOn: "2026-11-03",
+    raisedAt: "2026-11-03T15:30",
+    raisedBy: "Vikram Desai",
+    revisedSpec: {
+      sheet: "W-02",
+      title: "Living room window schedule, revised",
+      rows: [
+        ["Glazed area", "236 sq ft, up from the 180 sq ft allowance"],
+        ["Frames", "Powder-coated aluminium, sliding and fixed panels"],
+        ["Glass", "6 mm toughened, double glazed"],
+        ["Lintel", "One continuous lintel over the garden wall"],
+      ],
+    },
     summary:
       "The living room windows grow from the agreed glazing allowance of 180 sq ft to 236 sq ft, to open the room to the garden.",
     working: "56 sq ft beyond the allowance × ₹1,500 per sq ft.",
@@ -344,12 +447,25 @@ export const changes: Change[] = [
     affects: "Doors, windows and joinery",
     validUntil: "2026-11-18",
     status: "pending",
+    anchor: "change:living-glazing",
+    short: "the larger windows",
+    lands: [{ milestoneId: 8, amount: 84000 }],
   },
   {
     id: "study-room",
     title: "Study next to the master bedroom",
     reason: "Added area",
     raisedOn: "2026-02-20",
+    raisedAt: "2026-02-20",
+    raisedBy: "Vikram Desai",
+    revisedSpec: {
+      sheet: "A-102",
+      title: "First floor plan, version 2",
+      rows: [
+        ["Study", "150 sq ft next to the master bedroom"],
+        ["Built-up area", "3,350 sq ft, up from 3,200 sq ft"],
+      ],
+    },
     summary: "A study added on the first floor, which increases the built-up area from 3,200 to 3,350 sq ft.",
     working: "150 sq ft added × ₹2,600 per sq ft.",
     cost: 390000,
@@ -358,6 +474,10 @@ export const changes: Change[] = [
     status: "approved",
     decidedOn: "2026-03-28",
     addendum: "Addendum 1",
+    anchor: "change:study-room",
+    short: "the study",
+    // Already inside the milestone amounts above.
+    lands: [],
   },
 ];
 
@@ -383,6 +503,7 @@ export function withGst(amount: number) {
 
 // ---- Staff side ----
 
+/** Kept for older screens. New staff code reads the eight projects in firm-data.ts. */
 export const staffProjects = [
   { id: "iyer", name: "Iyer Residence", place: "Kanakapura Road" },
   { id: "nair", name: "Nair Farmhouse", place: "Devanahalli" },

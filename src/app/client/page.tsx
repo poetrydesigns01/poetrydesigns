@@ -1,252 +1,259 @@
 "use client";
 
 import Link from "next/link";
-import { HouseElevation } from "@/components/house-elevation";
-import { Status } from "@/components/page-band";
-import { client, contacts, designs, milestones, project, withGst } from "@/lib/demo-data";
-import { useChanges, useDemo } from "@/lib/demo-store";
-import { formatDate, formatShortDate, inr, inrDelta } from "@/lib/format";
+import { useLayoutEffect, useRef, useState } from "react";
+import { useOnHidden } from "@/components/craft/seal";
+import { StruckFigure } from "@/components/craft/struck-figure";
+import { FloorNote } from "@/components/home/floor-note";
+import { Sheet } from "@/components/home/sheet";
+import { WaitingList } from "@/components/home/waiting-list";
+import { House } from "@/components/house/house";
+import { HouseCaption } from "@/components/house/house-caption";
+import { HouseLegend } from "@/components/house/house-legend";
+import { ClientPage } from "@/components/page-band";
+import { ThreadPost } from "@/components/thread/thread";
+import { client, contacts, site, TODAY } from "@/lib/demo-data";
+import { useDemo, useProjection } from "@/lib/demo-store";
+import { countWord, dayCount, daysBetween, formatDate, inr, listWords } from "@/lib/format";
+import { BANDS, STOPS, STOREYS } from "@/lib/house-model";
+import type { StoreyGroup, WaitingItem } from "@/lib/projection";
 
-const COUNT_WORDS = ["Nothing is", "One thing is", "Two things are", "Three things are", "Four things are", "Five things are", "Six things are"];
+// Iyer Residence home. It answers three questions and says each fact once: what needs her
+// next (the headline, the one button and the one peg on the house), what she has agreed to,
+// and who to call. Everything else is a link to the page that holds it.
 
-type Action = {
-  key: string;
-  kind: string;
-  title: string;
-  detail: string;
-  figure?: string;
-  href: string;
-  cta: string;
-};
+// The floor bands of the house, in the order they are drawn: top to bottom.
+const BAND_ORDER: StoreyGroup[] = ["second", "first", "ground"];
 
-export default function ClientHome() {
-  const { designDecisions, paymentApproved } = useDemo();
-  const changes = useChanges();
+/** From this width the house stands beside the sheets, so a row can point at its peg. */
+const besideTheSheets = () => window.matchMedia("(min-width: 1024px)").matches;
 
-  const duePayment = milestones.find((m) => m.status === "awaiting-approval");
-  const pendingChanges = changes.filter((c) => c.status === "pending");
-  const approvedChanges = changes.filter((c) => c.status === "approved");
-  const awaitingDesigns = designs.filter((d) => {
-    const latest = d.versions[d.versions.length - 1];
-    return latest.status === "awaiting" && !designDecisions[d.id];
-  });
-  const approvedDesigns = designs.filter((d) => {
-    const status = designDecisions[d.id]?.status ?? d.versions[d.versions.length - 1].status;
-    return status === "approved";
-  });
-
-  const approvedValue = project.initialEstimate + approvedChanges.reduce((sum, c) => sum + c.cost, 0);
-  const pendingValue = pendingChanges.reduce((sum, c) => sum + c.cost, 0);
-  const pendingDays = pendingChanges.reduce((sum, c) => sum + c.delayDays, 0);
-
-  const actions: Action[] = [];
-  if (duePayment && !paymentApproved) {
-    actions.push({
-      key: "payment",
-      kind: "Payment",
-      title: `Approve the payment for ${duePayment.name.toLowerCase()}`,
-      detail: `The work was finished on ${formatShortDate(duePayment.workCompletedOn!)}. Approving it creates the demand letter for your bank.`,
-      figure: inr(withGst(duePayment.amount).total),
-      href: "/client/payments",
-      cta: "Review payment",
-    });
-  }
-  for (const design of awaitingDesigns) {
-    const latest = design.versions[design.versions.length - 1];
-    actions.push({
-      key: design.id,
-      kind: design.kind,
-      title: `${design.title}, version ${latest.version}`,
-      detail: `${latest.uploadedBy} uploaded it on ${formatShortDate(latest.uploadedOn)}. Approve it or ask for changes.`,
-      href: `/client/designs/${design.id}`,
-      cta: design.kind === "Drawing" ? "Review drawing" : "Review specification",
-    });
-  }
-  for (const change of pendingChanges) {
-    actions.push({
-      key: change.id,
-      kind: "Change",
-      title: change.title,
-      detail: `Adds ${change.delayDays} days. This price is held until ${formatShortDate(change.validUntil!)}.`,
-      figure: inrDelta(change.cost),
-      href: "/client/changes",
-      cta: "Review change",
-    });
-  }
-
-  return (
-    <>
-      <section className="on-dark overflow-hidden bg-rosewood text-lime">
-        <div className="mx-auto grid max-w-6xl items-end gap-x-10 gap-y-6 px-5 pb-10 pt-8 sm:px-8 sm:pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-16">
-          <div className="lg:pb-6">
-            <p className="text-lime/75">
-              {project.name}, {project.category.toLowerCase()} on Kanakapura Road
-            </p>
-            <h1 className="display display-xl mt-4">
-              {COUNT_WORDS[Math.min(actions.length, 6)]} waiting for you, {client.firstName}.
-            </h1>
-            <p className="mt-6 max-w-md text-[1.125rem] text-lime/80">
-              The first floor is finished. The second floor and roof slab are under way, and handover is expected in
-              September 2027.
-            </p>
-            {actions.length > 0 && (
-              <a href="#next" className="btn btn-primary mt-8">
-                See what is next
-              </a>
-            )}
-          </div>
-          <HouseElevation builtUpTo={project.builtUpTo} className="h-auto w-full" />
-        </div>
-      </section>
-
-      {/* What decision or payment is due next? */}
-      <section id="next" className="mx-auto max-w-6xl scroll-mt-4 px-5 py-10 sm:px-8 sm:py-16">
-        <h2 className="display display-lg">What needs you next</h2>
-        {actions.length === 0 ? (
-          <p className="mt-5 max-w-xl text-[1.125rem] text-ink-soft">
-            Nothing needs your decision today. We will email you when a drawing, a payment or a change is ready for
-            you.
-          </p>
-        ) : (
-          <ul className="mt-6 border-t border-ink">
-            {actions.map((action) => (
-              <li
-                key={action.key}
-                className="grid gap-x-8 gap-y-3 border-b border-sand py-6 md:grid-cols-[7rem_minmax(0,1fr)_auto] md:items-center"
-              >
-                <p className="text-ink-soft">{action.kind}</p>
-                <div>
-                  <h3 className="text-[1.25rem] font-semibold leading-snug">{action.title}</h3>
-                  <p className="mt-1 max-w-xl text-ink-soft">{action.detail}</p>
-                </div>
-                <div className="flex items-center justify-between gap-6 md:justify-end">
-                  {action.figure && <span className="figure text-[1.5rem]">{action.figure}</span>}
-                  <Link href={action.href} className="btn btn-primary shrink-0">
-                    {action.cta}
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* What have I agreed to? */}
-      <section className="bg-sand-2">
-        <div className="mx-auto grid max-w-6xl gap-x-16 gap-y-8 px-5 py-10 sm:px-8 sm:py-16 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)]">
-          <div>
-            <h2 className="display display-lg">What you have agreed to</h2>
-            <p className="figure mt-8 text-[clamp(2.75rem,6vw,4.25rem)] leading-none">{inr(approvedValue)}</p>
-            <p className="mt-3 max-w-sm text-ink-soft">
-              The approved value of your home, before GST. It began at {inr(project.initialEstimate)} and{" "}
-              {approvedChanges.length === 1 ? "one change has" : `${approvedChanges.length} changes have`} been added
-              since.
-            </p>
-          </div>
-          <dl className="self-end border-t border-ink">
-            <AgreedRow term="Construction agreement" detail={`Signed on ${formatDate(project.agreementSignedOn)}`} value="View" href="/client/payments" />
-            <AgreedRow term="Initial estimate" detail={`${(project.builtUpArea - 150).toLocaleString("en-IN")} sq ft at ${inr(project.ratePerSqFt)} per sq ft`} value={inr(project.initialEstimate)} />
-            {approvedChanges.map((change) => (
-              <AgreedRow
-                key={change.id}
-                term={change.addendum ?? "Addendum"}
-                detail={`${change.title}, approved on ${formatDate(change.decidedOn!)}`}
-                value={inrDelta(change.cost)}
-                href="/client/changes"
-              />
-            ))}
-            <AgreedRow
-              term="Designs"
-              detail={`${approvedDesigns.length} of ${designs.length} drawings and specifications approved`}
-              value="See designs"
-              href="/client/designs"
-            />
-          </dl>
-        </div>
-      </section>
-
-      {/* If I change my mind, what happens? */}
-      <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16">
-        <h2 className="display display-lg">If you change your mind</h2>
-        <p className="mt-4 max-w-2xl text-[1.125rem] text-ink-soft">
-          Every change shows its price and what it does to the schedule before you decide. Nothing is added to your
-          home&rsquo;s value until you approve it.
-        </p>
-        {pendingChanges.length > 0 ? (
-          <div className="mt-8 grid gap-x-12 gap-y-8 border-t border-ink pt-6 md:grid-cols-3">
-            <div>
-              <p className="text-ink-soft">Approved today</p>
-              <p className="figure mt-1 text-[2rem]">{inr(approvedValue)}</p>
-            </div>
-            <div>
-              <p className="text-ink-soft">
-                If you approve {pendingChanges.length === 1 ? "the open change" : `all ${pendingChanges.length} open changes`}
-              </p>
-              <p className="figure mt-1 text-[2rem]">{inr(approvedValue + pendingValue)}</p>
-            </div>
-            <div>
-              <p className="text-ink-soft">Effect on the schedule</p>
-              <p className="figure mt-1 text-[2rem]">{pendingDays} more days</p>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-8 border-t border-ink pt-6">
-            <Status tone="done">No changes are open.</Status> Your approved value is {inr(approvedValue)}.
-          </p>
-        )}
-        <Link href="/client/changes" className="btn btn-quiet mt-8">
-          See all changes
-        </Link>
-      </section>
-
-      {/* Who to talk to */}
-      <section className="border-t border-sand">
-        <div className="mx-auto grid max-w-6xl gap-x-16 gap-y-6 px-5 py-10 sm:px-8 sm:py-14 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)]">
-          <div>
-            <h2 className="display display-md">Who to talk to</h2>
-            <p className="mt-3 max-w-sm text-ink-soft">
-              Start with {contacts[0].name.split(" ")[0]}. She knows your project and brings in the architect or
-              engineer when they are needed.
-            </p>
-          </div>
-          <ol className="border-t border-ink">
-            {contacts.map((contact) => (
-              <li key={contact.name} className="grid gap-x-6 gap-y-1 border-b border-sand py-4 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <div>
-                  <p className="text-ink-soft">{contact.level}</p>
-                  <p className="text-[1.125rem] font-semibold">
-                    {contact.name}, {contact.role.toLowerCase()}
-                  </p>
-                  <p className="text-ink-soft">{contact.responds}</p>
-                </div>
-                <a href={`tel:${contact.phone.replace(/\s/g, "")}`} className="link self-center font-semibold">
-                  {contact.phone}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-    </>
-  );
+function headline(count: number): string {
+  if (count === 0) return `Nothing needs you this week, ${client.firstName}.`;
+  if (count === 1) return `One thing is waiting for you, ${client.firstName}.`;
+  return `${countWord(count, true)} things are waiting for you, ${client.firstName}.`;
 }
 
-function AgreedRow({ term, detail, value, href }: { term: string; detail: string; value: string; href?: string }) {
-  return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 border-b border-sand py-4">
-      <div>
-        <dt className="text-[1.125rem] font-semibold">{term}</dt>
-        <dd className="text-ink-soft">{detail}</dd>
-      </div>
-      <dd className="text-right">
-        {href ? (
-          <Link href={href} className={/^[+₹−]/.test(value) ? "figure text-[1.25rem]" : "link font-semibold"}>
-            {value}
-          </Link>
-        ) : (
-          <span className="figure text-[1.25rem]">{value}</span>
-        )}
-      </dd>
+/** The item as it reads after "the next thing waiting for you:". */
+function itemWords(item: WaitingItem): string {
+  const title = item.title.charAt(0).toLowerCase() + item.title.slice(1);
+  switch (item.kind) {
+    case "stage":
+      // "Accept the first floor structure as finished"
+      return `accepting ${title.replace(/^accept /, "")}`;
+    case "schedule":
+      return `the change to your schedule for milestone ${item.key.split(":")[1]}`;
+    default:
+      return title.startsWith("the ") ? title : `the ${title}`;
+  }
+}
+
+/** The peg's caption: what the one mark at rest stands for. */
+function pegWords(item: WaitingItem | undefined): string {
+  if (!item) return "Nothing is waiting for you. Every brass seal is something you agreed.";
+  return `The brass peg marks the next thing waiting for you: ${itemWords(item)}.`;
+}
+
+function floorWords(label: string, waiting: number, agreed: number): string {
+  const waitingWords =
+    waiting === 0 ? "Nothing is waiting here" : waiting === 1 ? "One thing is waiting here" : `${countWord(waiting, true)} things are waiting here`;
+  const agreedWords = agreed === 0 ? "nothing is agreed yet" : agreed === 1 ? "one is agreed" : `${countWord(agreed)} are agreed`;
+  return `${label}. ${waitingWords} and ${agreedWords}.`;
+}
+
+function tel(phone: string) {
+  return `tel:${phone.replace(/\s/g, "")}`;
+}
+
+export default function ClientHome() {
+  const demo = useDemo();
+  const projection = useProjection();
+  const { waiting, pending } = projection;
+  // The floor the house is open at, and the row under the pointer or the focus.
+  const [focus, setFocus] = useState<StoreyGroup | null>(null);
+  const [pointed, setPointed] = useState<string | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+  // A pointer that was over a row when she left never reports leaving it.
+  useOnHidden(tableRef, () => setPointed(null));
+  // A tall floor note makes the table scroll inside itself. Keeping the room for that
+  // scrollbar from the start means the house does not change size as a floor opens.
+  useLayoutEffect(() => {
+    tableRef.current?.style.setProperty("scrollbar-gutter", "stable");
+  }, []);
+
+  const bands = () => tableRef.current?.getElementsByClassName("band");
+
+  /** Closing from inside the note hands the focus back to the floor it belonged to. */
+  const closeFromNote = () => {
+    const band = focus ? bands()?.[BAND_ORDER.indexOf(focus)] : undefined;
+    if (band instanceof HTMLElement) band.focus({ preventScroll: true });
+    setFocus(null);
+  };
+
+  const point = (anchor: string | null) => {
+    if (anchor === null || besideTheSheets()) setPointed(anchor);
+  };
+
+  const builtUpTo = STOPS[projection.todayStop].builtUpTo;
+  const underWay = STOREYS.find((storey) => storey.id === builtUpTo + 1);
+  const curingDay = daysBetween(site.curing.startedOn, TODAY);
+  const curing = curingDay >= 0 && curingDay <= site.curing.days;
+  const next = waiting[0];
+  const status = `${underWay ? `${underWay.label} walls going up. ` : ""}Handover ${formatDate(projection.handoverAgreed)}.`;
+  const siteNote = `${underWay ? `${underWay.label} going up.` : "On site."}${
+    curing ? ` Slab curing, day ${curingDay} of ${site.curing.days}` : ""
+  }`;
+
+  // At rest the house shows one peg: the next item. A row under the pointer shows its own
+  // peg as well. With a floor open, every peg on that floor shows.
+  const only = focus
+    ? waiting.filter((item) => item.group === focus).map((item) => item.anchor)
+    : next
+      ? [next.anchor]
+      : [];
+  const caption = focus
+    ? floorWords(
+        BANDS[focus].label,
+        waiting.filter((item) => item.group === focus).length,
+        projection.agreed.filter((item) => item.group === focus).length,
+      )
+    : pegWords(next);
+
+  // The newest word from someone on the team, with one photo at most.
+  const latest = projection.posts.find((post) => post.kind === "post" && post.by !== "meera" && post.by !== "arjun");
+  const { during } = projection.credits;
+  const left = Math.max(0, projection.credits.left);
+  const [first, head, office] = contacts;
+  const tried = projection.tried;
+  const triedNames = listWords(tried.map((change) => change.short));
+  // "Would add" reads the same for the jacuzzi and for the larger windows.
+  const pricedLine =
+    pending.length === 0
+      ? null
+      : `${pending.length === 1 ? "One change is" : `${countWord(pending.length, true)} changes are`} priced. ${pending
+          .map(
+            (change) =>
+              `${change.short.charAt(0).toUpperCase()}${change.short.slice(1)} would add ${inr(change.cost)}${
+                change.delayDays > 0 ? ` and ${dayCount(change.delayDays)}` : ""
+              }.`,
+          )
+          .join(" ")}`;
+
+  // From 1024 px the head is the calm first screen beside the house: the answer and one
+  // button, with the first row of what needs her just under it.
+  const top = (
+    <div className="lg:flex lg:min-h-[29rem] lg:flex-col lg:justify-center">
+      <h1 className="display display-xl max-w-[13ch]">{headline(waiting.length)}</h1>
+      <p className="mt-4 max-w-[56ch] text-17 text-lime/85 lg:mt-5">{status}</p>
+      {next && (
+        <Link href={next.href} className="btn btn-primary mt-5 self-start lg:mt-6">
+          {next.cta}
+        </Link>
+      )}
     </div>
+  );
+
+  // The house keeps its place when a floor is opened: the note grows downwards from it,
+  // and from 1024 px the table scrolls inside itself when the note is tall.
+  const table = (
+    <div className="flex flex-col">
+      <House
+        arrival
+        interactive
+        labels
+        scene={{ only, highlight: pointed, markers: "needs-you", note: siteNote, focus }}
+        onFocusChange={setFocus}
+      />
+      <div className="mt-4">
+        <p aria-hidden="true" className="max-w-[58ch] text-17">
+          {caption}
+        </p>
+        <HouseCaption visible={false}>{caption}</HouseCaption>
+      </div>
+      {focus && (
+        <div className="mt-4">
+          <FloorNote key={focus} group={focus} onClose={closeFromNote} />
+        </div>
+      )}
+      {/* The note is what is read while a floor is open, so the legend stands aside for it. */}
+      {!focus && (
+        <div className="mt-2">
+          <HouseLegend
+            show={["built", "paid", "to-come", "line", "peg"]}
+            open={!demo.taught.legend}
+            onDone={demo.taught.legend ? undefined : () => demo.teach("legend")}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <ClientPage head={top} table={table} tableRef={tableRef}>
+      {/* What decision or payment is due next? */}
+      <Sheet id="next" title="What needs you">
+        <WaitingList items={waiting} projection={projection} onPoint={point} />
+      </Sheet>
+
+      {/* What have I agreed to? */}
+      <Sheet title="What you have agreed to" tone="sand">
+        <StruckFigure
+          size="md"
+          agreed={projection.agreedValue}
+          tried={tried.length > 0 ? projection.triedValue : null}
+          note={`with ${triedNames}, not approved`}
+        />
+        <p className="mt-1 max-w-[58ch] text-ink-soft">The approved value of your home, before GST.</p>
+        <Link href="/client/record" className="link mt-3 inline-flex min-h-11 items-center font-semibold">
+          Your agreement and every decision
+        </Link>
+        {pricedLine && (
+          <>
+            <p className="mt-3 max-w-[58ch]">{pricedLine}</p>
+            <Link href="/client/changes" className="link inline-flex min-h-11 items-center">
+              {pending.length === 1 ? "Try it on the house" : "Try them on the house"}
+            </Link>
+          </>
+        )}
+      </Sheet>
+
+      {/* What is happening on site? */}
+      {latest && (
+        <Sheet title="Latest from site">
+          <ThreadPost post={{ ...latest, photos: latest.photos.slice(0, 1) }} />
+          <Link href="/client/updates" className="link mt-4 inline-flex min-h-11 items-center">
+            All updates
+          </Link>
+        </Sheet>
+      )}
+
+      {/* Who to talk to */}
+      <Sheet title="Your team and your hours">
+        <p className="max-w-[58ch]">
+          Start with {first.name}, {first.role.toLowerCase()}.{" "}
+          <a href={tel(first.phone)} className="link inline-flex min-h-11 items-center whitespace-nowrap font-semibold">
+            {first.phone}
+          </a>
+        </p>
+        <ul className="mt-2">
+          {[head, office].map((contact) => (
+            <li key={contact.name} className="flex flex-wrap items-center justify-between gap-x-4">
+              <span className="text-ink-soft">
+                Then {contact === office ? "the director's desk at the office" : `${contact.name}, ${contact.role}`}
+              </span>
+              <a href={tel(contact.phone)} className="link inline-flex min-h-11 items-center whitespace-nowrap">
+                {contact.phone}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-5 max-w-[58ch]">
+          {left} of {during.granted} construction hours left.{projection.credits.low ? " You are running low." : ""}{" "}
+          <Link href="/client/hours" className="link inline-flex min-h-11 items-center">
+            See your hours
+          </Link>
+        </p>
+      </Sheet>
+    </ClientPage>
   );
 }

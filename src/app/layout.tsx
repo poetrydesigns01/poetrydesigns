@@ -8,9 +8,11 @@ const eczar = Eczar({
   weight: ["500", "600"],
 });
 
+// The width axis lets the lettering on the house be set a little narrower.
 const anek = Anek_Latin({
   variable: "--font-anek",
   subsets: ["latin", "latin-ext"],
+  axes: ["wdth"],
 });
 
 export const metadata: Metadata = {

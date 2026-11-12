@@ -1,110 +1,177 @@
 "use client";
 
-import { PageBand, Section, Status } from "@/components/page-band";
-import { contacts, credits } from "@/lib/demo-data";
-import { useDemo } from "@/lib/demo-store";
-import { formatDate, hours } from "@/lib/format";
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { useOnHidden } from "@/components/craft/seal";
+import { FocusTarget, Sheet, useFocusedId } from "@/components/home/sheet";
+import { HoursRule } from "@/components/hours/hours-rule";
+import { ClientPage } from "@/components/page-band";
+import { Chip } from "@/components/register/chips";
+import { usePause } from "@/components/register/recording-pause";
+import { SampleTag } from "@/components/register/sample-tag";
+import { useDemo, useProjection } from "@/lib/demo-store";
+import { formatDate, formatStamp, hours, inr } from "@/lib/format";
+
+// Advisory hours: how many are left, what each session used, and a way to ask for more.
+// Bought hours are added by the office once she has paid, and show here with who added
+// them and when. Nothing on this screen works out a price.
+
+const ASKS = [2, 5, 10];
 
 export default function HoursPage() {
-  const { creditsRequested, requestCredits } = useDemo();
-  const { preConstruction, construction, entries } = credits;
-  const constructionLeft = construction.granted - construction.used;
-  const contact = contacts[0].name.split(" ")[0];
+  const demo = useDemo();
+  const projection = useProjection();
+  const pause = usePause();
+  const focused = useFocusedId();
+  const [asking, setAsking] = useState(false);
+  const [ask, setAsk] = useState(5);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const askRef = useRef<HTMLButtonElement>(null);
+  const sendRef = useRef<HTMLButtonElement>(null);
+  const firstChip = useRef<HTMLButtonElement>(null);
+  const requestRef = useRef<HTMLDivElement>(null);
+  const what = `Your request for ${hours(ask)} more`;
+  const sending = pause.pending !== null && pause.pending.what === what;
+
+  // A half-made request does not wait for her on a screen she has left.
+  useOnHidden(rootRef, () => setAsking(false));
+
+  const { before, during, left, low, requested, added, sessions } = projection.credits;
+  const total = before.granted + during.granted;
+
+  const openAsk = () => {
+    flushSync(() => setAsking(true));
+    firstChip.current?.focus();
+  };
+
+  const closeAsk = () => {
+    if (sending) pause.cancel();
+    flushSync(() => setAsking(false));
+    askRef.current?.focus();
+  };
+
+  const send = () => {
+    if (sending) return;
+    const amount = ask;
+    pause.start({
+      what,
+      origin: sendRef.current,
+      commit: () => {
+        const focusedHere = rootRef.current?.matches(":focus-within") ?? false;
+        flushSync(() => {
+          demo.requestCredits(amount);
+          setAsking(false);
+        });
+        if (focusedHere) requestRef.current?.focus({ preventScroll: true });
+      },
+    });
+  };
+
+  const newestAdded = added[added.length - 1];
+  const focusOnRequest = Boolean(focused?.startsWith("hours:")) && requested !== null;
+  const focusOnAdded = Boolean(focused?.startsWith("hours:")) && !focusOnRequest;
 
   return (
-    <>
-      <PageBand
-        title="Consultation hours"
-        lede="Your home includes 20 hours of one-to-one time with your architect and engineers: 12 before construction and 8 during it. One credit is one hour."
-      />
-
-      <Section title="Where your hours stand">
-        <div className="grid gap-x-16 gap-y-10 border-t border-ink pt-8 md:grid-cols-2">
-          <HoursMeter title="Before construction" granted={preConstruction.granted} used={preConstruction.used} note="This allowance closed when construction began." />
-          <HoursMeter
-            title="During construction"
-            granted={construction.granted}
-            used={construction.used}
-            note="For decisions on site, such as electrical points, plumbing and railings."
-            warn={constructionLeft <= 3}
-          />
-        </div>
-
-        <div className="mt-10 bg-sand-2 p-5 sm:p-7">
-          {creditsRequested ? (
-            <p className="reveal text-[1.125rem]">
-              <Status tone="done">Request sent.</Status> {contact} will confirm the price with you before any hours are
-              added.
+    <div ref={rootRef} className="contents">
+      <ClientPage
+        head={
+          <>
+            <h1 className="display display-xl max-w-[16ch] text-balance">
+              {left > 0 ? `You have ${hours(left)} left of ${total}.` : "Your construction hours are used."}
+            </h1>
+            <p className="mt-4 max-w-[58ch] text-17 text-lime/85">
+              {low ? "You are running low on construction hours, and sessions" : "Sessions"} still go ahead past your
+              allowance.
             </p>
-          ) : (
-            <div className="grid gap-x-10 gap-y-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-              <p className="text-[1.125rem]">
-                <Status tone="due">You have {hours(constructionLeft)} left.</Status> Sessions still go ahead when the
-                allowance runs out, and the extra time is charged separately. You can add hours now.
-              </p>
-              <button type="button" className="btn btn-primary" onClick={requestCredits}>
+            {!requested && !asking && (
+              <button ref={askRef} type="button" className="btn btn-primary mt-5" onClick={openAsk}>
                 Ask for more hours
               </button>
-            </div>
-          )}
-        </div>
-      </Section>
-
-      <div className="bg-sand-2">
-        <Section title="Every session so far">
-          <ul className="border-t border-ink">
-            {entries.map((entry) => (
-              <li
-                key={`${entry.date}-${entry.topic}`}
-                className="grid gap-x-8 gap-y-1 border-b border-sand py-4 md:grid-cols-[8rem_minmax(0,1fr)_12rem_6rem] md:items-baseline"
-              >
-                <p className="text-ink-soft">{formatDate(entry.date)}</p>
-                <p className="font-semibold">{entry.topic}</p>
-                <p className="text-ink-soft">
-                  With {entry.with}
-                  <span className="md:hidden">, {entry.phase.toLowerCase()}</span>
+            )}
+            {!requested && asking && (
+              // The choices sit on paper of their own, so they read as they do everywhere else.
+              <div className="enter-row mt-5 max-w-[30rem] bg-lime p-4 text-ink" role="group" aria-label="Ask for more hours">
+                <p className="font-semibold">How many more hours?</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ASKS.map((option, index) => (
+                    <Chip key={option} ref={index === 0 ? firstChip : undefined} pressed={ask === option} onClick={() => setAsk(option)}>
+                      {hours(option)}
+                    </Chip>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    ref={sendRef}
+                    type="button"
+                    className="btn btn-primary bg-rosewood! text-lime! hover:bg-rosewood-2!"
+                    aria-disabled={sending || undefined} onClick={send}>
+                    Send request
+                  </button>
+                  <button type="button" className="btn btn-quiet bg-sand-2! text-ink! hover:bg-sand!" onClick={closeAsk}>
+                    Go back
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        }
+        table={<HoursRule />}
+      >
+        {requested && (
+          <Sheet title="Your request">
+            <FocusTarget on={focusOnRequest}>
+              <div ref={requestRef} tabIndex={-1} className="outline-offset-4">
+                <p className="max-w-[58ch]">
+                  Asked on {requested.at.length > 10 ? formatStamp(requested.at) : formatDate(requested.at)} for{" "}
+                  {requested.hours} more {requested.hours === 1 ? "hour" : "hours"}. Rohan Menon will call you with the price. Once you have paid, he adds them
+                  here and you see who added them and when.
                 </p>
-                <p className="figure text-[1.125rem] md:text-right">{hours(entry.hours)}</p>
+              </div>
+            </FocusTarget>
+          </Sheet>
+        )}
+
+        <Sheet title="Hours added">
+          {added.length === 0 ? (
+            <p className="max-w-[58ch] text-ink-soft">No hours have been added yet.</p>
+          ) : (
+            <ul className="sheet-rows">
+              {added.map((addition, index) => (
+                <li key={addition.id}>
+                  <FocusTarget on={focusOnAdded && addition === newestAdded}>
+                    <p className="flex flex-wrap items-baseline justify-between gap-x-4">
+                      <span className="font-semibold">
+                        {hours(addition.hours)} for {addition.pool === "during" ? "construction" : "before construction"}
+                      </span>
+                      <span className="figure">{inr(addition.amount)}</span>
+                    </p>
+                    <p className="max-w-[58ch] text-ink-soft">
+                      Paid on {formatDate(addition.receivedOn)}, reference {addition.reference}, before GST.{" "}
+                      {index === 0 && <SampleTag>Sample price</SampleTag>}
+                    </p>
+                  </FocusTarget>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Sheet>
+
+        <Sheet title="Every session so far" tone="sand">
+          <ul className="sheet-rows">
+            {sessions.map((session) => (
+              <li key={session.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4">
+                <span className="min-w-0">
+                  <span className="block font-semibold leading-snug">{session.topic}</span>
+                  <span className="block text-ink-soft">
+                    {formatDate(session.date)}, with {session.with}
+                  </span>
+                </span>
+                <span className="figure">{hours(session.hours)}</span>
               </li>
             ))}
           </ul>
-        </Section>
-      </div>
-    </>
-  );
-}
-
-/** One block per credit, so the allowance can be counted at a glance. */
-function HoursMeter({ title, granted, used, note, warn }: { title: string; granted: number; used: number; note: string; warn?: boolean }) {
-  const left = granted - used;
-
-  return (
-    <div>
-      <h3 className="text-[1.125rem] font-semibold">{title}</h3>
-      <p className="mt-2">
-        <span className="figure text-[2.75rem] leading-none">{left}</span>
-        <span className="text-ink-soft"> of {granted} hours left</span>
-      </p>
-      <div
-        className="mt-4 flex gap-1"
-        role="img"
-        aria-label={`${used} of ${granted} hours used, ${left} left`}
-      >
-        {Array.from({ length: granted }, (_, index) => {
-          const fill = Math.max(0, Math.min(1, used - index));
-          return (
-            <span key={index} className="relative h-9 flex-1 overflow-hidden border border-ink/50">
-              <span
-                className={`absolute inset-y-0 left-0 ${warn ? "bg-brass" : "bg-rosewood"}`}
-                style={{ width: `${fill * 100}%` }}
-              />
-            </span>
-          );
-        })}
-      </div>
-      <p className="mt-3 text-ink-soft">
-        {hours(used)} used. {note}
-      </p>
+        </Sheet>
+      </ClientPage>
     </div>
   );
 }
