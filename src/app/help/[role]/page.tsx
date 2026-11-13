@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { SignInOrOut } from "@/components/sign-out";
 import { GUIDE_ROLES, GUIDES, isGuideRole, type Guide } from "@/components/guides/guide-data";
+import { OpenStep } from "@/components/guides/open-step";
 import { countWord } from "@/lib/format";
 
 // One role's guide: three to five numbered steps, each with the screen it happens on.
@@ -54,10 +56,14 @@ function GuideSteps({ guide }: { guide: Guide }) {
                   {step.text}
                 </p>
                 <p className="mt-1 max-w-[52ch] text-15 text-ink-soft">{step.how}</p>
-                <Link href={step.href} className="link mt-1 inline-flex min-h-11 items-center text-15 font-semibold">
+                <OpenStep
+                  role={guide.role}
+                  href={step.href}
+                  className="link mt-1 inline-flex min-h-11 items-center text-15 font-semibold"
+                >
                   Open this screen
                   <span className="sr-only"> for step {i + 1}</span>
-                </Link>
+                </OpenStep>
               </div>
             </li>
           ))}
@@ -65,14 +71,12 @@ function GuideSteps({ guide }: { guide: Guide }) {
 
         <ul className="mt-12 flex flex-wrap gap-x-6 text-15">
           <li>
-            <Link href={guide.home.href} className="link inline-flex min-h-11 items-center">
+            <OpenStep role={guide.role} href={guide.home.href} className="link inline-flex min-h-11 items-center">
               {guide.home.label}
-            </Link>
+            </OpenStep>
           </li>
           <li>
-            <Link href="/" className="link inline-flex min-h-11 items-center">
-              Switch person
-            </Link>
+            <SignInOrOut className="link inline-flex min-h-11 items-center" />
           </li>
         </ul>
       </div>

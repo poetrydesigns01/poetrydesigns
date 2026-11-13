@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from "react";
+import { SignOutButton } from "@/components/sign-out";
 import { useDemo, useProjection } from "@/lib/demo-store";
 import { countWord } from "@/lib/format";
 
@@ -111,15 +112,17 @@ function HouseChip({ cottage }: { cottage: boolean }) {
   );
 }
 
-/** Her name, holding what used to be places of their own. */
+/** Her name, holding what used to be places of their own, and the way out. */
 function NameMenu() {
   const ref = useRef<HTMLDetailsElement>(null);
+  const { session } = useDemo();
   const links = [
     { href: "/client/hours", label: "Your hours" },
     { href: "/client/record", label: "Your agreement and every decision" },
     { href: "/help/client", label: "Guide for this screen" },
-    { href: "/", label: "Switch person" },
   ];
+  // Staff who used "See it as" are still signed in as themselves.
+  const other = session && session.role !== "client" ? session.name : null;
 
   return (
     <details ref={ref} className="relative shrink-0" onKeyDown={closeOnEscape}>
@@ -142,6 +145,13 @@ function NameMenu() {
             </Link>
           </li>
         ))}
+        <li className="mt-1 border-t border-sand pt-1">
+          {other && <p className="px-4 pt-2 text-15 text-ink-soft">Signed in as {other}</p>}
+          <SignOutButton
+            className="flex min-h-11 w-full items-center px-4 text-left text-17 hover:bg-sand-2"
+            onDone={() => close(ref)}
+          />
+        </li>
       </ul>
     </details>
   );

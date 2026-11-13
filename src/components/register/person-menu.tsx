@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLayoutEffect, useRef, type KeyboardEvent } from "react";
+import { SignOutButton } from "@/components/sign-out";
 import { useDemo, useFirm } from "@/lib/demo-store";
 import type { Firm } from "@/lib/firm";
 import { ROLE_PEOPLE, type Person, type PersonId, type StaffRole } from "@/lib/firm-data";
@@ -9,7 +10,8 @@ import { viewerIdOf } from "./project-switch";
 
 // Who you are on this screen, and in the demo, who else you could be. In the rail it opens
 // from the person block; on a phone, from the initials button in the board. Choosing the
-// other person for the role changes the page in place, with no navigation.
+// other person for the role changes the page in place, with no navigation; it changes who
+// is viewed, not who signed in.
 
 /** "Senior architect, Project Head": the title, and the Project Head flag when it holds. */
 export function personTitle(person: Person, firm: Firm): string {
@@ -55,6 +57,9 @@ export function PersonMenu({ role, variant = "button" }: { role: StaffRole; vari
 
   if (!person) return null;
 
+  // The switch above and "See it as" change who is viewed; the session stays whoever signed in.
+  const signedInAs = demo.session && demo.session.name !== person.name ? demo.session.name : null;
+
   const close = (focus: boolean) => {
     if (ref.current) ref.current.open = false;
     if (focus) summaryRef.current?.focus();
@@ -86,26 +91,24 @@ export function PersonMenu({ role, variant = "button" }: { role: StaffRole; vari
     >
       <p className="px-2 text-15">
         You are {person.name}, {titleWords(person, firm)}.
+        {signedInAs && <span className="block text-ink-soft">Signed in as {signedInAs}.</span>}
       </p>
-      <div role="group" aria-labelledby={`demo-${role}-${variant}`}>
-        <p id={`demo-${role}-${variant}`} className="lettering px-2 text-ink-soft">
-          Demo: see the portal as someone else
-        </p>
-        <ul className="mt-1">
-          {others.map((other) => (
-            <li key={other.id}>
-              <button type="button" className={item} onClick={() => become(other.id)}>
-                {other.name}, {titleWords(other, firm)}
-              </button>
-            </li>
-          ))}
-          <li>
-            <Link href="/" className={item} onNavigate={() => close(false)}>
-              Pick another role
-            </Link>
-          </li>
-        </ul>
-      </div>
+      {others.length > 0 && (
+        <div role="group" aria-labelledby={`demo-${role}-${variant}`}>
+          <p id={`demo-${role}-${variant}`} className="lettering px-2 text-ink-soft">
+            Demo: see the portal as someone else
+          </p>
+          <ul className="mt-1">
+            {others.map((other) => (
+              <li key={other.id}>
+                <button type="button" className={item} onClick={() => become(other.id)}>
+                  {other.name}, {titleWords(other, firm)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <ul className="border-t border-sand pt-2">
         <li>
           <Link href={`/help/${role}`} className={item} onNavigate={() => close(false)}>
@@ -113,9 +116,7 @@ export function PersonMenu({ role, variant = "button" }: { role: StaffRole; vari
           </Link>
         </li>
         <li>
-          <Link href="/" className={item} onNavigate={() => close(false)}>
-            Switch person
-          </Link>
+          <SignOutButton className={item} onDone={() => close(false)} />
         </li>
       </ul>
     </div>

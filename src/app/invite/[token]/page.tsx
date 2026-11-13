@@ -1,11 +1,11 @@
-import Form from "next/form";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { SampleTag } from "@/components/register/sample-tag";
+import { InviteForm } from "./invite-form";
 
-// Accepting an invite, front end only. The client sets a password and opens their home.
-// Nothing typed here is checked, kept or sent: the fields have no names.
+// Accepting an invite, front end only. The client sets a password and opens their home,
+// signed in. Nothing typed here is checked, kept or sent: the fields have no names.
 
 const INVITES: Record<string, { by: string; project: string; clients: string; opens: string }> = {
   "iyer-residence": {
@@ -15,9 +15,6 @@ const INVITES: Record<string, { by: string; project: string; clients: string; op
     opens: "/client",
   },
 };
-
-const input =
-  "block min-h-12 w-full rounded-[3px] border-0 bg-lime px-3 text-17 text-ink placeholder:text-ink-soft";
 
 export function generateStaticParams() {
   return Object.keys(INVITES).map((token) => ({ token }));
@@ -48,26 +45,10 @@ async function InviteFromParams({ params }: { params: Promise<{ token: string }>
       </h1>
       <p className="mt-3 text-17 text-lime/80">Set a password to open your home.</p>
 
-      <Form action={invite.opens} className="mt-6 grid max-w-md gap-5" autoComplete="off">
-        <div>
-          <label htmlFor="invite-password" className="block text-17 font-semibold">
-            Choose a password
-          </label>
-          <input id="invite-password" type="password" className={`${input} mt-1.5`} />
-        </div>
-        <div>
-          <label htmlFor="invite-again" className="block text-17 font-semibold">
-            Type it again
-          </label>
-          <input id="invite-again" type="password" className={`${input} mt-1.5`} />
-        </div>
-        <button type="submit" className="btn btn-primary mt-1 w-full sm:w-auto sm:justify-self-start">
-          Open your home
-        </button>
-      </Form>
+      <InviteForm opens={invite.opens} />
 
       <p className="mt-8 text-17 text-lime/80">
-        <SampleTag>Demo only</SampleTag> Nothing is checked. Opening your home takes you to Meera&apos;s screens.
+        <SampleTag>Demo only</SampleTag> Nothing is checked. Opening your home signs you in as Meera.
       </p>
     </div>
   );

@@ -11,7 +11,25 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 and pick a person.
+Open http://localhost:3000 and sign in with one of the demo accounts below.
+
+## Demo accounts
+
+Each role's screens open by signing in on the first screen. These accounts are for the demo only: they are checked in the browser against a list in `src/lib/demo-accounts.ts`, so they are not real security. IDs are not case-sensitive and may be typed with `@poetrydesigns.in` after them; passwords are case-sensitive.
+
+| ID | Password | Person | Role | Opens |
+|---|---|---|---|---|
+| `meera.iyer` | `Meera@2026` | Meera Iyer | Client (homeowner) | `/client` |
+| `rohan.menon` | `Rohan@2026` | Rohan Menon | Business development | `/staff/bd` |
+| `vikram.desai` | `Vikram@2026` | Vikram Desai | Senior architect, Project Head | `/staff/architect` |
+| `ananya.rao` | `Ananya@2026` | Ananya Rao | Junior architect | `/staff/architect` |
+| `suresh.gowda` | `Suresh@2026` | Suresh Gowda | Site engineer | `/staff/site` |
+| `manjunath.k` | `Manjunath@2026` | Manjunath K | Junior site engineer | `/staff/site` |
+| `prakash.hegde` | `Prakash@2026` | Prakash Hegde | Procurement lead | `/staff/finance` |
+| `divya.shenoy` | `Divya@2026` | Divya Shenoy | Accountant | `/staff/finance` |
+| `shalini.murthy` | `Shalini@2026` | Shalini Murthy | Operations head and admin | `/staff/admin` |
+
+Every client and staff screen needs a signed-in session; without one it returns to the sign-in screen. "Sign out" is in each person's menu. The session lasts for the browser tab, and signing out keeps what was done in the demo.
 
 ## What the demo shows
 

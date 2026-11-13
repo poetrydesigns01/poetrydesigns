@@ -735,6 +735,7 @@ const START: DemoState = {
   focusRow: null,
   taught: { legend: false, hold: false },
   offline: false,
+  session: null,
 };
 
 /** Appends events the way the store does, at fixed times, so the checks are pure. */

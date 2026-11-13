@@ -2,6 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import { stampNow } from "./clock";
+import type { DemoAccount } from "./demo-accounts";
 import { milestones, TODAY, type ChangeStatus, type DesignStatus } from "./demo-data";
 import { deriveFirm, type Firm } from "./firm";
 import {
@@ -41,7 +42,14 @@ export type DemoState = {
   taught: { legend: boolean; hold: boolean };
   /** The "no signal" demo toggle on the site engineer's phone. */
   offline: boolean;
+  /**
+   * Who signed in on the first screen, with a demo account. It decides only whether the
+   * portal opens: "See it as" and the person switch change who is viewed, not this.
+   */
+  session: DemoSession | null;
 };
+
+export type DemoSession = { id: string; role: DemoAccount["role"]; name: string };
 
 const initialState: DemoState = {
   designDecisions: {},
@@ -57,6 +65,7 @@ const initialState: DemoState = {
   focusRow: null,
   taught: { legend: false, hold: false },
   offline: false,
+  session: null,
 };
 
 export const DEMO_STORAGE_KEY = "poetry-demo-state";
@@ -201,6 +210,27 @@ export function useDemo() {
     /** Records one staff event: called from a handler or the pause timer, never from render. */
     record: (event: NewEvent) => write(applyEvent(read(), event, stampNow())),
 
+    // ---- Signing in ----
+    /** Opens the portal as an account: one write sets the session, who is viewed and the staff role. */
+    signIn: (account: DemoAccount) => {
+      const now = read();
+      const { role, person } = account;
+      const viewers =
+        role === "architect" || role === "site" || role === "finance"
+          ? ({ ...now.viewers, [role]: person } as DemoState["viewers"])
+          : now.viewers;
+      write({
+        ...now,
+        session: { id: account.id, role, name: account.name },
+        viewers,
+        lastRole: role === "client" ? now.lastRole : role,
+      });
+    },
+    /** Closes the portal. Everything done in the tab is kept for the next person to sign in. */
+    signOut: () => {
+      if (read().session) write({ ...read(), session: null });
+    },
+
     // ---- UI state ----
     setViewer: <R extends keyof DemoState["viewers"]>(role: R, person: DemoState["viewers"][R]) =>
       write({ ...read(), viewers: { ...read().viewers, [role]: person } }),
@@ -235,7 +265,7 @@ export function getDemoSnapshot(): DemoState {
   return typeof window === "undefined" ? initialState : read();
 }
 
-/** Clears everything done in this tab (events, viewers, scope, lessons and the no-signal toggle). */
+/** Clears everything done in this tab (events, viewers, scope, lessons, the no-signal toggle and the session). */
 export function resetDemo(): void {
   try {
     window.sessionStorage.removeItem(storageKey);

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { Settle } from "@/components/settle";
+import { SignOutButton } from "@/components/sign-out";
 import { useDemo, useFirm } from "@/lib/demo-store";
 import type { StaffRole } from "@/lib/firm-data";
 import { countWord } from "@/lib/format";
@@ -119,7 +120,7 @@ function Count({ n, ring }: { n: number; ring: "rail-count" | "tab-count" }) {
   );
 }
 
-/** The "More" tab on a phone: the places that did not fit, the guide and the way out. */
+/** The "More" tab on a phone: the places that did not fit, the guide and signing out. */
 function MoreSheet({ places, role, active }: { places: Place[]; role: StaffRole; active: string | null }) {
   const ref = useRef<HTMLDetailsElement>(null);
   const summaryRef = useRef<HTMLElement>(null);
@@ -178,9 +179,7 @@ function MoreSheet({ places, role, active }: { places: Place[]; role: StaffRole;
             </Link>
           </li>
           <li>
-            <Link href="/" className={item} onNavigate={close}>
-              Switch person
-            </Link>
+            <SignOutButton className={`${item} w-full text-left`} onDone={close} />
           </li>
         </ul>
       </div>
@@ -268,9 +267,7 @@ export function StaffShell({ children }: { children: ReactNode }) {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/" className="link inline-flex min-h-11 items-center text-ink-soft">
-                    Switch person
-                  </Link>
+                  <SignOutButton className="link inline-flex min-h-11 items-center text-ink-soft" />
                 </li>
               </ul>
             </aside>

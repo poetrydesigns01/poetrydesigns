@@ -48,7 +48,7 @@ export default function GuidesPage() {
 
         <p className="mt-10 text-15">
           <Link href="/" className="link inline-flex min-h-11 items-center">
-            Back to the person picker
+            Back to sign in
           </Link>
         </p>
       </div>

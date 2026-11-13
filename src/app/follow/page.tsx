@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ChalkTick } from "@/components/staff/chalk-tick";
+import { ACCOUNTS } from "@/lib/demo-accounts";
 import { useDemo, useFirm, type DemoState, type FirmEvent } from "@/lib/demo-store";
 import type { StaffRole } from "@/lib/firm-data";
 import { datePart, formatShortDate, formatTime, inr } from "@/lib/format";
@@ -49,6 +50,13 @@ function StepRow({ n, step, turn }: { n: number; step: Step; turn: boolean }) {
 
   const open = (o: Open) => {
     const as = o.as;
+    // Opening a step signs a visitor in as the person whose step it is; the screens behind
+    // these links open only for someone signed in. Someone already signed in stays so.
+    if (!demo.session) {
+      const person = "person" in as ? as.person : as.role === "client" ? "meera" : as.role === "bd" ? "rohan" : "shalini";
+      const account = ACCOUNTS.find((a) => a.person === person);
+      if (account) demo.signIn(account);
+    }
     if (as.role === "architect") demo.setViewer("architect", as.person);
     if (as.role === "site") demo.setViewer("site", as.person);
     if (as.role === "finance") demo.setViewer("finance", as.person);
@@ -239,7 +247,8 @@ export default function Follow() {
           </Link>
           <h1 className="display mt-8 text-32 sm:mt-12">Follow one thing through the portal</h1>
           <p className="mt-3 max-w-[52ch] text-15 text-lime/80">
-            Each step opens the screen of the person whose turn it is.
+            Each step opens the screen of the person whose turn it is. If no one is signed in, opening a step
+            signs you in as that person.
           </p>
         </div>
       </header>
@@ -248,7 +257,7 @@ export default function Follow() {
         <Sheet title="One material request, from site to delivery" steps={material} />
         <p className="text-15 text-ink-soft">
           <Link href="/" className="link inline-flex min-h-11 items-center">
-            Pick a person
+            Back to sign in
           </Link>
         </p>
       </div>

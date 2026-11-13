@@ -1,0 +1,2092 @@
+/* The sign-in page: a laterite site at dusk beside the site board. Markup is in
+   components/login. Everything that reaches into the house is scoped under .login-stage.
+   Only transform and opacity move, apart from a few short stroke draws on single paths. */
+
+/* ---- The page ---- */
+
+.login {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  overflow-x: clip;
+  background: var(--color-rosewood);
+  color: var(--color-lime);
+  scroll-padding-bottom: 1rem;
+}
+
+.lg-scene {
+  position: relative;
+  height: min(53.2vw, 34svh);
+  overflow: hidden;
+  background: var(--color-rosewood);
+}
+
+.lg-stage-box {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.lg-head {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.lg-head :is(a, button) {
+  pointer-events: auto;
+}
+
+.lg-wordmark {
+  line-height: 1.1;
+}
+
+.lg-hero,
+.lg-sub,
+.lg-caption-slot {
+  display: none;
+}
+
+.lg-tag {
+  position: absolute;
+  left: 16px;
+  bottom: 8px;
+  z-index: 2;
+  padding: 4px 8px;
+  border-radius: 2px;
+  background: var(--color-rosewood);
+  color: var(--color-chalk);
+}
+
+.lg-band {
+  height: 8px;
+  background-color: var(--color-rosewood-2);
+  background-image: var(--tex-earth);
+}
+
+.lg-board-col {
+  flex: 1 0 auto;
+  background: var(--color-lime);
+  color: var(--color-ink);
+}
+
+.lg-post {
+  display: none;
+}
+
+.lg-foot {
+  display: grid;
+  gap: 4px;
+  padding: 16px 16px 24px;
+  background-color: var(--color-rosewood-2);
+  background-image: var(--tex-earth);
+  color: rgb(250 248 245 / 0.8);
+}
+
+.lg-foot p {
+  max-width: 52ch;
+}
+
+@media (max-width: 639.98px) and (max-height: 620px) {
+  .lg-scene {
+    height: 120px;
+  }
+
+  .lg-h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .lg-board-head {
+    min-height: 0;
+  }
+
+  .lg-board-head .sample-tag {
+    margin-left: auto;
+  }
+
+  .lg-roles {
+    margin-top: 8px;
+  }
+}
+
+/* Tablet: the stage is a band of its own, with the board as the earth under it. */
+@media (min-width: 640px) {
+  .lg-scene {
+    height: auto;
+    display: flex;
+    justify-content: center;
+  }
+
+  .lg-stage-box {
+    position: relative;
+    width: min(100%, 680px);
+  }
+
+  .lg-head {
+    right: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .lg-hero {
+    display: block;
+    margin-top: 6px;
+    font-size: var(--text-32);
+    line-height: 1.12;
+  }
+
+  .lg-caption-slot {
+    display: block;
+    max-width: 240px;
+    padding: 8px 10px;
+    border-radius: 2px;
+    background: rgb(42 26 18 / 0.85);
+  }
+
+  .lg-tag {
+    display: none;
+  }
+
+  .lg-band {
+    height: 16px;
+  }
+
+  .lg-foot {
+    justify-items: center;
+    text-align: center;
+  }
+}
+
+/* Desktop: the site on the left, the board standing on teak posts on the right, one ground. */
+@media (min-width: 1024px) {
+  .login {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 520px);
+    grid-template-rows: minmax(0, 1fr) 64px;
+    min-height: 100svh;
+    overflow-x: clip;
+  }
+
+  .lg-scene {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: block;
+    overflow: visible;
+    background: none;
+  }
+
+  /* The words stand as one block in the room left of the board, on the same 48 px
+     gutter as the board on the right, with an even 24 / 12 / 32 rhythm inside. */
+  .lg-head {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    display: grid;
+    justify-items: start;
+    width: calc(100% - 520px);
+    max-width: 640px;
+    padding: 48px 32px 0 48px;
+  }
+
+  /* The brand, then the promise under it: one lockup, not a heading over a paragraph. */
+  .lg-wordmark {
+    font-size: var(--text-32);
+    line-height: 1;
+    letter-spacing: 0.005em;
+  }
+
+  .lg-wordmark::after {
+    content: "";
+    display: block;
+    width: 56px;
+    height: 2px;
+    margin-top: 20px;
+    background: var(--color-laterite);
+  }
+
+  .lg-hero {
+    max-width: 14ch;
+    margin-top: 24px;
+    font-size: clamp(2.75rem, 4.6vw, 4.25rem);
+    line-height: 1.02;
+    text-wrap: balance;
+  }
+
+  .lg-sub {
+    display: block;
+    max-width: 40ch;
+    margin-top: 16px;
+    color: rgb(250 248 245 / 0.8);
+    text-wrap: pretty;
+  }
+
+  /* The chosen role, set off as a short note under a laterite rule, not loose text. */
+  .lg-caption-slot {
+    width: 100%;
+    max-width: 40ch;
+    margin-top: 40px;
+    padding: 2px 0 2px 16px;
+    border-left: 2px solid var(--color-laterite);
+    background: none;
+  }
+
+  .lg-caption .lg-people {
+    margin-top: 8px;
+  }
+
+  /* The stage stands on the ground band, centred in the room left of the board. */
+  .lg-stage-box {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: max(520px, min(100% - 520px - 64px, 1100px, (100svh - 64px - 340px) * 1000 / 532));
+    margin-left: max(32px, calc((100% - 520px - max(520px, min(100% - 520px - 64px, 1100px, (100svh - 64px - 340px) * 1000 / 532))) / 2));
+  }
+
+  .lg-band {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    height: auto;
+  }
+
+  .lg-board-col {
+    grid-column: 2;
+    grid-row: 1;
+    position: relative;
+    z-index: 3;
+    display: flex;
+    align-items: safe flex-end;
+    justify-content: flex-end;
+    padding-right: 48px;
+    background: none;
+  }
+
+  .lg-board-wrap {
+    --post-h: max(40px, calc((100svh - 64px - 634px) / 2));
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    padding-bottom: var(--post-h);
+  }
+
+  .login-board {
+    border: 1.5px solid var(--color-rosewood);
+    border-radius: 3px;
+  }
+
+  .lg-post {
+    display: block;
+    position: absolute;
+    bottom: 0;
+    width: 12px;
+    height: var(--post-h);
+    background: var(--tex-teak);
+  }
+
+  .lg-post:nth-of-type(1) {
+    left: calc(18% - 6px);
+  }
+
+  .lg-post:nth-of-type(2) {
+    left: calc(82% - 6px);
+  }
+
+  .lg-foot {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-items: start;
+    gap: 8px 24px;
+    padding: 0 32px;
+    background: none;
+    text-align: left;
+  }
+
+  .lg-foot p {
+    max-width: none;
+  }
+}
+
+@media (min-width: 1600px) {
+  .lg-head {
+    padding: 64px 32px 0 64px;
+  }
+
+  .lg-board-col {
+    padding-right: 64px;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 820px) {
+  .lg-head {
+    padding-top: 40px;
+  }
+
+  .lg-hero {
+    margin-top: 20px;
+    font-size: clamp(2.5rem, 4vw, 3.25rem);
+    line-height: 1.04;
+  }
+
+  .lg-caption-slot {
+    margin-top: 32px;
+  }
+
+  /* The sample drawing would reach down into the site; the sentence and names stay. */
+  .lg-instrument {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 680px) {
+  .lg-hero,
+  .lg-sub {
+    display: none;
+  }
+}
+
+/* ---- The board ---- */
+
+.login-board {
+  position: relative;
+  padding: 16px 16px 24px;
+  background: var(--color-lime);
+  color: var(--color-ink);
+}
+
+.login-board :focus-visible {
+  outline-color: var(--color-brass);
+}
+
+@media (min-width: 640px) {
+  .login-board {
+    max-width: 480px;
+    margin-inline: auto;
+    padding: 24px 24px 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .login-board {
+    max-width: none;
+    padding: 32px;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 800px) {
+  .login-board {
+    padding: 24px;
+  }
+}
+
+.lg-board-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.lg-roles {
+  min-width: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.lg-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.lg-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .lg-roles {
+    margin-top: 16px;
+  }
+
+  .lg-legend {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    margin-bottom: 8px;
+    padding: 0;
+  }
+
+  .lg-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.role-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 44px;
+  padding: 5px 4px;
+  border-radius: 3px;
+  background: var(--color-sand-2);
+  color: var(--color-ink);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur-tap) var(--ease-lime),
+    color var(--dur-tap) var(--ease-lime),
+    transform var(--dur-tap) var(--ease-lime),
+    outline-color var(--dur-tap) var(--ease-lime);
+}
+
+.lg-tile-label {
+  font-size: var(--text-13);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .role-tile {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+    min-height: 48px;
+    padding: 6px 12px;
+  }
+
+  .lg-tile-label {
+    font-size: var(--text-15);
+    text-align: left;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 800px) {
+  .role-tile {
+    min-height: 44px;
+  }
+}
+
+.role-tile:has(:checked) {
+  background: var(--color-rosewood);
+  color: var(--color-lime);
+}
+
+.role-tile:has(:focus-visible) {
+  outline: 2px solid var(--color-brass);
+  outline-offset: 2px;
+}
+
+.role-tile[data-prefix] {
+  outline: 1.5px solid var(--color-rosewood);
+  outline-offset: 0;
+}
+
+.role-tile:has(:disabled) {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.role-glyph {
+  display: block;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  overflow: visible;
+}
+
+.role-glyph-peg svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  vertical-align: top;
+}
+
+@media (min-width: 640px) {
+  .role-glyph,
+  .role-glyph-peg svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.role-glyph .rg-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+.role-glyph .rg-solid {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+
+.role-glyph .rg-fill {
+  fill: currentColor;
+  stroke: var(--color-sand-2);
+  stroke-width: 0.6;
+}
+
+.role-tile:has(:checked) .rg-fill {
+  stroke: var(--color-rosewood);
+}
+
+.role-tile .rg-move {
+  transition: transform var(--dur-tap) var(--ease-lime);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .role-tile:hover {
+    transform: translateY(-2px);
+  }
+
+  .role-tile[data-role="client"]:hover .rg-move {
+    transform: translateY(-2px);
+  }
+
+  .role-tile[data-role="site"]:hover .rg-move,
+  .role-tile[data-role="admin"]:hover .rg-move {
+    transform: translateY(3px);
+  }
+
+  .role-tile[data-role="bd"]:hover .rg-move,
+  .role-tile[data-role="finance"]:hover .rg-move,
+  .role-tile[data-role="architect"]:hover .rg-move {
+    transform: translateY(2px);
+  }
+}
+
+.field-row {
+  margin-top: 14px;
+}
+
+.lg-password-row {
+  margin-top: 6px;
+}
+
+@media (min-width: 640px) {
+  .field-row {
+    margin-top: 16px;
+  }
+
+  .lg-password-row {
+    margin-top: 6px;
+  }
+}
+
+.lg-label {
+  display: block;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.lg-input {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid var(--color-rosewood);
+  border-radius: 2px 2px 0 0;
+  background: var(--color-sand-2);
+  color: var(--color-ink);
+  font-size: var(--text-17);
+  line-height: 1.4;
+}
+
+.lg-input::placeholder {
+  color: var(--color-ink-soft);
+  opacity: 1;
+}
+
+.lg-input:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: 2px;
+}
+
+.lg-input[aria-invalid="true"] {
+  border-bottom-color: var(--color-brick);
+}
+
+.lg-input:-webkit-autofill,
+.lg-input:-webkit-autofill:hover,
+.lg-input:-webkit-autofill:focus {
+  box-shadow: inset 0 0 0 100px var(--color-sand-2);
+  -webkit-text-fill-color: var(--color-ink);
+  caret-color: var(--color-ink);
+}
+
+.lg-input-password {
+  padding-right: 56px;
+}
+
+.lg-show {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 44px;
+  height: 48px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lg-show:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.lg-status {
+  min-height: 22px;
+  margin-top: 2px;
+  color: var(--color-ink-soft);
+  line-height: 1.45;
+}
+
+.lg-status[data-error] {
+  color: var(--color-brick);
+}
+
+/* The board stands on its posts, so a message that wraps must not lift the fields above it:
+   each slot keeps room for two lines. */
+@media (min-width: 1024px) {
+  .lg-status {
+    min-height: 44px;
+  }
+
+  .lg-password-row {
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 800px) {
+  .lg-board-wrap {
+    --post-h: max(24px, calc((100svh - 64px - 680px) / 2));
+  }
+}
+
+.lg-submit {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 8px;
+}
+
+.lg-title-block {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  height: 36px;
+  margin-top: 16px;
+  border-block: 1px solid rgb(42 26 18 / 0.3);
+  color: var(--color-ink-soft);
+}
+
+.lg-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.lg-cell:first-child {
+  padding-left: 0;
+}
+
+.lg-cell + .lg-cell {
+  border-left: 1px solid rgb(42 26 18 / 0.3);
+}
+
+.lg-rev {
+  display: inline-block;
+  height: 1.25em;
+  overflow: hidden;
+  line-height: 1.25em;
+  vertical-align: bottom;
+}
+
+.lg-rev-col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The stamp lands over the right half of the strip at topping out. */
+.lg-stamp {
+  position: absolute;
+  right: 6px;
+  top: -6px;
+  opacity: 0;
+  pointer-events: none;
+  transform: rotate(-4deg);
+}
+
+.lg-kota {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 44px;
+  border: 3px double var(--color-kota);
+  border-radius: 6px;
+  background: rgb(250 248 245 / 0.9);
+  color: var(--color-kota);
+  line-height: 1;
+}
+
+.lg-kota-word {
+  line-height: 1;
+}
+
+.lg-stamp[data-kind="seal"] {
+  top: -8px;
+  right: 24px;
+}
+
+.lg-seal {
+  display: block;
+  width: 48px;
+  height: 48px;
+  overflow: visible;
+}
+
+/* ---- Layouts that reshape the board; after its own rules, so they win ---- */
+
+/* A short laptop window: the board tightens so it stands whole on its posts. */
+@media (min-width: 1024px) and (max-height: 740px) {
+  .lg-h1,
+  .lg-legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .lg-board-head {
+    min-height: 0;
+  }
+
+  .lg-board-head .sample-tag {
+    margin-left: auto;
+  }
+
+  .lg-roles {
+    margin-top: 8px;
+  }
+
+  .lg-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .lg-status {
+    min-height: 22px;
+  }
+
+  .lg-board-wrap {
+    --post-h: 16px;
+  }
+
+  .login-board {
+    padding: 16px 24px;
+  }
+}
+
+/* A phone on its side: the site stands behind the board, quietly, and the board turns into
+   two columns, who on the left and the fields on the right, so Sign in is above the fold. */
+@media (max-width: 1023.98px) and (max-height: 500px) and (orientation: landscape) {
+  .lg-scene {
+    position: fixed;
+    inset: 0;
+    height: auto;
+    opacity: 0.35;
+  }
+
+  .lg-head,
+  .lg-tag,
+  .lg-band {
+    display: none;
+  }
+
+  .lg-board-col {
+    position: relative;
+    z-index: 1;
+    padding: 8px 16px;
+    background: none;
+  }
+
+  .login-board {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto auto auto;
+    column-gap: 24px;
+    max-width: 720px;
+    margin-inline: auto;
+    padding: 16px;
+    border-radius: 3px;
+  }
+
+  .lg-board-head {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 0;
+  }
+
+  .lg-roles {
+    grid-column: 1;
+    grid-row: 2 / span 3;
+    align-self: start;
+    margin-top: 8px;
+  }
+
+  .lg-id-row {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin-top: 0;
+  }
+
+  .lg-password-row {
+    grid-column: 2;
+    grid-row: 3;
+    margin-top: 0;
+  }
+
+  .lg-submit {
+    grid-column: 2;
+    grid-row: 4;
+    margin-top: 4px;
+  }
+
+  .lg-title-block {
+    display: none;
+  }
+
+  .lg-h1,
+  .lg-legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .lg-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .role-tile {
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-height: 44px;
+    padding: 5px 4px;
+  }
+
+  .lg-tile-label {
+    font-size: var(--text-13);
+    text-align: center;
+  }
+
+  .lg-status {
+    min-height: 22px;
+  }
+
+  .lg-session {
+    max-width: 720px;
+    margin-inline: auto;
+  }
+
+  .lg-foot {
+    position: relative;
+    z-index: 1;
+    background: none;
+  }
+
+  .login[data-phase="success"] .lg-scene {
+    opacity: 1;
+  }
+}
+
+/* Someone already signed in in this tab: the way back to their screen, or out. */
+.lg-session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border-radius: 3px;
+  background: var(--color-rosewood-2);
+  color: var(--color-chalk);
+}
+
+.lg-session :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-lime);
+}
+
+@media (min-width: 640px) and (max-width: 1023.98px) {
+  .lg-session {
+    max-width: 480px;
+    margin: 0 auto 8px;
+  }
+}
+
+/* ---- The caption beside the stage ---- */
+
+.lg-caption {
+  animation: lg-caption-in var(--dur-row) var(--ease-lime) both;
+}
+
+.lg-people {
+  margin-top: 6px;
+  color: var(--color-chalk);
+}
+
+.lg-who {
+  transition:
+    color var(--dur-row) var(--ease-lime),
+    opacity var(--dur-row) var(--ease-lime);
+}
+
+.lg-who[data-lit] {
+  color: var(--color-lime);
+}
+
+.lg-who[data-dim] {
+  opacity: 0.6;
+}
+
+.lg-tick {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 4px;
+  vertical-align: -1px;
+  overflow: visible;
+}
+
+.lg-tick path {
+  fill: none;
+  stroke: var(--color-chalk);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: lg-tick 200ms var(--ease-trowel) forwards;
+}
+
+.lg-instrument {
+  margin-top: 10px;
+}
+
+.lg-instrument figcaption {
+  font-size: var(--text-13);
+}
+
+.lg-instrument svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* TaskCourse has no dark tone; its summary line would be ink on rosewood. */
+.lg-instrument .text-ink-soft {
+  color: rgb(250 248 245 / 0.75);
+}
+
+/* ---- The stage ---- */
+
+.login-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1000 / 532;
+  overflow: hidden;
+  contain: layout paint;
+  container-type: inline-size;
+  background: var(--color-rosewood);
+}
+
+.login-camera {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  transition: transform 700ms var(--ease-teak);
+}
+
+/* The flight carries the house out of the stage's box and over the whole screen. */
+.login-stage[data-phase="success"] {
+  overflow: visible;
+  contain: none;
+}
+
+.login[data-phase="success"] {
+  overflow: clip;
+}
+
+.login[data-phase="success"] .lg-scene {
+  z-index: 4;
+  overflow: visible;
+}
+
+.login[data-phase="success"] .lg-stage-box {
+  z-index: 3;
+}
+
+.login[data-phase="success"] .lg-board-col {
+  background-color: var(--color-rosewood);
+  transition: background-color 200ms var(--ease-lime) 780ms;
+}
+
+.login-sky,
+.sun-x,
+.sun-y {
+  position: absolute;
+  inset: 0;
+}
+
+.sun-x {
+  animation: lg-sun-x 48s linear -10.5s infinite;
+}
+
+.sun-y {
+  animation: lg-sun-y 48s linear -10.5s infinite;
+}
+
+.sun {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: clamp(18px, 4.4cqw, 44px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  /* A hot white core that warms to amber at the rim, with a soft glow round it. */
+  background: radial-gradient(circle at 50% 50%, #fffdf3 0%, #fff2c2 34%, #ffd36b 62%, #f2a33a 86%, #e07b2a 100%);
+  box-shadow:
+    0 0 6px 1px rgb(255 214 120 / 0.9),
+    0 0 22px 6px rgb(255 176 72 / 0.45),
+    0 0 60px 18px rgb(240 140 50 / 0.18);
+}
+
+/* The wide haze of light round the sun, breathing slowly. */
+.sun::before {
+  content: "";
+  position: absolute;
+  inset: -260%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 205 110 / 0.22) 0%, rgb(255 170 70 / 0.1) 30%, rgb(255 150 60 / 0) 62%);
+  pointer-events: none;
+  animation: lg-sun-haze 6s ease-in-out infinite alternate;
+}
+
+/* Faint rays, turning very slowly. */
+.sun::after {
+  content: "";
+  position: absolute;
+  inset: -140%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgb(255 215 130 / 0.16) 0deg 4deg, rgb(255 215 130 / 0) 4deg 18deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 22%, #000 30%, transparent 70%);
+  mask: radial-gradient(circle, transparent 0 22%, #000 30%, transparent 70%);
+  pointer-events: none;
+  animation: lg-sun-rays 90s linear infinite;
+}
+
+@keyframes lg-sun-haze {
+  from {
+    opacity: 0.7;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes lg-sun-rays {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.login-stage:is([data-offscreen], [data-lite]) :is(.sun-x, .sun-y, .sc-pennant, .lb-lit) {
+  animation-play-state: paused;
+}
+
+.login-stage:is([data-offscreen], [data-lite]) .sun::before,
+.login-stage:is([data-offscreen], [data-lite]) .sun::after {
+  animation-play-state: paused;
+}
+
+.login-house {
+  position: absolute;
+  left: 6%;
+  top: 26.316%;
+  width: 72%;
+  aspect-ratio: 720 / 440;
+  container-type: inline-size;
+}
+
+/* ---- The scene ---- */
+
+.sc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  fill: none;
+}
+
+.sc * {
+  vector-effect: non-scaling-stroke;
+}
+
+.sc-roofs {
+  fill: var(--color-rosewood-2);
+}
+
+.sc-palm path {
+  fill: none;
+  stroke: var(--color-rosewood-2);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.sc-palm .sc-trunk {
+  stroke-width: 3;
+}
+
+.role-layer {
+  opacity: 0;
+  transition: opacity var(--dur-row) var(--ease-lime);
+}
+
+.sc-laterite {
+  fill: var(--color-laterite);
+  stroke: rgb(42 26 18 / 0.6);
+  stroke-width: 1;
+}
+
+.sc-dashed {
+  fill: none;
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.sc-site {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  transform: scaleY(0);
+  transition: transform var(--dur-place) var(--ease-teak);
+}
+
+.sc-site-glass {
+  fill: var(--color-rosewood-2);
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+  stroke-opacity: 0.55;
+}
+
+.sc-site-mark {
+  stroke: var(--color-lime);
+  stroke-width: 2;
+  opacity: 0;
+  transition: opacity var(--dur-row) var(--ease-lime);
+}
+
+.sc-plot-dash {
+  fill: none;
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  transition: opacity var(--dur-tap) var(--ease-lime);
+}
+
+.sc-plot-solid {
+  fill: none;
+  stroke: var(--color-lime);
+  stroke-width: 2;
+  opacity: 0;
+  transition: opacity var(--dur-tap) var(--ease-lime);
+}
+
+.sc-plot-hatch {
+  stroke: var(--color-lime);
+  stroke-width: 1;
+  opacity: 0;
+  transition: opacity var(--dur-row) var(--ease-lime);
+}
+
+.sc-stake {
+  fill: var(--color-chalk);
+  opacity: 0;
+  transform: translateY(-24px);
+  transition:
+    opacity 150ms var(--ease-lay),
+    transform 150ms var(--ease-brass);
+}
+
+.sc-plot-string {
+  fill: none;
+  stroke: var(--color-chalk);
+  stroke-width: 1.5;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 200ms var(--ease-teak);
+}
+
+.sc-pile-block {
+  fill: var(--color-laterite);
+  stroke: rgb(42 26 18 / 0.6);
+  stroke-width: 1;
+}
+
+.sc-pile-pit {
+  fill: var(--color-laterite-pit);
+}
+
+.sc-scaffold {
+  opacity: 0.5;
+  transition: opacity var(--dur-row) var(--ease-lime);
+}
+
+.sc-lift {
+  fill: none;
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  transition: transform var(--dur-place) var(--ease-teak);
+}
+
+.login-stage[data-lifts="1"] :is(.sc-lift[data-k="2"], .sc-lift[data-k="3"]),
+.login-stage[data-lifts="2"] .sc-lift[data-k="3"] {
+  transform: scaleY(0);
+}
+
+.sc-steel {
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+  opacity: 0.8;
+}
+
+.sc-counterweight {
+  fill: var(--color-laterite);
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+}
+
+.sc-pennant {
+  fill: var(--color-lime);
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: lg-pennant 2.4s ease-in-out infinite alternate;
+}
+
+.sc-trolley-box {
+  fill: var(--color-rosewood-2);
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+}
+
+.sc-hook {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.sc-cable {
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: center top;
+}
+
+.sc-hook-j {
+  fill: none;
+  stroke: var(--color-chalk);
+  stroke-width: 1.5;
+}
+
+.sc-carried {
+  opacity: 0;
+}
+
+.sc-carried rect {
+  fill: var(--color-laterite);
+  stroke: rgb(42 26 18 / 0.6);
+  stroke-width: 1;
+}
+
+.sc-bag rect {
+  fill: var(--color-plaster);
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+}
+
+.sc-pallet-board {
+  stroke: var(--color-teak-light);
+  stroke-width: 2;
+}
+
+/* ---- The blocks over the house ---- */
+
+.lb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  fill: none;
+}
+
+.lb * {
+  vector-effect: non-scaling-stroke;
+}
+
+.lb-block {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.lb-block[data-on] {
+  opacity: 1;
+}
+
+.lb-face {
+  fill: var(--color-laterite);
+  stroke: rgb(42 26 18 / 0.6);
+  stroke-width: 1;
+}
+
+.lb-face.lb-light {
+  fill: var(--color-laterite-face);
+}
+
+.lb-face.lb-dark,
+.lb-pits {
+  fill: var(--color-laterite-pit);
+}
+
+.lb-storey,
+.lb-frame {
+  transition: opacity var(--dur-row) var(--ease-lime);
+}
+
+.lb-glass {
+  fill: var(--color-rosewood-2);
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+  stroke-opacity: 0.55;
+  transition: stroke var(--dur-row) var(--ease-lime);
+}
+
+.lb-mullions {
+  stroke: var(--color-chalk);
+  stroke-width: 1;
+  stroke-opacity: 0.55;
+}
+
+.lb-joint {
+  stroke: var(--color-lime);
+  stroke-width: 1;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  shape-rendering: crispEdges;
+  transition:
+    stroke-dashoffset 200ms var(--ease-trowel),
+    opacity var(--dur-row) var(--ease-lime);
+}
+
+.lb-string {
+  opacity: 0;
+  transition:
+    opacity var(--dur-tap) var(--ease-lime),
+    transform var(--dur-lift) var(--ease-teak);
+}
+
+.lb-string[data-on] {
+  opacity: 1;
+}
+
+.lb-string-line {
+  stroke: var(--color-lime);
+  stroke-width: 1;
+  transition: stroke var(--dur-tap) var(--ease-lime);
+}
+
+.lb-pin {
+  fill: var(--color-lime);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.lb[data-brick] .lb-string-line {
+  stroke: var(--color-brick);
+}
+
+.lb[data-brick] .lb-pin {
+  fill: var(--color-brick);
+}
+
+.lb-shutter {
+  transform-box: fill-box;
+  transform-origin: center top;
+  transform: scaleY(0);
+  transition: transform var(--dur-lift) var(--ease-teak);
+}
+
+.lb-shutter-face {
+  fill: var(--color-teak);
+}
+
+.lb-slats {
+  stroke: var(--color-teak-light);
+  stroke-width: 1;
+  opacity: 0;
+  transition: opacity var(--dur-tap) var(--ease-lime);
+}
+
+.login-stage[data-shutter] .lb-shutter {
+  transform: scaleY(1);
+  transition-duration: var(--dur-place);
+}
+
+.login-stage[data-shutter] .lb-slats {
+  opacity: 1;
+  transition-delay: 200ms;
+}
+
+.lb-sweep {
+  stroke: var(--color-lime);
+  stroke-width: 2;
+  opacity: 0;
+}
+
+.lb-mote {
+  fill: var(--color-chalk);
+  opacity: 0;
+}
+
+.lb-lit {
+  fill: var(--color-teak-light);
+  opacity: 0;
+  animation: lg-dusk 48s linear -10.5s infinite;
+}
+
+.lb-door {
+  fill: var(--color-lime);
+  opacity: 0;
+}
+
+.lb-leaf {
+  opacity: 0;
+  transform-box: fill-box;
+}
+
+.lb-leaf[data-side="left"] {
+  transform-origin: left center;
+}
+
+.lb-leaf[data-side="right"] {
+  transform-origin: right center;
+}
+
+.lb-leaf rect {
+  fill: var(--color-teak);
+  stroke: var(--color-teak-light);
+  stroke-width: 1;
+}
+
+.lb-leaf path {
+  stroke: var(--color-teak-light);
+  stroke-width: 1;
+}
+
+.lb[data-door] :is(.lb-door, .lb-leaf) {
+  opacity: 1;
+}
+
+/* ---- The house, as the stage shows it ---- */
+
+/* The overlay draws its own string line. */
+.login-stage .house .string-line {
+  display: none;
+}
+
+/* The second floor's first course is typed, not shown in advance. */
+.login-stage .house .storey[data-state="under-way"] .course {
+  opacity: 0;
+  transform: translateY(-9px);
+}
+
+.login-stage .house .storey[data-state="under-way"] .wire {
+  stroke-dasharray: 3 6;
+  opacity: 0.55;
+}
+
+/* Topped out here is a fact, not a forecast: no haze, no dashed outline. */
+.login-stage .house .storey[data-future] .haze {
+  opacity: 0;
+}
+
+.login-stage .house .storey[data-future][data-state="built"] .wire {
+  opacity: 0;
+}
+
+.login-stage .house .storey[data-future][data-state="built"] .edge {
+  opacity: 1;
+}
+
+.login-stage .house .storey[data-future][data-state="built"] .lines {
+  opacity: 1;
+}
+
+.login-stage .house[data-forecast] g.pass {
+  opacity: 1;
+}
+
+.login-stage .house .storey .mass {
+  transition:
+    opacity var(--dur-row) var(--ease-lime),
+    transform var(--dur-pour) linear;
+}
+
+/* ---- The wake: once per page load the plinth pours and the first courses go down ---- */
+
+.login-stage[data-waking] .house .storey[data-storey="0"] .mass {
+  animation: house-pour var(--dur-pour) linear 100ms backwards;
+}
+
+.login-stage[data-waking] .lb-block[data-base] {
+  animation: house-lay var(--dur-course) var(--ease-lay) backwards;
+  animation-delay: calc(450ms + var(--o) * 35ms);
+}
+
+.login-stage[data-waking] .lb-frames {
+  animation: house-fade var(--dur-row) var(--ease-lime) 300ms backwards;
+}
+
+.login-stage[data-waking] .lb-string[data-on] .lb-string-in {
+  animation: house-fade var(--dur-row) var(--ease-lime) 1300ms backwards;
+}
+
+.login-stage[data-waking] .sc-trolley {
+  animation: lg-trolley-in 700ms var(--ease-teak) 200ms backwards;
+}
+
+/* ---- Who is signing in: each role moves the camera and shows its own work ---- */
+
+.login-stage[data-role="client"] .role-layer[data-for="client"],
+.login-stage[data-role="bd"] .role-layer[data-for="bd"],
+.login-stage[data-role="architect"] .role-layer[data-for="architect"],
+.login-stage[data-role="site"] .role-layer[data-for="site"],
+.login-stage[data-role="admin"] .role-layer[data-for="admin"] {
+  opacity: 1;
+}
+
+.login-stage[data-preview="client"] .role-layer[data-for="client"],
+.login-stage[data-preview="bd"] .role-layer[data-for="bd"],
+.login-stage[data-preview="architect"] .role-layer[data-for="architect"],
+.login-stage[data-preview="site"] .role-layer[data-for="site"],
+.login-stage[data-preview="admin"] .role-layer[data-for="admin"] {
+  opacity: 0.35;
+}
+
+/* The homeowner: the house still to come reads as her forecast, with her pegs on it. */
+.login-stage[data-role="client"] .house .storey[data-state="to-come"] .wire {
+  opacity: 1;
+  stroke: var(--color-lime);
+}
+
+.lg-peg {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.lg-peg-mark {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: clamp(28px, 7.2cqw, 56px);
+  width: auto;
+  translate: -50% 0;
+  overflow: visible;
+}
+
+.login-stage:is([data-role="client"], [data-preview="client"]) .lg-peg {
+  opacity: 1;
+}
+
+.login-stage[data-role="client"] .lg-peg {
+  animation: house-drop var(--dur-press) var(--ease-brass) backwards;
+  animation-delay: calc(200ms + var(--k, 0) * 85ms);
+}
+
+/* Business development: the plot is pegged out, string pulled between the stakes. */
+.login-stage:is([data-role="bd"], [data-preview="bd"]) .sc-stake {
+  opacity: 1;
+  transform: none;
+}
+
+.login-stage[data-role="bd"] .sc-stake {
+  transition-delay: calc(120ms + var(--k) * 110ms);
+}
+
+.login-stage:is([data-role="bd"], [data-preview="bd"]) .sc-plot-string {
+  stroke-dashoffset: 0;
+}
+
+.login-stage[data-role="bd"] .sc-plot-string {
+  transition-delay: calc(270ms + (var(--k) + 1) * 110ms);
+}
+
+.login-stage:is([data-role="bd"], [data-preview="bd"]) .sc-plot-dash {
+  opacity: 0;
+}
+
+.login-stage:is([data-role="bd"], [data-preview="bd"]) .sc-plot-solid {
+  opacity: 0.9;
+}
+
+.login-stage:is([data-role="bd"], [data-preview="bd"]) .sc-plot-hatch {
+  opacity: 0.35;
+}
+
+.login-stage[data-role="bd"] :is(.sc-plot-dash, .sc-plot-solid, .sc-plot-hatch) {
+  transition-delay: 640ms;
+}
+
+/* The architect: a T-square sweeps the house down into its own elevation drawing. */
+.login-stage[data-role="architect"] .lb-sweep {
+  animation: lg-sweep 820ms var(--ease-teak) both;
+}
+
+.login-stage[data-role="architect"] .lb-storey {
+  opacity: 0.18;
+  transition-delay: calc((3 - var(--s, 0)) * 170ms);
+}
+
+.login-stage[data-role="architect"] .house .storey .mass {
+  opacity: 0.18;
+  transition-delay: calc((3 - var(--s, 0)) * 170ms);
+}
+
+.login-stage[data-role="architect"] .house .storey .wire {
+  opacity: 0.9;
+  stroke: var(--color-lime);
+  stroke-dasharray: none;
+}
+
+.login-stage[data-role="architect"] .lb-glass {
+  stroke: var(--color-lime);
+  stroke-opacity: 0.9;
+}
+
+.lg-dims > * {
+  position: absolute;
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity var(--dur-row) var(--ease-lime),
+    transform var(--dur-row) var(--ease-lime);
+}
+
+.login-stage:is([data-role="architect"], [data-preview="architect"]) .lg-dims > * {
+  opacity: 1;
+  transform: none;
+}
+
+.login-stage[data-role="architect"] .lg-dims > * {
+  transition-delay: calc(700ms + var(--k, 0) * 60ms);
+}
+
+.lg-dim-run {
+  height: 0;
+  border-top: 1px solid var(--color-chalk);
+}
+
+.lg-dim-run::before,
+.lg-dim-run::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  width: 1px;
+  height: 7px;
+  background: var(--color-chalk);
+  rotate: 45deg;
+}
+
+.lg-dim-run::before {
+  left: 0;
+}
+
+.lg-dim-run::after {
+  right: 0;
+}
+
+.lg-dim-label {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  translate: -50% 0;
+  color: var(--color-chalk);
+  white-space: nowrap;
+}
+
+.lg-level {
+  translate: 0 -50%;
+  padding-right: 4px;
+  color: var(--color-chalk);
+  white-space: nowrap;
+}
+
+@media (max-width: 639.98px) {
+  .lg-dims {
+    display: none;
+  }
+}
+
+/* The site engineer: the crane brings a pallet of cement down beside the house. */
+.login-stage[data-role="site"] .sc-scaffold {
+  opacity: 0.9;
+}
+
+.login-stage[data-role="site"] .sc-pallet-at {
+  transition-duration: 0s;
+}
+
+/* Procurement and finance: lime runs into every finished course, as money into a paid stage. */
+.login-stage[data-role="finance"] .lb-joint[data-full],
+.login-stage[data-preview="finance"] .lb-joint[data-full] {
+  stroke-dashoffset: 0;
+  stroke-width: 2;
+  opacity: 0.92;
+}
+
+.login-stage[data-preview="finance"] .lb-joint[data-full] {
+  opacity: 0.35;
+}
+
+.login-stage[data-role="finance"] .lb-joint[data-full] {
+  transition:
+    stroke-dashoffset 400ms var(--ease-trowel),
+    opacity var(--dur-row) var(--ease-lime);
+  transition-delay: calc(var(--c, 0) * 45ms);
+}
+
+/* The admin: the camera pulls back and the other sites rise on the horizon. */
+.login-stage:is([data-role="admin"], [data-preview="admin"]) .sc-site {
+  transform: none;
+}
+
+.login-stage[data-role="admin"] .sc-site {
+  transition-delay: calc(var(--k) * 120ms);
+}
+
+.login-stage:is([data-role="admin"], [data-preview="admin"]) .sc-site-mark {
+  opacity: 0.9;
+}
+
+.login-stage[data-role="admin"] .sc-site-mark {
+  transition-delay: 440ms;
+}
+
+.lg-trenches {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.lg-trench {
+  position: absolute;
+  top: calc(100% + 0.4%);
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity var(--dur-row) var(--ease-lime),
+    transform var(--dur-row) var(--ease-lime);
+}
+
+.lg-trench svg {
+  width: 100%;
+  height: auto;
+}
+
+.login-stage:is([data-role="admin"], [data-preview="admin"]) .lg-trench {
+  opacity: 1;
+  transform: none;
+}
+
+.login-stage[data-role="admin"] .lg-trench {
+  transition-delay: calc(560ms + var(--k, 0) * 120ms);
+}
+
+/* ---- Topped out: the house is finished and the door opens on their screen ---- */
+
+.lb[data-topping] .lb-block {
+  opacity: 1;
+}
+
+.lb[data-topping] .lb-block:not([data-on]) {
+  animation: house-lay var(--dur-course) var(--ease-lay) backwards;
+  animation-delay: min(calc((var(--o) - var(--from, 0)) * 3ms), 260ms);
+}
+
+.login-stage[data-phase="success"] .lb-work {
+  opacity: 0;
+  transition: opacity 180ms var(--ease-lime) 220ms;
+}
+
+.login-stage[data-phase="success"] .lb-lit {
+  animation: none;
+  opacity: 0.6;
+  transition: opacity 200ms var(--ease-lime) 640ms;
+}
+
+.login-stage[data-phase="success"] :is(.sc-scaffold, .role-layer, .role-layer[data-for]) {
+  opacity: 0;
+  transition: opacity var(--dur-lift) var(--ease-lime) 300ms;
+}
+
+.login[data-phase="success"] .lg-exit {
+  opacity: 0;
+  transform: translateX(24px);
+  transition:
+    opacity 180ms var(--ease-lime) 960ms,
+    transform 180ms var(--ease-lime) 960ms;
+}
+
+.lg-light {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 50;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  background: var(--color-lime);
+  pointer-events: none;
+  transform-origin: center;
+}
+
+.lg-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  opacity: 0;
+  background: var(--color-lime);
+  pointer-events: none;
+}
+
+.lg-opening {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 51;
+  translate: -50% -50%;
+  color: rgb(42 26 18 / 0.7);
+  animation: house-fade var(--dur-row) var(--ease-lime) both;
+}
+
+/* ---- Less motion: a still golden-hour frame. Every state is still reached. ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .sun-x,
+  .sun-y,
+  .sun::before,
+  .sun::after,
+  .sc-pennant,
+  .lb-lit {
+    animation: none;
+  }
+
+  .sun-x {
+    transform: translateX(12%);
+  }
+
+  .sun-y {
+    transform: translateY(66%);
+  }
+
+  .lb-lit {
+    opacity: 0.3;
+  }
+
+  .login-camera {
+    transform: none !important;
+  }
+
+  .role-tile:hover,
+  .role-tile:hover .rg-move {
+    transform: none !important;
+  }
+
+  .login[data-phase="success"] .lg-exit {
+    transform: none;
+  }
+}
+
+.login-stage[data-reduced] .login-camera {
+  transform: none !important;
+}
+
+.login-stage[data-reduced] .role-layer {
+  transition: opacity 200ms linear !important;
+  transition-delay: 0s !important;
+}
+
+.login-stage[data-reduced][data-phase="success"] .lb-work {
+  display: none;
+}
+
+.login[data-reduced][data-phase="success"] .lg-stamp {
+  opacity: 1;
+}
+
+.login[data-reduced][data-phase="success"] .lg-veil {
+  opacity: 1;
+  transition: opacity 200ms linear !important;
+  transition-delay: 0s !important;
+}
+
+.login[data-reduced] .lg-caption {
+  animation-name: house-fade;
+}
+
+/* ---- Keyframes ---- */
+
+@keyframes lg-sun-x {
+  from {
+    transform: translateX(-6%);
+  }
+
+  to {
+    transform: translateX(96%);
+  }
+}
+
+/* An arc: up from behind the ground at the left, down behind it at the right. */
+@keyframes lg-sun-y {
+  0% {
+    transform: translateY(112%);
+    animation-timing-function: cubic-bezier(0.25, 0.6, 0.5, 1);
+  }
+
+  50% {
+    transform: translateY(36%);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
+  }
+
+  100% {
+    transform: translateY(112%);
+  }
+}
+
+/* Evening: the lights come on as the sun goes down, and go off before it rises. */
+@keyframes lg-dusk {
+  0%,
+  84% {
+    opacity: 0;
+  }
+
+  90%,
+  97% {
+    opacity: 0.55;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes lg-pennant {
+  from {
+    transform: skewY(-6deg);
+  }
+
+  to {
+    transform: skewY(6deg);
+  }
+}
+
+@keyframes lg-trolley-in {
+  from {
+    transform: translateX(120px);
+  }
+}
+
+@keyframes lg-sweep {
+  0% {
+    transform: translateY(38px);
+    opacity: 1;
+  }
+
+  85% {
+    transform: translateY(392px);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(392px);
+    opacity: 0;
+  }
+}
+
+@keyframes lg-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes lg-tick {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
