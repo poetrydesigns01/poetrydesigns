@@ -313,10 +313,3 @@ export function RevisionRegister({
     </Register>
   );
 }
-
-/** Letters a person may see, with the ones paid this month kept for the record. */
-export function lettersOpenOrPaidThisMonth(letters: LetterView[]): LetterView[] {
-  return letters.filter(
-    (l) => l.state !== "paid" || l.receipts.some((r) => r.on >= `${WEEK.from.slice(0, 7)}-01` && r.reference !== "Earlier payment"),
-  );
-}

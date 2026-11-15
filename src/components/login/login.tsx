@@ -21,16 +21,15 @@ import { SignOutButton } from "@/components/sign-out";
 import { ACCOUNTS, accountForId, findAccount, type DemoAccount } from "@/lib/demo-accounts";
 import { useDemo } from "@/lib/demo-store";
 import { usePrefersReducedMotion } from "@/lib/motion";
-import { RoleCaption } from "./role-caption";
 import { SignInBoard, type BoardHandlers, type BoardRefs } from "./sign-in-board";
 import { SiteStage, type StageHandle, type StagePhase } from "./site-stage";
 import { blocksFor, type LoginRole } from "./site-model";
 import { EASE, Timers, reducedNow } from "./timing";
 import "./login.css";
 
-// The first screen: sign in on the site board, beside a laterite house going up at dusk.
-// Every character typed lays a block; a wrong password knocks the top ones off; the right
-// one tops the house out, and its front door opens on the person's own screen.
+// The first screen: a frosted sign-in card beside a laterite house going up in the late
+// afternoon sun. Every character typed lays a block; a wrong password knocks the top ones
+// off; the right one tops the house out, and its front door opens on the person's screen.
 
 const DOMAIN = "@poetrydesigns.in";
 
@@ -57,15 +56,6 @@ function useOnClient(): boolean {
     () => false,
   );
 }
-
-const ROLE_TAG: Record<LoginRole, string> = {
-  client: "Homeowner",
-  bd: "Business development",
-  architect: "Architect",
-  site: "Site engineer",
-  finance: "Finance",
-  admin: "Admin",
-};
 
 /**
  * The router keeps a page it leaves in the document, hidden, and shows it again on the way
@@ -116,7 +106,6 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [caps, setCaps] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [revision, setRevision] = useState(0);
   const [signedIn, setSignedIn] = useState<DemoAccount | null>(null);
   const [slowPush, setSlowPush] = useState(false);
 
@@ -368,7 +357,7 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
       const still = reducedNow();
 
       if (!trimmed) {
-        announce(setIdError, "Enter your ID, in the form firstname.lastname.");
+        announce(setIdError, "Enter your ID, like firstname.lastname.");
         refs.id.current?.focus();
         stage.current?.twang();
         if (still) stage.current?.brick();
@@ -380,8 +369,8 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
         const lower = trimmed.toLowerCase();
         const message =
           lower.includes("@") && !lower.endsWith(DOMAIN)
-            ? "Use your ID without the email part, like firstname.lastname."
-            : `No account has the ID “${cut(trimmed)}”. Check the spelling.`;
+            ? "Use your ID without the email part."
+            : `No account “${cut(trimmed)}”. Check the spelling.`;
         announce(setIdError, message);
         refs.id.current?.focus();
         refs.id.current?.select();
@@ -396,7 +385,7 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
       }
 
       if (!password) {
-        announce(setPasswordError, `Enter the password for ${account.id}.`);
+        announce(setPasswordError, "Enter your password.");
         refs.password.current?.focus();
         return;
       }
@@ -406,15 +395,9 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
         const misses = (live.current.misses.get(account.id) ?? 0) + 1;
         live.current.misses.set(account.id, misses);
         const stuck =
-          account.role === "admin"
-            ? "Still not right. Check Caps Lock; the demo passwords are in the README."
-            : "Still not right. Check Caps Lock, or ask Shalini Murthy, operations head, to reset it.";
-        const message =
-          misses >= 3
-            ? stuck
-            : `That password is not right for ${account.id}. Passwords are case-sensitive.${caps ? " Caps Lock is on." : ""}`;
+          account.role === "admin" ? "Still wrong. Check Caps Lock." : "Still wrong. Ask Shalini Murthy to reset it.";
+        const message = misses >= 3 ? stuck : `Wrong password. It is case-sensitive.${caps ? " Caps Lock is on." : ""}`;
         announce(setPasswordError, message);
-        setRevision((n) => n + 1);
         refs.password.current?.focus();
         refs.password.current?.select();
         if (still) {
@@ -457,10 +440,9 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
   const success = phase === "success";
   // Someone already signed in in this tab who came back here: say so, and offer the way back.
   const already = onClient && demo.session && !signedIn ? (accountForId(demo.session.id) ?? null) : null;
-  const tag = success && signedIn ? `${signedIn.name.split(" ")[0]} ✓` : match ? `${match.name.split(" ")[0]} ✓` : role ? ROLE_TAG[role] : null;
 
   return (
-    <main className="login" data-phase={phase} data-reduced={reduced ? "" : undefined}>
+    <main className="login glass-world" data-phase={phase} data-reduced={reduced ? "" : undefined}>
       <p className="sr-only">
         A laterite house being built on site, with a crane and scaffolding. Each character you type lays a block.
       </p>
@@ -468,38 +450,34 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
         {success && signedIn ? `Signed in. Opening ${signedIn.name}'s screen.` : ""}
       </p>
 
-      <div className="lg-scene on-dark">
-        <div className="lg-head">
-          <div className="lg-titles">
-            <p className="display text-22 lg-wordmark lg-exit">Poetry Designs</p>
-            <p className="display display-xl lg-hero lg-exit">From concept to reality.</p>
-          </div>
-          <div className="lg-caption-slot lg-exit" aria-hidden="true">
-            <RoleCaption role={role} match={match} />
-          </div>
+      <div className="lg-scene">
+        <div className="lg-head lg-exit">
+          <p className="display text-22 lg-wordmark">Poetry Designs</p>
+          <p className="display display-xl lg-hero">From concept to reality.</p>
         </div>
-        {tag && (
-          <p className="lettering text-13 lg-tag" aria-hidden="true">
-            {tag}
-          </p>
-        )}
-        <div className="lg-stage-box">
-          <SiteStage ref={stage} role={role} preview={preview} phase={phase} reduced={reduced} />
+        <div className="lg-window-slot">
+          <div className="lg-window">
+            <SiteStage ref={stage} role={role} preview={preview} phase={phase} reduced={reduced} />
+            <div className="lg-ground" aria-hidden="true" />
+          </div>
         </div>
       </div>
 
-      <div className="lg-band" aria-hidden="true" />
-
       <div className="lg-board-col">
-        <div className="lg-board-wrap lg-exit">
+        <div className="lg-card glass-strong lg-exit">
           {already && (
-            <p className="lg-session text-15">
-              <span>Signed in as {already.name}.</span>
-              <Link href={already.home} className="link font-semibold">
-                Open your screen
-              </Link>
-              <SignOutButton className="link" />
-            </p>
+            <div className="lg-session glass-inner text-15">
+              <p>Signed in as {already.name}.</p>
+              <p className="lg-session-actions">
+                <Link href={already.home} className="link font-semibold">
+                  Open your screen
+                </Link>
+                <SignOutButton
+                  className="link"
+                  onDone={() => refs.id.current?.focus({ preventScroll: true })}
+                />
+              </p>
+            </div>
           )}
           <SignInBoard
             role={role}
@@ -511,20 +489,14 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
             showPassword={showPassword}
             success={success}
             signedIn={signedIn}
-            revision={revision}
             refs={refs}
             on={stableOn}
           />
-          <span className="lg-post" aria-hidden="true" />
-          <span className="lg-post" aria-hidden="true" />
         </div>
-      </div>
-
-      <footer className="lg-foot lg-exit on-dark text-15">
-        <Link href="/follow" className="link inline-flex min-h-11 items-center hover:text-lime">
+        <Link href="/follow" className="lg-follow lg-exit link text-15">
           Follow one payment from site to bank
         </Link>
-      </footer>
+      </div>
 
       <div ref={lightRef} className="lg-light" aria-hidden="true" />
       <div className="lg-veil" aria-hidden="true" />

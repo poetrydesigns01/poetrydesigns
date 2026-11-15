@@ -44,7 +44,7 @@ import { SiteRefs } from "./site-refs";
 import { EASE, Timers, modestDevice, reducedNow } from "./timing";
 import { useSiteLoop } from "./use-site-loop";
 
-// The stage: a laterite site at dusk with the real house half built in it. Everything a
+// The stage: a laterite site in the late afternoon sun with the real house half built in it. Everything a
 // keystroke does happens here by hand, through refs, so typing never renders the scene.
 
 export type StagePhase = "idle" | "error" | "success";
@@ -718,12 +718,17 @@ export const SiteStage = memo(function SiteStage({
           overlay.style.setProperty("--from", String(visual()));
           overlay.setAttribute("data-topping", "");
         }
+        // Just before the flight the stage's own sky, earth and far town fade, while the
+        // window still clips them, so nothing changes colour in a single frame.
+        st.timers.after(620, () => stageRef.current?.setAttribute("data-leaving", ""));
         // The flight: the camera carries the door to the middle of the screen, the house
         // filling it, and the stage lets it out of its box to do so.
         st.timers.after(780, () => {
           const stage = stageRef.current;
           const camera = cameraRef.current;
           if (!stage || !camera) return;
+          // Only now does the scene leave its window, so nothing spills out before the flight.
+          stage.setAttribute("data-flight", "");
           const box = stage.getBoundingClientRect();
           const vw = window.innerWidth;
           const vh = window.innerHeight;
@@ -807,11 +812,12 @@ export const SiteStage = memo(function SiteStage({
             </div>
           </div>
         </div>
+        <div className="login-earth" />
         <SceneBack refs={refs} />
         <HorizonTrenches />
         <div className="login-house">
           <House
-            tone="dark"
+            tone="light"
             labels={false}
             scene={{ stop, markers: "none", money: false, stringLabel: false }}
           />
@@ -873,7 +879,7 @@ const HorizonTrenches = memo(function HorizonTrenches() {
             cash={p.cash}
             inDesign={p.margin === null}
             scale={scale}
-            tone="dark"
+            tone="paper"
             width={120}
             height={56}
           />

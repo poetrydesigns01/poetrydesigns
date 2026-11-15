@@ -33,7 +33,7 @@ function qtyWords(qty: number, item: CatalogueItem): string {
 }
 
 /** The words for a stack: "500 of 850 kg ordered. 350 kg still to order." */
-export function stackWords(item: CatalogueItem, requested: number, ordered: number, delivered: boolean): string {
+function stackWords(item: CatalogueItem, requested: number, ordered: number, delivered: boolean): string {
   if (delivered) return `${qtyWords(requested, item)} delivered.`;
   if (ordered <= 0) return `${qtyWords(requested, item)} requested. None ordered yet.`;
   if (ordered >= requested) return `All ${qtyWords(requested, item)} ordered.`;

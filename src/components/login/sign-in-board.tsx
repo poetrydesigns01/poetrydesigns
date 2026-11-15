@@ -18,9 +18,9 @@ import { ROLE_SENTENCE } from "./role-caption";
 import { RoleGlyph } from "./role-glyphs";
 import { ROLES, type LoginRole } from "./site-model";
 
-// The site board: who is signing in, their ID and password, and the title block that gets
-// stamped when the house is topped out. The fields are not controlled: every keystroke is
-// read from the input itself, so typing never renders this board.
+// The sign-in card: who is signing in, their ID and password, and the stamp that lands
+// when the house is topped out. The fields are not controlled: every keystroke is read
+// from the input itself, so typing never renders this card.
 
 const TILE: Record<LoginRole, { short: string; long: string; name: string }> = {
   client: { short: "Homeowner", long: "Homeowner", name: "Homeowner" },
@@ -31,8 +31,6 @@ const TILE: Record<LoginRole, { short: string; long: string; name: string }> = {
   admin: { short: "Admin", long: "Admin", name: "Admin" },
 };
 
-const REV_DIGITS = Array.from({ length: 21 }, (_, i) => i);
-
 export type BoardRefs = {
   form: RefObject<HTMLFormElement | null>;
   id: RefObject<HTMLInputElement | null>;
@@ -40,7 +38,7 @@ export type BoardRefs = {
   idRow: RefObject<HTMLDivElement | null>;
   passwordRow: RefObject<HTMLDivElement | null>;
   stamp: RefObject<HTMLDivElement | null>;
-  /** The "Checked" cell's name, written by hand when the stamp lands. */
+  /** The name on the stamp, written by hand when it lands. */
   checked: RefObject<HTMLSpanElement | null>;
 };
 
@@ -90,7 +88,6 @@ export const SignInBoard = memo(function SignInBoard({
   showPassword,
   success,
   signedIn,
-  revision,
   refs: {
     form: formRef,
     id: idRef,
@@ -112,13 +109,10 @@ export const SignInBoard = memo(function SignInBoard({
   success: boolean;
   /** Set at success: who is signing in, for the button and the stamp. */
   signedIn: DemoAccount | null;
-  revision: number;
   refs: BoardRefs;
   on: BoardHandlers;
 }) {
-  const first = signedIn?.name.split(" ")[0] ?? "";
   const idStatus = idError ?? (match ? personLine(match) : "");
-  const passwordStatus = passwordError ?? (caps ? "Caps Lock is on." : "");
   const hydrated = useHydrated();
 
   // A value already in a field when the page hydrated (the browser restoring the form, or
@@ -135,10 +129,19 @@ export const SignInBoard = memo(function SignInBoard({
     <form ref={formRef} className="login-board" noValidate onSubmit={on.onSubmit} aria-label="Sign in">
       <div className="lg-board-head">
         <h1 className="display text-32 lg-h1">Sign in</h1>
+        <p className="lg-helper text-15">{ROLE_SENTENCE.none}</p>
+        <div ref={stampRef} className="lg-stamp" data-kind={signedIn?.role === "client" ? "seal" : "kota"} aria-hidden="true">
+          {signedIn?.role === "client" ? (
+            <SealMark className="lg-seal" />
+          ) : (
+            <span className="display text-22 lg-kota-word">Approved</span>
+          )}
+          <span ref={checkedRef} className="lettering text-13 lg-checked" />
+        </div>
       </div>
 
       <fieldset className="lg-roles" onKeyDown={on.onRoleKeyDown}>
-        <legend className="lg-legend text-15 font-semibold">Who is signing in?</legend>
+        <legend className="sr-only">Who is signing in?</legend>
         <div className="lg-tiles">
           {ROLES.map((r) => (
             <label
@@ -163,9 +166,10 @@ export const SignInBoard = memo(function SignInBoard({
               />
               <RoleGlyph role={r} />
               <span className="lg-tile-label">
-                <span className="sm:hidden">{TILE[r].short}</span>
-                <span className="hidden sm:inline">{TILE[r].long}</span>
+                <span className="lg-tile-short">{TILE[r].short}</span>
+                <span className="lg-tile-long">{TILE[r].long}</span>
               </span>
+              <span className="lg-tile-tick" aria-hidden="true" />
               <span id={`login-role-${r}`} hidden>
                 {ROLE_SENTENCE[r]}
               </span>
@@ -175,7 +179,7 @@ export const SignInBoard = memo(function SignInBoard({
       </fieldset>
 
       <div ref={idRowRef} className="field-row lg-id-row">
-        <label htmlFor="login-id" className="lg-label text-15 font-semibold">
+        <label htmlFor="login-id" className="lg-label text-15">
           ID
         </label>
         <input
@@ -183,7 +187,7 @@ export const SignInBoard = memo(function SignInBoard({
           id="login-id"
           name="username"
           type="text"
-          className="lg-input"
+          className="glass-field lg-input"
           autoComplete="username"
           autoCapitalize="none"
           autoCorrect="off"
@@ -197,13 +201,13 @@ export const SignInBoard = memo(function SignInBoard({
           onFocus={on.onIdFocus}
           onBlur={on.onFieldBlur}
         />
-        <p id="login-id-status" className="lg-status text-15" data-error={idError ? "" : undefined} aria-live="polite">
+        <p id="login-id-status" className="lg-status text-13" data-error={idError ? "" : undefined} aria-live="polite">
           {idStatus}
         </p>
       </div>
 
       <div ref={passwordRowRef} className="field-row lg-password-row">
-        <label htmlFor="login-password" className="lg-label text-15 font-semibold">
+        <label htmlFor="login-password" className="lg-label text-15">
           Password
         </label>
         <div className="relative">
@@ -212,7 +216,7 @@ export const SignInBoard = memo(function SignInBoard({
             id="login-password"
             name="password"
             type={showPassword ? "text" : "password"}
-            className="lg-input lg-input-password"
+            className="glass-field lg-input lg-input-password"
             autoComplete="current-password"
             autoCapitalize="none"
             autoCorrect="off"
@@ -238,11 +242,11 @@ export const SignInBoard = memo(function SignInBoard({
         </div>
         <p
           id="login-password-status"
-          className="lg-status text-15"
+          className="lg-status text-13"
           data-error={passwordError ? "" : undefined}
           aria-live="polite"
         >
-          {passwordStatus}
+          {passwordError ?? (caps ? <span className="glass-chip chip-late">Caps Lock is on</span> : "")}
         </p>
       </div>
 
@@ -254,33 +258,6 @@ export const SignInBoard = memo(function SignInBoard({
       >
         {success && signedIn ? `Signing in as ${signedIn.name}` : "Sign in"}
       </button>
-
-      <div className="lg-title-block lettering text-13" aria-hidden="true">
-        <span className="lg-cell">Site board</span>
-        <span className="lg-cell">
-          Rev{" "}
-          <span className="lg-rev">
-            <span className="roll lg-rev-col" style={{ transform: `translateY(${-Math.min(revision, 20) * 1.25}em)` }}>
-              {REV_DIGITS.map((d) => (
-                <span key={d}>{d}</span>
-              ))}
-            </span>
-          </span>
-        </span>
-        <span className="lg-cell">
-          Checked <span ref={checkedRef}>—</span>
-        </span>
-        <div ref={stampRef} className="lg-stamp" data-kind={signedIn?.role === "client" ? "seal" : "kota"}>
-          {signedIn?.role === "client" ? (
-            <SealMark className="lg-seal" />
-          ) : (
-            <div className="lg-kota">
-              <span className="display text-22 lg-kota-word">Approved</span>
-              <span className="lettering text-13">{first}</span>
-            </div>
-          )}
-        </div>
-      </div>
     </form>
   );
 });

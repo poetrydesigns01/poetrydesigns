@@ -76,7 +76,7 @@ const LIFTS = SCENE.lifts.map((lift, i) => {
   return { k: i + 1, d: poles + ledger + brace };
 });
 
-// The tower crane, in chalk lines, the lattice drawn as one zigzag.
+// The tower crane in brass paint, the lattice drawn as one zigzag.
 const { mastX, mastTop, jibY, jibFrom, counterTo, trolleyPark, cable } = SCENE.crane;
 function zigzag(x0: number, x1: number, y0: number, y1: number, step: number, vertical: boolean): string {
   let d = "";
