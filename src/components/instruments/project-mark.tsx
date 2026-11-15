@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { HouseMark, markForStop } from "@/components/house/house-mark";
 import { hatch, rects } from "@/lib/draw";
 import { projects, type CategoryId, type MilestoneState, type ProjectId } from "@/lib/firm-data";

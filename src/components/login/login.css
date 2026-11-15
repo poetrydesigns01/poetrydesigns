@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 /* The sign-in page: a laterite site at dusk beside the site board. Markup is in
    components/login. Everything that reaches into the house is scoped under .login-stage.
    Only transform and opacity move, apart from a few short stroke draws on single paths. */

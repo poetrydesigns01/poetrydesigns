@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // Fictional data for the UI/UX demo. Every person, address and amount is made up.
 // The payment rows follow Poetry's workflow (workflow-template.ts): the sign-up advance and
 // instalments 1 to 10, instalment n opening construction milestone n. This file imports

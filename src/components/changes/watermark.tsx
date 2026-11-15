@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // Her name and today's date, written across a view-only sheet from corner to corner. It is
 // drawn over the sheet and takes no pointer, so the sheet is read through it and cannot be
 // lifted from the page. The same mark as the design viewer's, kept here for the changes.

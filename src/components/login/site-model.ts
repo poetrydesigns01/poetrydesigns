@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { courseRows, mulberry32 } from "@/lib/draw";
 import { STOREYS, type Line, type Rect } from "@/lib/house-model";
 

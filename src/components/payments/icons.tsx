@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { ReactNode } from "react";
 
 // Small line icons for the payment screens. Each is decorative: the words beside it carry

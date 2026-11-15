@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { contacts } from "@/lib/demo-data";
 import { PhoneIcon } from "./icons";
 

@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // Poetry Designs' project workflow, as their "Project Workflow Template" workbook lays it out:
 // the "Project Track map" sheet gives the stages, tasks, task managers and supporting teams,
 // and the "Project Schedule & Tracker" sheet gives the weeks (8 pre-construction weeks, then

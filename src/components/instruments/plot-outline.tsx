@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { SealGlyphAt } from "./glyphs";
 
 // Setting out a plot: the outline is dashed until it is pegged. A stake is driven at each

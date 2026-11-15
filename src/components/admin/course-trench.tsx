@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { hatch } from "@/lib/draw";
 import { inr, percent } from "@/lib/format";
 

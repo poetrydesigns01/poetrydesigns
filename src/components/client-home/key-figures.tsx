@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { ReactNode } from "react";
 import { StatusChip } from "@/components/register/status-chip";
 import { formatDate, inr } from "@/lib/format";

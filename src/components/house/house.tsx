@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 "use client";
 
 import { memo, useEffect, useRef, type CSSProperties, type KeyboardEvent } from "react";

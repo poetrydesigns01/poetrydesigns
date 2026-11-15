@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { TODAY } from "@/lib/demo-data";
 import type { DraftView, ProjectView } from "@/lib/firm";
 import { formatDate } from "@/lib/format";

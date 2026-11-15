@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { RequestStatus, StampView } from "@/lib/firm";
 import { TODAY } from "@/lib/demo-data";
 import { people } from "@/lib/firm-data";

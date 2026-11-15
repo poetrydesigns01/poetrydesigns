@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { ReactNode, RefObject } from "react";
 
 // The frame of a client page. The table is rosewood and holds the house, its instrument

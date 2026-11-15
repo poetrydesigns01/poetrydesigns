@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { Person, PersonId } from "@/lib/firm-data";
 
 // Each person keeps one name colour in every chat, dark enough to read on a cream bubble.

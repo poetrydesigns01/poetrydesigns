@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // Sample-data disclaimers are no longer shown on screen (the client found them cluttering).
 // The component stays so older screens compile; it renders nothing.
 

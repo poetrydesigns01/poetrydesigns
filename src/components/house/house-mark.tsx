@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { hatch, rects } from "@/lib/draw";
 import { STEPS, STOPS, STOREYS, TODAY_STOP, type Pass, type Storey } from "@/lib/house-model";
 

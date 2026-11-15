@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 /* Payments: the contract bar fills as money comes in. Only transform moves. */
 .pay-fill {
   transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);

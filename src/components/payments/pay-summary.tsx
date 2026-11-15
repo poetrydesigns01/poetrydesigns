@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { StatusChip } from "@/components/register/status-chip";
 import { formatShortDate, inr } from "@/lib/format";
 import type { PaymentStageView } from "@/lib/portal";

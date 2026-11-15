@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { FinanceToday } from "@/components/finance/finance-today";
 
 // Procurement and finance, Today: Prakash Hegde's requests and Divya Shenoy's money.

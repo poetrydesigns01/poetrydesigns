@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 "use client";
 
 import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";

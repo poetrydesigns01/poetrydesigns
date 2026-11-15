@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { TODAY, withGst } from "./demo-data";
 import type { Firm } from "./firm";
 import { cottageEstimate, templateOf, type CategoryId, type ProjectId, type TemplateMilestone } from "./firm-data";

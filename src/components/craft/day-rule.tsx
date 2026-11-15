@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { CSSProperties } from "react";
 import { addDays, dayCount, formatDate } from "@/lib/format";
 

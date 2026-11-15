@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import Link from "next/link";
 import { useId, type ReactNode } from "react";
 import { TODAY } from "@/lib/demo-data";

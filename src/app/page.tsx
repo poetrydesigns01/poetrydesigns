@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { Login } from "@/components/login/login";
 
 // The first screen: sign in as one of the six people who build a house.

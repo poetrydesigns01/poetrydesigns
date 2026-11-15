@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // What a register says when nothing is in it: one plain sentence, no picture.
 
 export function EmptyQuiet({ children = "Nothing needs you today." }: { children?: string }) {

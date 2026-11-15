@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // A stand-in drawing for the demo's design viewer. Real projects show the architect's uploaded PDF or image here.
 
 type Room = { x: number; y: number; w: number; h: number; name: string; size: string };

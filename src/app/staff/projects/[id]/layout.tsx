@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { ProjectFrame } from "@/components/project/project-frame";

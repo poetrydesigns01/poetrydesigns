@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { DEPTH, VIEW, type Line, type Rect } from "./house-model";
 
 // Everything the house is drawn with, as plain path data: block joints, pits, hatches

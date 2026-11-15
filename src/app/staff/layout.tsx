@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { StaffShell } from "@/components/register/staff-shell";
 import { SessionGate } from "@/components/session-gate";
 

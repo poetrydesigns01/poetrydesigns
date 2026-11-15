@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";

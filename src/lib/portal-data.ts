@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { PersonId, ProjectId } from "./firm-data";
 import { workflowTask } from "./workflow-template";
 

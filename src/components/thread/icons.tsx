@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // Small line icons for the chat, drawn in currentColor.
 
 import type { ReactNode } from "react";

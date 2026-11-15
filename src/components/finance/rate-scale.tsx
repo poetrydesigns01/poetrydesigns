@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // A small rate scale for one material and size: one line, one notch per vendor at its last
 // rate, the cheapest notch filled and named. It is decoration; the sentence beside it says
 // the cheapest vendor and rate in words.

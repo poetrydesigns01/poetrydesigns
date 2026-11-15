@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // Where keyboard focus goes when the control that holds it is about to leave the page: a
 // panel closing on its own record, or a "Mark seen" button whose row moves on. Without this
 // the browser drops focus to the page itself and a keyboard user starts again from the top.

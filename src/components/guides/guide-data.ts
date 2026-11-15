@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // The short guides for the training session: one per role, three to five steps each. Every
 // step is one sentence, one line on how it is done, and the screen it happens on. Plain
 // data, so the guide pages can be drawn on the server.

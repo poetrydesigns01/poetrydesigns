@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { groupOf, type StoreyGroup } from "./projection";
 
 // The single truth for the house: its storeys, where marks stand on it, the shapes of

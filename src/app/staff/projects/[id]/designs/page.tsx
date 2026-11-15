@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { Suspense } from "react";
 import { ProjectDesigns } from "@/components/project/designs";
 import type { ProjectId } from "@/lib/firm-data";

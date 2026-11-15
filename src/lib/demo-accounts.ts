@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { PersonId } from "./firm-data";
 
 // Demo-only accounts. They are checked in the browser against this list, so they are

@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { ReactNode } from "react";
 
 // Small line icons for the design screens. Decoration only: every one sits beside a word

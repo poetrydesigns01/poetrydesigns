@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { Firm, LetterView, ProjectView } from "@/lib/firm";
 import type { Person, PersonId, ProjectId } from "@/lib/firm-data";
 import { inr } from "@/lib/format";

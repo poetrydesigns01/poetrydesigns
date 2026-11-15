@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 "use client";
 
 import { useId, useMemo, useState, type FormEvent } from "react";

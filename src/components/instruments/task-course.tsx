@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { hatch } from "@/lib/draw";
 
 // A person's recent tasks laid as one course of blocks, oldest first. A task done on time

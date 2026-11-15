@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // The only brass on a staff screen. A standing peg: the client still has to speak. A flat
 // seal with an engraved tick: the client has agreed. Both are decoration; the words beside
 // them say the same thing.

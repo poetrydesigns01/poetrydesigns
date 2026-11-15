@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { ReactNode } from "react";
 
 // One labelled field on a staff form. The label is 15 semibold above the control; a hint

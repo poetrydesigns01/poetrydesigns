@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { ReactNode } from "react";
 
 // An A4 sheet of white paper: a material report, an estimate. When it is printed, it is

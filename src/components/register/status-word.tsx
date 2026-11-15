@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // Status is always a word from the vocabulary, written once per row. Paid, Approved and
 // Delivered are written in kota; Overdue in bold ink. Colour never carries it alone.
 

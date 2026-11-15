@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import Link from "next/link";
 import { StatusChip } from "@/components/register/status-chip";
 import type { DesignItemStatus, DesignStageView, Tone } from "@/lib/portal";

@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { Suspense } from "react";
 import { RequestDetail } from "@/components/finance/request-detail";
 import { REQUEST_NUMBERS } from "@/lib/firm-data";

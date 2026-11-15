@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // Small helpers for the sign-in motion. Everything here runs in handlers, timers and
 // frames, never during render.
 

@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 "use client";
 
 import { dayWords } from "@/components/admin/admin-data";

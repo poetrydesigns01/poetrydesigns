@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // Her name and today's date written across a view-only page, corner to corner. The lines
 // sit 140 px apart and the words 240 px apart along a line, at 9% so the page stays legible.
 

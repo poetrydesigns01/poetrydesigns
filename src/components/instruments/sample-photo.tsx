@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { PhotoKind } from "@/lib/firm-data";
 
 // A site photo stands in as a line drawing in a sand frame, 4 by 3, so no one takes it

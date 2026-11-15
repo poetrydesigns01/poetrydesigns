@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { TODAY } from "@/lib/demo-data";
 import { addDays, daysBetween, formatDate, formatShortDate } from "@/lib/format";
 import type { TimelineInstalment, TimelineStage, TimelineView } from "@/lib/portal";

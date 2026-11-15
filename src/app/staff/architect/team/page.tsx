@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { ArchitectTeam } from "@/components/architect/team";
 
 // A senior architect's team: assigning, due and late work, the last 90 days, and who is on each project.

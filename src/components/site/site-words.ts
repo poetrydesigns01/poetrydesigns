@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { site as iyerSite, TODAY } from "@/lib/demo-data";
 import type { Firm, MilestoneView, ProjectView, RequestView } from "@/lib/firm";
 import {

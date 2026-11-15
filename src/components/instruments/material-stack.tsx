@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { ChalkTick } from "@/components/staff/chalk-tick";
 import { GLYPH_SCALE, type CatalogueItem, type CatalogueUnit } from "@/lib/firm-data";
 

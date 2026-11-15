@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { TODAY } from "./demo-data";
 
 const inrFormat = new Intl.NumberFormat("en-IN", {

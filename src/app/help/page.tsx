@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import Link from "next/link";
 import { GUIDE_ROLES, GUIDES } from "@/components/guides/guide-data";
 import { countWord } from "@/lib/format";

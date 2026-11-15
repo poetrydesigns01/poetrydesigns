@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { ClientNav } from "@/components/client-nav";
 import { PauseBar, PauseProvider } from "@/components/register/recording-pause";
 import { SessionGate } from "@/components/session-gate";

@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { RevisionView } from "@/lib/firm";
 import type { Tone } from "@/lib/portal";
 

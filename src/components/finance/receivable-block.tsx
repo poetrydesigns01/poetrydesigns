@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { PegGlyphAt } from "@/components/instruments/glyphs";
 import type { LetterView } from "@/lib/firm";
 import { countWord } from "@/lib/format";

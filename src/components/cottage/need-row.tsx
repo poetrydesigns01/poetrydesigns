@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import Link from "next/link";
 
 // One thing waiting for her on the cottage: a whole-row link with the title, the figure on

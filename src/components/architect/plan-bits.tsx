@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { PlanStageState, PlanTaskView, PlanView } from "@/lib/workflow-plan";
 import type { WorkflowClock } from "@/lib/workflow-template";
 import type { Tone } from "@/lib/portal";

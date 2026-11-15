@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { StatusChip } from "@/components/register/status-chip";
 import type { RequestView } from "@/lib/firm";
 import { datePart, daysBetween } from "@/lib/format";

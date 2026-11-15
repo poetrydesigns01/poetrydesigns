@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // A tick as it is chalked on a delivered stack: one stroke, drawn by hand. It is always
 // decoration; the words beside it say what happened.
 

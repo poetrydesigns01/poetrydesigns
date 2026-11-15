@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { dayCount, inr } from "@/lib/format";
 import { RollingFigure } from "./rolling-figure";
 

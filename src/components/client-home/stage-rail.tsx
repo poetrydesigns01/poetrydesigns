@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import Link from "next/link";
 import { formatShortDate } from "@/lib/format";
 import type { TimelineView } from "@/lib/portal";

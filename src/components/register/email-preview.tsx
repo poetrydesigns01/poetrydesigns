@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // What an action would email, shown as a preview only. The demo sends no email, and the
 // preview says so before anything else.
 

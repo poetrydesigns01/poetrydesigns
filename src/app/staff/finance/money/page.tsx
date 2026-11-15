@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { MoneyIn } from "@/components/finance/money-in";
 import "@/components/payments/payments.css";
 

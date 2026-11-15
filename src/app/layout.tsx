@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import type { Metadata } from "next";
 import { Anek_Latin, Eczar } from "next/font/google";
 import "./globals.css";

@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 import { TODAY } from "./demo-data";
 
 // The only place the demo reads the clock. The day is always TODAY so every screen tells

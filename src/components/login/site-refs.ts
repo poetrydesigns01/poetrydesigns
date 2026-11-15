@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // The elements the stage moves by hand. The two drawings that hold them are rendered once
 // and never again, so React never fights the attributes and transforms written here. Each
 // element registers itself from a ref callback; nothing is looked up in the document.

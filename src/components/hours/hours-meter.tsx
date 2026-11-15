@@ -1,3 +1,6 @@
+/*
+ * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
+ */
 // Advisory hours as a row of cells, one per hour: filled for what is used, part filled for
 // a half hour, open for what is left. Hours used beyond the pool show as brick cells.
 
