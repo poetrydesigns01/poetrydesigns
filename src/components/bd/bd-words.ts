@@ -1,6 +1,7 @@
 import { TODAY } from "@/lib/demo-data";
 import type { DraftView, ProjectView } from "@/lib/firm";
 import { formatDate } from "@/lib/format";
+import type { Tone } from "@/lib/portal";
 
 // Small sayings shared by the business development screens. Pure, so pages and drafts
 // say the same thing the same way.
@@ -42,7 +43,7 @@ export function coordinateWords(lat: number, lng: number): string {
   return `Coordinates ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 }
 
-/** The pipeline word split for a turn margin: "Building" over "Milestone 4". */
+/** The pipeline word split for a turn margin: "Building" over "Stage 4". */
 export function phaseMargin(p: ProjectView): { margin: string; sub?: string } {
   const [head, ...rest] = p.stageWords.split(", ");
   const tail = rest.join(", ");
@@ -74,4 +75,14 @@ export function pipeline(projects: ProjectView[]): ProjectView[] {
   return projects
     .filter((p) => p.phase !== "draft" && p.onboardedBy === "rohan")
     .sort((a, b) => (b.onboardedOn ?? "").localeCompare(a.onboardedOn ?? ""));
+}
+
+/** Where a project stands, as one chip. */
+export function phaseChip(p: ProjectView): { tone: Tone; words: string } {
+  if (p.phase === "handed-over") return { tone: "done", words: "Handed over" };
+  if (p.phase === "building")
+    return { tone: "progress", words: p.currentMilestone ? `Milestone ${p.currentMilestone}` : p.stageWords.replace(/^Building, /, "") };
+  if (p.phase === "in-design") return { tone: "waiting", words: "In design" };
+  if (p.phase === "invited") return { tone: "waiting", words: "Invited" };
+  return { tone: "locked", words: "Draft" };
 }

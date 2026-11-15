@@ -1,204 +1,128 @@
 "use client";
 
 import { useState } from "react";
-import { TaskCourse } from "@/components/instruments/task-course";
-import { Chip, ChipGroup } from "@/components/register/chips";
 import { StaffBoard } from "@/components/register/staff-board";
+import { StatusChip } from "@/components/register/status-chip";
 import { useFirm } from "@/lib/demo-store";
-import {
-  courses,
-  performance,
-  templateOf,
-  type CategoryId,
-  type CourseBlock,
-  type PerformanceRow,
-} from "@/lib/firm-data";
+import { courses, performance, templateOf, type PerformanceRow } from "@/lib/firm-data";
 import { daysBetween, formatShortDate } from "@/lib/format";
+import { GlassTable, Initials, Meter, Panel, Segments, StatCard, StatRow } from "./glass-kit";
 
 // How the juniors are doing over the last 90 days: tasks, on time, late, revisions and days
-// taken, overall and by category, in one table. Below it each junior's last 30 days are
-// drawn as a course of task blocks per category, and open to list the tasks. Seniors see
-// the same figures on their team pages.
+// taken, in one table; then each junior's recent tasks, late ones in brick.
 
-type Key = "tasks" | "onTimePercent" | "late" | "avgRevisions" | "avgDays";
+type Key = "tasks" | "onTimePercent" | "late" | "avgRevisions";
 
-const COLUMNS: { key: Key; label: string }[] = [
-  { key: "tasks", label: "Tasks" },
-  { key: "onTimePercent", label: "On time" },
-  { key: "late", label: "Late" },
-  { key: "avgRevisions", label: "Revisions, average" },
-  { key: "avgDays", label: "Days, average" },
+const SORTS: { id: Key; label: string }[] = [
+  { id: "tasks", label: "Tasks" },
+  { id: "onTimePercent", label: "On time" },
+  { id: "late", label: "Late" },
+  { id: "avgRevisions", label: "Revisions" },
 ];
-
-function cell(row: PerformanceRow, key: Key): string {
-  if (key === "onTimePercent") return `${row.onTime}, ${row.onTimePercent}%`;
-  if (key === "avgRevisions") return row.avgRevisions.toFixed(1);
-  if (key === "avgDays") return row.avgDays.toFixed(1);
-  return String(row[key]);
-}
-
-/** The 90 days by category, as one sentence: "City villa 9 tasks, 2.6 days, 89% on time. Farmhouse ..." */
-function categoryWords(row: PerformanceRow): string {
-  return row.byCategory.map((c) => `${templateOf(c.category).name} ${c.words}.`).join(" ");
-}
 
 export function PerformancePage() {
   const firm = useFirm();
-  const [sort, setSort] = useState<{ key: Key; down: boolean } | null>(null);
-  const rows = sort
-    ? [...performance].sort((a, b) => (sort.down ? b[sort.key] - a[sort.key] : a[sort.key] - b[sort.key]))
-    : performance;
-
-  const choose = (key: Key) =>
-    setSort((s) => (s?.key === key ? (s.down ? { key, down: false } : null) : { key, down: true }));
-
-  const categoryOf = (block: CourseBlock): CategoryId => firm.project(block.projectId)?.category ?? "city-villa";
+  const [sort, setSort] = useState<Key>("tasks");
+  const rows = [...performance].sort((a, b) => b[sort] - a[sort]);
+  const tasks = performance.reduce((t, r) => t + r.tasks, 0);
+  const onTime = performance.reduce((t, r) => t + r.onTime, 0);
+  const late = performance.reduce((t, r) => t + r.late, 0);
+  const revisions = tasks > 0 ? performance.reduce((t, r) => t + r.avgRevisions * r.tasks, 0) / tasks : 0;
+  const name = (row: PerformanceRow) => firm.person(row.person)?.name ?? row.person;
 
   return (
     <>
-      <StaffBoard place="Performance" headline="How the juniors are doing, last 90 days." chip={false} />
-      <div className="mt-8 grid gap-10">
-        <section aria-label="By junior" className="grid gap-4">
-          <h2 className="register-title">By junior</h2>
+      <StaffBoard place="Performance" headline="Juniors, last 90 days" chip={false} />
+      <div className="mt-6 grid gap-5">
+        <StatRow cols={4} label="All juniors">
+          <StatCard label="Tasks" value={tasks} icon="check" />
+          <StatCard label="On time" value={`${tasks > 0 ? Math.round((onTime / tasks) * 100) : 0}%`} icon="clock" />
+          <StatCard label="Late" value={late} icon="alert" tone={late > 0 ? "late" : undefined} />
+          <StatCard label="Revisions" value={revisions.toFixed(1)} sub="Average per task" icon="file" />
+        </StatRow>
 
-          <div className="lg:hidden">
-            <ChipGroup label="Sort, highest first">
-              {COLUMNS.map((c) => (
-                <Chip
-                  key={c.key}
-                  pressed={sort?.key === c.key}
-                  onClick={() => setSort(sort?.key === c.key ? null : { key: c.key, down: true })}
-                >
-                  {c.label}
-                </Chip>
-              ))}
-            </ChipGroup>
-          </div>
+        <Panel title="By junior" aside={<Segments<Key> label="Sort" value={sort} onChange={setSort} options={SORTS} />} strong>
+          <GlassTable<PerformanceRow>
+            caption="Juniors, last 90 days"
+            rows={rows}
+            rowKey={(r) => r.person}
+            wide="lg"
+            lead={(r) => (
+              <span className="flex items-center gap-2">
+                <Initials name={name(r)} />
+                {name(r)}
+              </span>
+            )}
+            chip={(r) => <span className="figure text-15">{r.onTimePercent}%</span>}
+            columns={[
+              {
+                label: "Junior",
+                cell: (r) => (
+                  <span className="flex items-center gap-2">
+                    <Initials name={name(r)} />
+                    <span className="grid">
+                      <span>{name(r)}</span>
+                      <span className="text-13 font-normal text-ink-soft">
+                        {r.byCategory.map((c) => templateOf(c.category).name).join(" · ")}
+                      </span>
+                    </span>
+                  </span>
+                ),
+              },
+              { label: "Tasks", align: "right", width: "w-20", cell: (r) => <span className="figure">{r.tasks}</span> },
+              {
+                label: "On time",
+                width: "w-44",
+                cell: (r) => (
+                  <span className="grid gap-1">
+                    <span className="figure">{r.onTimePercent}%</span>
+                    <Meter value={r.onTimePercent / 100} tone={r.onTimePercent >= 80 ? "done" : "waiting"} label={`${name(r)}, on time`} />
+                  </span>
+                ),
+              },
+              {
+                label: "Late",
+                align: "right",
+                width: "w-20",
+                cell: (r) => <span className={`figure ${r.late > 0 ? "late-text" : "font-normal"}`}>{r.late}</span>,
+              },
+              { label: "Revisions", align: "right", width: "w-24", cell: (r) => <span className="figure font-normal">{r.avgRevisions.toFixed(1)}</span> },
+              { label: "Days", align: "right", width: "w-20", cell: (r) => <span className="figure font-normal">{r.avgDays.toFixed(1)}</span> },
+            ]}
+          />
+        </Panel>
 
-          <table className="hidden w-full border-collapse lg:table">
-            <thead>
-              <tr className="border-b border-sand">
-                <th scope="col" className="py-2 pr-3 text-left text-15 font-semibold">
-                  Junior
-                </th>
-                {COLUMNS.map((c) => (
-                  <th
-                    key={c.key}
-                    scope="col"
-                    className="py-1 text-right text-15 font-semibold"
-                    aria-sort={sort?.key === c.key ? (sort.down ? "descending" : "ascending") : "none"}
-                  >
-                    <button
-                      type="button"
-                      className="inline-flex min-h-11 cursor-pointer items-center px-2 underline decoration-1 underline-offset-4"
-                      onClick={() => choose(c.key)}
-                    >
-                      {c.label}
-                      {sort?.key === c.key && (
-                        <span className="sr-only">, sorted {sort.down ? "highest" : "lowest"} first</span>
-                      )}
-                    </button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.person} className="border-b border-sand">
-                  <th scope="row" className="py-3 pr-3 text-left align-top font-normal">
-                    <span className="block text-17 font-semibold">{firm.person(row.person)?.name}</span>
-                    <span className="block text-15 text-ink-soft">{categoryWords(row)}</span>
-                  </th>
-                  {COLUMNS.map((c) => (
-                    <td key={c.key} className="figure px-2 py-3 text-right align-top text-17">
-                      {cell(row, c.key)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <ul className="grid lg:hidden">
-            {rows.map((row) => (
-              <li key={row.person} className="border-b border-sand py-3">
-                <p className="text-17 font-semibold">{firm.person(row.person)?.name}</p>
-                <p className="text-15 text-ink-soft">
-                  {row.tasks} tasks, {row.onTime} on time ({row.onTimePercent}%), {row.late} late.{" "}
-                  {row.avgRevisions.toFixed(1)} revisions and {row.avgDays.toFixed(1)} days on average.
-                </p>
-                <p className="text-15 text-ink-soft">{categoryWords(row)}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section aria-label="Last 30 days, by category" className="grid gap-4">
-          <h2 className="register-title">Last 30 days, by category</h2>
-          <ul className="grid gap-8">
-            {rows.map((row) => {
-              const person = firm.person(row.person);
-              const blocks = courses[row.person] ?? [];
-              const categories = row.byCategory.map((c) => c.category);
-              return (
-                <li key={row.person} className="grid gap-3">
-                  <h3 className="text-17 font-semibold">{person?.name}</h3>
-                  <div className="grid gap-6 sm:grid-cols-2">
-                    {categories.map((category) => {
-                      const mine = blocks.filter((b) => categoryOf(b) === category);
-                      const tasks = mine.map((b) => ({ title: b.title, late: b.lateDays, revisions: b.revisions }));
-                      return (
-                        <div key={category} className="grid content-start gap-2">
-                          {tasks.length > 0 ? (
-                            <TaskCourse
-                              tasks={tasks}
-                              label={templateOf(category).name}
-                              width={240}
-                            />
-                          ) : (
-                            <p className="text-15 font-semibold">
-                              {templateOf(category).name}
-                              <span className="lettering block font-normal text-ink-soft">
-                                No tasks in this period.
-                              </span>
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {blocks.length > 0 && (
-                    <details>
-                      <summary className="lettering inline-flex min-h-11 cursor-pointer items-center underline decoration-1 underline-offset-4">
-                        {person?.first}&rsquo;s tasks ({blocks.length})
-                      </summary>
-                      <ul className="sheet-rows ruled">
-                        {blocks.map((b) => (
-                          <li key={b.title} className="grid gap-0.5">
-                            <p className="text-17">
-                              {b.title}, {firm.project(b.projectId)?.name}
-                            </p>
-                            <p className="text-15 text-ink-soft">
-                              Assigned {formatShortDate(b.assigned)}, accepted {formatShortDate(b.accepted)},{" "}
-                              {daysBetween(b.assigned, b.accepted)} days.{" "}
-                              {b.revisions === 1 ? "1 revision" : `${b.revisions} revisions`}.{" "}
-                              <span className={b.lateDays > 0 ? "font-bold text-ink" : "font-semibold text-kota"}>
-                                {b.lateDays > 0
-                                  ? `Late by ${b.lateDays === 1 ? "1 day" : `${b.lateDays} days`}`
-                                  : "On time"}
-                              </span>
-                              .
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+        <div className="grid gap-5 lg:grid-cols-2">
+          {rows.map((row) => {
+            const blocks = courses[row.person] ?? [];
+            return (
+              <Panel key={row.person} title={`${name(row)}, last 30 days`}>
+                {blocks.length === 0 ? (
+                  <p className="px-1 text-15 text-ink-soft">No tasks.</p>
+                ) : (
+                  <ul className="grid gap-1">
+                    {blocks.map((b) => (
+                      <li key={b.title} className="glass-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5">
+                        <span className="grid min-w-0">
+                          <span className="truncate text-15">{b.title}</span>
+                          <span className="text-13 text-ink-soft">
+                            {firm.project(b.projectId)?.name} · {formatShortDate(b.assigned)} · {daysBetween(b.assigned, b.accepted)} days
+                            {b.revisions > 0 ? ` · ${b.revisions} ${b.revisions === 1 ? "revision" : "revisions"}` : ""}
+                          </span>
+                        </span>
+                        {b.lateDays > 0 ? (
+                          <StatusChip tone="late">{b.lateDays === 1 ? "1 day late" : `${b.lateDays} days late`}</StatusChip>
+                        ) : (
+                          <StatusChip tone="done">On time</StatusChip>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Panel>
+            );
+          })}
+        </div>
       </div>
     </>
   );

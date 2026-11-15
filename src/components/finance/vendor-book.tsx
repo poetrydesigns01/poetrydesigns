@@ -4,19 +4,18 @@ import { useRef, useState } from "react";
 import { field } from "@/components/register/chips";
 import { Field } from "@/components/register/field";
 import { usePause } from "@/components/register/recording-pause";
-import { Register, RegisterRow } from "@/components/register/register";
-import { SampleTag } from "@/components/register/sample-tag";
+import { Count, GlassTable, Icon, Panel, Segments } from "@/components/admin/glass-kit";
 import { StaffBoard } from "@/components/register/staff-board";
+import { StatusChip } from "@/components/register/status-chip";
 import { TODAY } from "@/lib/demo-data";
 import { getDemoSnapshot, useDemo, useFirm, useViewer } from "@/lib/demo-store";
 import { vendors as seedVendors, type CatalogueItem, type PersonId, type Vendor } from "@/lib/firm-data";
 import { addDays, formatShortDate } from "@/lib/format";
 import { focusReturn } from "./focus-return";
-import { RateScale } from "./rate-scale";
 import { numberFrom, perUnit, rateWords } from "./shared";
 
-// The vendor book: for each material, who sells it, where they are, how to reach them and
-// what was last paid, before GST. A rate scale per size shows at a glance who is cheapest.
+// The vendor book: one table of who sells what, where they are, how to reach them and the
+// last rate paid, before GST. Narrowed to one material, the cheapest per size is marked.
 // Anyone in procurement can add a vendor; only the admin can delete one.
 
 const GSTIN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -78,13 +77,15 @@ function AddVendor({ person, onDone }: { person: PersonId; onDone: () => void })
 
   return (
     <form
-      className="grid gap-4 border-t border-sand pt-4"
+      className="glass-strong grid gap-4 p-4 sm:p-5"
+      aria-label="Add vendor"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
         submit();
       }}
     >
+      <h2 className="text-17 font-semibold">New vendor</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Vendor name" error={errors.name}>
           <input className={field} autoComplete="off" value={draft.name} onChange={(e) => set({ name: e.target.value })} />
@@ -143,116 +144,132 @@ function AddVendor({ person, onDone }: { person: PersonId; onDone: () => void })
 
 export function VendorBook() {
   const firm = useFirm();
-  const demo = useDemo();
   const me = useViewer("finance");
-  const pause = usePause();
   const [adding, setAdding] = useState(false);
-  const addRef = useRef<HTMLButtonElement>(null);
-  const materials = firm.catalogue.filter((c) => firm.vendors.some((v) => v.rates.some((r) => r.material === c.id)));
-  // The sample tag goes beside the first GSTIN on the screen only.
-  const firstMaterial = materials[0];
-  const taggedKey = firstMaterial
-    ? `${firstMaterial.id}:${firm.vendors.find((v) => v.rates.some((r) => r.material === firstMaterial.id))?.id}`
-    : "";
+  const [material, setMaterial] = useState<string>("all");
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const live = firm.vendors.filter((v) => !v.deleted);
+  const materials = firm.catalogue.filter((c) => live.some((v) => v.rates.some((r) => r.material === c.id)));
+  const item = materials.find((m) => m.id === material);
+  const rows = item ? live.filter((v) => v.rates.some((r) => r.material === item.id)) : live;
+  // The cheapest last rate per size of the chosen material.
+  const cheapest = new Map<string, number>();
+  if (item)
+    for (const v of rows)
+      for (const r of v.rates)
+        if (r.material === item.id) cheapest.set(r.sub, Math.min(cheapest.get(r.sub) ?? Infinity, r.rate));
+  const ratesOf = (v: Vendor) => v.rates.filter((r) => !item || r.material === item.id);
+  const nameOf = (id: string) => firm.catalogue.find((c) => c.id === id)?.name ?? id;
+  const latest = (v: Vendor) => {
+    const rates = ratesOf(v);
+    return rates.length > 0 ? rates.reduce((a, b) => (b.on > a.on ? b : a)) : undefined;
+  };
+  const best = (v: Vendor) => !!item && ratesOf(v).some((r) => cheapest.get(r.sub) === r.rate);
 
   return (
     <>
-      <StaffBoard
-        place="Vendors"
-        headline={`${firm.vendors.length} vendors across ${materials.length} materials.`}
-        state="Every rate here is the last one paid, before GST."
-        chip={false}
-      />
+      <StaffBoard place="Vendors" headline={`${live.length} vendors`} chip={false} />
 
-      <div className="mt-6 grid justify-items-start gap-3">
-        <button
-          ref={addRef}
-          type="button"
-          className="btn btn-quiet"
-          aria-expanded={adding}
-          onClick={() => {
-            if (adding && pause.pending !== null && pause.pending.rowId === null) pause.cancel();
-            setAdding((a) => !a);
-          }}
-        >
-          {adding ? "Close" : "Add vendor"}
-        </button>
+      <div ref={anchorRef} tabIndex={-1} className="mt-6 grid gap-5 outline-none">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <Segments<string>
+            label="Material"
+            value={material}
+            onChange={setMaterial}
+            options={[{ id: "all", label: "All" }, ...materials.map((m) => ({ id: m.id, label: m.name }))]}
+          />
+          <button
+            type="button"
+            className="btn btn-glass min-h-12 gap-2"
+            aria-expanded={adding}
+            onClick={() => setAdding((a) => !a)}
+          >
+            {!adding && <Icon name="plus" />}
+            {adding ? "Close" : "Add vendor"}
+          </button>
+        </div>
+
         {adding && (
-          <div className="w-full">
-            <AddVendor
-              person={me.id}
-              onDone={() => {
-                setAdding(false);
-                focusReturn(addRef.current)();
-              }}
-            />
-          </div>
+          <AddVendor
+            person={me.id}
+            onDone={() => {
+              setAdding(false);
+              focusReturn(anchorRef.current)();
+            }}
+          />
         )}
-        <p className="text-15 text-ink-soft">Only admin can delete a vendor.</p>
-      </div>
 
-      <div className="mt-10 grid gap-10 min-[1360px]:grid-cols-2 min-[1360px]:gap-8">
-        {materials.map((item) => {
-          const sellers = firm.vendors.filter((v) => v.rates.some((r) => r.material === item.id));
-          // One scale per size that more than one vendor has quoted for.
-          const subs = item.subs
-            .map((sub) => ({
-              sub,
-              rates: sellers.flatMap((v) =>
-                v.rates.filter((r) => r.material === item.id && r.sub === sub).map((r) => ({ vendor: v.name, rate: r.rate, unit: r.unit })),
-              ),
-            }))
-            .filter((s) => s.rates.length > 1);
-          return (
-            <div key={item.id} className="grid content-start gap-4">
-              <Register title={item.name}>
-                {sellers.map((v) => {
-                  const rates = v.rates.filter((r) => r.material === item.id);
-                  const latest = rates.reduce((a, b) => (b.on > a.on ? b : a));
-                  const first = `${item.id}:${v.id}` === taggedKey;
-                  return (
-                    <RegisterRow
-                      key={v.id}
-                      id={`vendor:${item.id}:${v.id}`}
-                      margin={formatShortDate(latest.on)}
-                      title={v.name}
-                      stamps={demo.events.flatMap((e) =>
-                        e.kind === "vendor.added" && e.vendor.id === v.id ? [{ words: "Vendor added", at: e.at, by: e.by }] : [],
-                      )}
-                      sentence={
-                        <>
-                          {rates.map((r) => `${r.sub}, ${rateWords(r.rate)} ${perUnit(r.unit)}`).join("; ")}. {v.area}.{" "}
-                          <a href={`tel:${v.phone.replace(/\s/g, "")}`} className="link whitespace-nowrap py-3.5">
-                            {v.phone}
-                          </a>
-                          . GSTIN {v.gstin}
-                          {first && (
-                            <>
-                              {" "}
-                              <SampleTag />
-                            </>
-                          )}
-                        </>
-                      }
-                    />
-                  );
-                })}
-              </Register>
-              {subs.map((s) => {
-                const cheapest = s.rates.reduce((a, b) => (b.rate < a.rate ? b : a));
-                return (
-                  <figure key={s.sub} className="grid gap-1">
-                    <RateScale rates={s.rates} />
-                    <figcaption className="lettering text-ink-soft">
-                      {s.sub}: cheapest is {cheapest.vendor}, {rateWords(cheapest.rate)} {perUnit(cheapest.unit)}, of{" "}
-                      {s.rates.length} quotes.
-                    </figcaption>
-                  </figure>
-                );
-              })}
-            </div>
-          );
-        })}
+        <Panel title={item ? item.name : "Every vendor"} aside={<Count n={rows.length} />} strong>
+          <GlassTable<Vendor>
+            caption="Vendors"
+            rows={rows}
+            rowKey={(v) => v.id}
+            wide="lg"
+            chip={(v) => (best(v) ? <StatusChip tone="done">Cheapest</StatusChip> : null)}
+            columns={[
+              {
+                label: "Vendor",
+                cell: (v) => (
+                  <span className="grid min-w-0">
+                    <span>{v.name}</span>
+                    <span className="inline-flex items-center gap-1 text-13 font-normal text-ink-soft">
+                      <Icon name="pin" className="size-3" />
+                      {v.area}
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                label: item ? "Last rate" : "Sells",
+                cell: (v) => (
+                  <ul className="grid gap-0.5">
+                    {ratesOf(v).map((r) => (
+                      <li key={`${r.material}-${r.sub}`} className="flex flex-wrap items-baseline gap-x-1.5">
+                        <span className="text-ink-soft">{item ? r.sub : `${nameOf(r.material)}, ${r.sub}`}</span>
+                        <span className={`figure ${cheapest.get(r.sub) === r.rate ? "font-semibold text-kota" : ""}`}>
+                          {rateWords(r.rate)}
+                        </span>
+                        <span className="text-13 text-ink-soft">{perUnit(r.unit)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ),
+              },
+              {
+                label: "Updated",
+                width: "w-24",
+                cell: (v) => {
+                  const r = latest(v);
+                  return <span className="text-13 font-normal">{r ? formatShortDate(r.on) : "–"}</span>;
+                },
+              },
+              {
+                label: "Phone",
+                width: "w-40",
+                cell: (v) => (
+                  <a
+                    href={`tel:${v.phone.replace(/\s/g, "")}`}
+                    className="link inline-flex min-h-11 items-center whitespace-nowrap font-normal"
+                  >
+                    {v.phone}
+                  </a>
+                ),
+              },
+              { label: "GSTIN", width: "w-44", phone: false, cell: (v) => <span className="text-13 font-normal">{v.gstin}</span> },
+              // "Cheapest" only means something once the book is narrowed to one material.
+              ...(item
+                ? [
+                    {
+                      label: "Best",
+                      width: "w-28",
+                      phone: false as const,
+                      cell: (v: Vendor) => (best(v) ? <StatusChip tone="done">Cheapest</StatusChip> : null),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </Panel>
       </div>
     </>
   );

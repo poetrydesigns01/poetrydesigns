@@ -1,67 +1,110 @@
 "use client";
 
-import { Register } from "@/components/register/register";
+import Link from "next/link";
+import { useState } from "react";
 import { StaffBoard } from "@/components/register/staff-board";
-import { TODAY } from "@/lib/demo-data";
+import { StatusChip } from "@/components/register/status-chip";
 import { useFirm, useViewer } from "@/lib/demo-store";
 import type { RequestView } from "@/lib/firm";
-import { addDays, datePart, listWords, weekdayDate } from "@/lib/format";
-import { RequestRow } from "./rows";
+import { formatShortDate } from "@/lib/format";
+import { Segmented, StatStrip, procurementDays, requestStatus, requestTitle } from "./site-kit";
 import "./site.css";
 
-// Every request the site engineer has raised, on every site, grouped by the day it was
-// raised, newest first. Each row is one link to the request, with the ladder on its side
-// saying where it has got to.
+// Every request this person raised, as a status list: where each stands, and how long
+// procurement took to order it (or has been sitting on it).
 
-function dayTitle(day: string): string {
-  if (day === TODAY) return "Today";
-  if (day === addDays(TODAY, -1)) return "Yesterday";
-  return weekdayDate(day);
+type Filter = "open" | "delivered" | "all";
+
+function Row({ r }: { r: RequestView }) {
+  const firm = useFirm();
+  const s = requestStatus(r);
+  const days = procurementDays(r);
+  const ordered = r.pos.length > 0;
+  return (
+    <li className="glass-row">
+      <Link href={`/staff/site/requests/${r.no}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_8rem_7rem_auto]">
+        <span className="grid min-w-0 gap-0.5">
+          <span className="truncate text-15 font-semibold text-ink">{requestTitle(r, firm)}</span>
+          <span className="truncate text-13 text-ink-soft">
+            {r.no.replace("MR-2026-", "MR ")} · {r.projectName}
+          </span>
+        </span>
+        <span className="col-start-2 row-start-1 justify-self-end sm:col-start-4">
+          <StatusChip tone={s.tone}>{s.words}</StatusChip>
+        </span>
+        <span className="text-13 text-ink-soft sm:col-start-2 sm:row-start-1 sm:text-15">
+          {r.queued ? (
+            "Not sent"
+          ) : ordered ? (
+            <>
+              PO in <span className="figure text-ink">{days} d</span>
+            </>
+          ) : (
+            <span className={days > 3 ? "late-text" : "text-ink"}>
+              <span className="figure">{days} d</span> waiting
+            </span>
+          )}
+        </span>
+        <span className="text-13 text-ink-soft sm:col-start-3 sm:row-start-1 sm:text-15">
+          {r.status === "Delivered" && r.deliveredAt ? `In ${formatShortDate(r.deliveredAt)}` : `Need ${formatShortDate(r.neededBy)}`}
+          {r.late && r.status !== "Delivered" && <span className="late-text"> · late</span>}
+        </span>
+      </Link>
+    </li>
+  );
 }
 
 export function MyRequests() {
   const firm = useFirm();
   const me = useViewer("site");
+  const [filter, setFilter] = useState<Filter>("open");
   const mine = firm.requests.filter((r) => r.by === me.id).sort((a, b) => b.at.localeCompare(a.at) || b.no.localeCompare(a.no));
   const open = mine.filter((r) => r.status !== "Delivered");
-
-  const days: { day: string; requests: RequestView[] }[] = [];
-  for (const r of mine) {
-    const day = datePart(r.at);
-    const group = days.find((d) => d.day === day);
-    if (group) group.requests.push(r);
-    else days.push({ day, requests: [r] });
-  }
-
-  // Where the open ones are, by site: "1 at Iyer Residence and 1 at Nair Farmhouse."
-  const bySite = [...new Set(open.map((r) => r.projectName))].map(
-    (name) => `${open.filter((r) => r.projectName === name).length} at ${name}`,
-  );
-
-  const headline =
-    open.length === 0
-      ? "All your requests are delivered."
-      : `${open.length} of your requests ${open.length === 1 ? "is" : "are"} open.`;
+  const delivered = mine.filter((r) => r.status === "Delivered");
+  const waiting = open.filter((r) => r.pos.length === 0 && !r.queued);
+  const ordered = mine.filter((r) => r.pos.length > 0);
+  const avg = ordered.length > 0 ? Math.round((ordered.reduce((sum, r) => sum + procurementDays(r), 0) / ordered.length) * 10) / 10 : 0;
+  const slow = waiting.filter((r) => procurementDays(r) > 3).length;
+  const lists: Record<Filter, RequestView[]> = { open, delivered, all: mine };
+  const shown = lists[filter];
+  const options: { id: Filter; label: string }[] = [
+    { id: "open", label: "Open" },
+    { id: "delivered", label: "Delivered" },
+    { id: "all", label: "All" },
+  ];
 
   return (
     <div className="site-screen">
-      <StaffBoard
-        place="My requests"
-        headline={headline}
-        state={open.length > 0 ? `${listWords(bySite)}.` : undefined}
-        chip={false}
+      <StaffBoard place="My requests" headline={mine.length === 0 ? "No requests yet" : open.length === 0 ? "All delivered" : `${open.length} open`} chip={false} />
+
+      <StatStrip
+        label="Procurement"
+        items={[
+          { icon: "box", label: "Open", value: open.length },
+          { icon: "truck", label: "Awaiting PO", value: waiting.length },
+          { icon: "clock", label: "Over 3 days", value: slow, alert: slow > 0 },
+          { icon: "calendar", label: "Avg days to PO", value: avg },
+        ]}
       />
-      {mine.length === 0 && <p className="text-17 text-ink-soft">You have not raised a request yet.</p>}
-      {/* On a wide screen the days stand two to a row, so a row's words keep a reading width. */}
-      <div className="grid items-start gap-10 min-[1360px]:grid-cols-2 min-[1360px]:gap-x-8">
-        {days.map(({ day, requests }) => (
-          <Register key={day} title={dayTitle(day)} limit={20}>
-            {requests.map((r) => (
-              <RequestRow key={r.no} request={r} />
+
+      <Segmented
+        label="Show"
+        value={filter}
+        onChange={setFilter}
+        options={options.map((o) => ({ ...o, count: lists[o.id].length }))}
+      />
+
+      <section aria-label="Requests" className="glass p-1.5 sm:p-2">
+        {shown.length === 0 ? (
+          <p className="px-3 py-3 text-15 text-ink-soft">None</p>
+        ) : (
+          <ul className="grid gap-0.5">
+            {shown.map((r) => (
+              <Row key={r.no} r={r} />
             ))}
-          </Register>
-        ))}
-      </div>
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

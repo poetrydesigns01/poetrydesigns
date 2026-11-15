@@ -5,17 +5,17 @@ import { Chip, ChipGroup, field } from "@/components/register/chips";
 import { EmailPreview } from "@/components/register/email-preview";
 import { Field } from "@/components/register/field";
 import { usePause } from "@/components/register/recording-pause";
-import { Register, RegisterRow } from "@/components/register/register";
 import { StaffBoard } from "@/components/register/staff-board";
+import { StatusChip } from "@/components/register/status-chip";
 import { useDemo, useFirm, type NewEvent } from "@/lib/demo-store";
 import type { Person, PersonId, ProjectId, StaffRole } from "@/lib/firm-data";
 import { listWords } from "@/lib/format";
 import { peopleOf, ROLE_GROUP, ROLE_TEAM, roleChangeWords, STAFF_ROLES, type PersonView } from "./admin-data";
+import { Count, Initials, Panel, Segments } from "./glass-kit";
 
-// Everyone who uses the portal, grouped by role. Each staff row has one action, "Change",
-// which opens the changes the admin can make: role, senior or junior, finance access, a
-// project or team, Project Head of a project, and deactivation. Every change asks for a
-// reason, waits five seconds, and is written to the log. People are never deleted.
+// Everyone who uses the portal, filtered by role. Each staff row has one action, "Change":
+// role, senior or junior, finance access, a project or team, Project Head, deactivation.
+// Every change asks for a reason, waits five seconds, and is logged. Nobody is deleted.
 
 type Action = "role" | "level" | "access" | "team" | "head" | "active";
 
@@ -45,51 +45,55 @@ const ROLE_WORD: Record<StaffRole, string> = {
   admin: "Admin",
 };
 
-/** One sentence about the person: title, projects, teams and access, no colon labels. */
-function personSentence(person: PersonView): string {
-  const heads = person.projects.filter((p) => p.head).map((p) => p.name);
-  const others = person.projects.filter((p) => !p.head).map((p) => p.name);
-  const parts = [person.title];
-  if (person.role === "client") {
-    if (others.length > 0) parts.push(`Client of ${listWords(others)}`);
-  } else {
-    if (heads.length > 0) parts.push(`Project Head of ${listWords(heads)}`);
-    if (others.length > 0) parts.push(`${heads.length > 0 ? "Also on" : "On"} ${listWords(others)}`);
-    if (person.onboarded > 0) parts.push(`Onboarded ${person.onboarded} projects`);
-    if (person.projects.length === 0 && person.onboarded === 0) parts.push("On no project yet");
-    if (person.teams.length > 0) parts.push(`${listWords(person.teams)} team`);
-    if (person.access.includes("finance")) parts.push("Finance access");
-  }
-  return `${parts.join(". ")}.`;
-}
+type RoleFilter = Person["role"] | "all";
+
+const ROLE_SHORT: Record<Person["role"], string> = {
+  bd: "BD",
+  architect: "Architects",
+  site: "Site",
+  finance: "Procurement",
+  admin: "Admin",
+  client: "Clients",
+};
 
 export function PeoplePage() {
   const demo = useDemo();
   const firm = useFirm();
   const [adding, setAdding] = useState(false);
+  const [role, setRole] = useState<RoleFilter>("all");
   const people = useMemo(() => peopleOf(firm, demo.events), [firm, demo.events]);
-  const roles = ROLE_ORDER.filter((role) => people.some((p) => p.role === role));
+  const roles = ROLE_ORDER.filter((r) => people.some((p) => p.role === r));
+  const shown = people
+    .filter((p) => role === "all" || p.role === role)
+    .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || Number(b.active) - Number(a.active));
+  const active = people.filter((p) => p.active && p.role !== "client").length;
 
   return (
     <>
       <StaffBoard
         place="People"
-        headline={`${people.length} people in ${roles.length} roles.`}
-        state="Deactivated people keep their place in the record. Nobody is deleted."
-        primary={{ label: "Add a person", onClick: () => setAdding(true) }}
+        headline={`${active} staff, ${people.filter((p) => p.role === "client").length} clients`}
+        primary={{ label: adding ? "Close" : "Add person", onClick: () => setAdding((a) => !a) }}
         chip={false}
       />
-      {adding && <AddPerson onClose={() => setAdding(false)} />}
-      <div className="mt-8 grid gap-12">
-        {roles.map((role) => (
-          <Register key={role} title={ROLE_GROUP[role]} limit={20}>
-            {people
-              .filter((p) => p.role === role)
-              .map((p) => (
-                <PersonRow key={p.id} person={p} />
-              ))}
-          </Register>
-        ))}
+      <div className="mt-6 grid gap-5">
+        {adding && <AddPerson onClose={() => setAdding(false)} />}
+        <Segments<RoleFilter>
+          label="Role"
+          value={role}
+          onChange={setRole}
+          options={[
+            { id: "all", label: "All", count: people.length },
+            ...roles.map((r) => ({ id: r, label: ROLE_SHORT[r], count: people.filter((p) => p.role === r).length })),
+          ]}
+        />
+        <Panel title={role === "all" ? "Everyone" : ROLE_GROUP[role]} aside={<Count n={shown.length} />} strong>
+          <ul className="grid gap-1">
+            {shown.map((p) => (
+              <PersonRow key={p.id} person={p} />
+            ))}
+          </ul>
+        </Panel>
       </div>
     </>
   );
@@ -100,6 +104,8 @@ function PersonRow({ person }: { person: PersonView }) {
   const pause = usePause();
   const rowId = `person:${person.id}`;
   const staff = person.role !== "client";
+  const heads = person.projects.filter((p) => p.head);
+  const others = person.projects.filter((p) => !p.head);
 
   const close = () => {
     if (pause.pending?.rowId === rowId) pause.cancel();
@@ -107,28 +113,48 @@ function PersonRow({ person }: { person: PersonView }) {
   };
 
   return (
-    <RegisterRow
-      id={rowId}
-      margin={person.role === "client" ? "Client" : person.senior ? "Senior" : "Junior"}
-      marginSub={person.active ? undefined : "Deactivated"}
-      title={person.active ? person.name : <s>{person.name}</s>}
-      sentence={personSentence(person)}
-      stamps={person.stamps}
-      action={
-        staff ? (
+    <li className={`glass-row grid gap-3 px-3 py-3 ${person.active ? "" : "opacity-70"}`} data-row-id={rowId}>
+      <div className="grid items-center gap-3 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_auto]">
+        <div className="flex min-w-0 items-center gap-3">
+          <Initials name={person.name} />
+          <span className="grid min-w-0">
+            <span className="truncate text-15 font-semibold">{person.active ? person.name : <s>{person.name}</s>}</span>
+            <span className="truncate text-13 text-ink-soft">{person.title}</span>
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {!person.active && <StatusChip tone="locked">Deactivated</StatusChip>}
+          {staff && <span className="glass-chip">{person.senior ? "Senior" : "Junior"}</span>}
+          {person.access.includes("finance") && <StatusChip tone="done">Finance access</StatusChip>}
+          {/* One count per kind; the full list is in the Change panel and the tooltip. */}
+          {heads.length > 0 && (
+            <span className="glass-chip chip-progress" title={heads.map((p) => p.name).join(", ")}>
+              Head · {heads.length}
+              <span className="sr-only">: {listWords(heads.map((p) => p.name))}</span>
+            </span>
+          )}
+          {others.length === 1 && <span className="glass-chip">{others[0].name}</span>}
+          {others.length > 1 && (
+            <span className="glass-chip" title={others.map((p) => p.name).join(", ")}>
+              {others.length} projects
+              <span className="sr-only">: {listWords(others.map((p) => p.name))}</span>
+            </span>
+          )}
+          {person.onboarded > 0 && <span className="glass-chip">{person.onboarded} onboarded</span>}
+        </div>
+        {staff && (
           <button
             type="button"
-            className="btn btn-quiet min-h-11"
+            className="btn btn-glass min-h-11 justify-self-start px-4 text-15 md:justify-self-end"
             aria-expanded={open}
             onClick={() => (open ? close() : setOpen(true))}
           >
             {open ? "Close" : "Change"}
           </button>
-        ) : undefined
-      }
-    >
+        )}
+      </div>
       {open && staff && <PersonChanges person={person} rowId={rowId} pause={pause} onDone={() => setOpen(false)} />}
-    </RegisterRow>
+    </li>
   );
 }
 
@@ -301,9 +327,18 @@ function PersonChanges({
   return (
     <form
       onSubmit={submit}
-      className="mt-2 grid gap-5 border-l-2 border-sand py-2 pl-4"
+      className="glass-inner grid gap-4 p-4"
       aria-label={`Change ${person.name}`}
     >
+      {person.projects.length > 0 && (
+        <ul aria-label="Projects" className="flex flex-wrap gap-1.5">
+          {person.projects.map((p) => (
+            <li key={p.id} className={`glass-chip ${p.head ? "chip-progress" : ""}`}>
+              {p.head ? `Head, ${p.name}` : p.name}
+            </li>
+          ))}
+        </ul>
+      )}
       <ChipGroup label="What to change">
         {actions.map((a) => (
           <Chip key={a.id} pressed={action === a.id} onClick={() => pick(a.id)}>
@@ -376,7 +411,7 @@ function PersonChanges({
         <>
           <p className="text-17">{readBack()}</p>
           {needsReason && (
-            <Field label="Reason" hint="Kept in the log beside the change." error={error || undefined}>
+            <Field label="Reason" error={error || undefined}>
               <input
                 id={`${ids}-reason`}
                 className={field}
@@ -420,7 +455,6 @@ function AddPerson({ onClose }: { onClose: () => void }) {
   const [senior, setSenior] = useState<boolean | null>(null);
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const what = `${name.trim() || "The new person"}${role ? `, ${titleFor(role, senior ?? false).toLowerCase()}` : ""}`;
 
   const close = () => {
     if (pause.pending?.what.startsWith("Add ")) pause.cancel();
@@ -468,8 +502,8 @@ function AddPerson({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <section aria-label="Add a person" className="mt-8 border-b border-sand pb-8">
-      <h2 className="register-title">Add a person</h2>
+    <section aria-label="Add a person" className="glass-strong p-4 sm:p-5">
+      <h2 className="text-17 font-semibold">Add a person</h2>
       <form onSubmit={submit} className="mt-4 grid max-w-[44rem] gap-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Full name" error={errors.name}>
@@ -534,12 +568,11 @@ function AddPerson({ onClose }: { onClose: () => void }) {
             "Open the link in this email to set up your sign-in. The link works once and for a short time.",
           ]}
         />
-        <p className="text-17">Add {what}.</p>
         <div className="flex flex-wrap gap-3">
-          <button type="submit" className="btn btn-quiet min-h-12" aria-disabled={pause.pending ? true : undefined}>
+          <button type="submit" className="btn btn-glass min-h-12" aria-disabled={pause.pending ? true : undefined}>
             Add {name.trim().split(/\s+/)[0] || "them"}
           </button>
-          <button type="button" className="btn btn-quiet min-h-12" onClick={close}>
+          <button type="button" className="btn btn-glass min-h-12" onClick={close}>
             Cancel
           </button>
         </div>

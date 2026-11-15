@@ -82,22 +82,27 @@ const NBSP = String.fromCharCode(0xa0);
 const MINUS = String.fromCharCode(0x2212);
 const JOINER = String.fromCharCode(0x2060);
 
-/** One short sentence of the money: "Building, milestone 6. Margin so far 19%. Cash −₹6,64,000." */
+/** A project's stage as the staff screens show it: "Milestone 4" rather than "Building, milestone 4". */
+export function stageChip(p: Pick<ProjectView, "stageWords">): string {
+  return p.stageWords.replace(/^Building, (milestone|stage) /i, "Milestone ").replace(/^In design, /i, "");
+}
+
+/** One short sentence of the money: "Stage 6. Margin so far 19%. Cash −₹6,64,000." */
 export function moneyLine(p: ProjectView, money: Money): string {
   const margin =
     money.margin === null ? "No margin until building starts." : `Margin so far ${percent(money.marginPercent ?? 0)}.`;
   // A word joiner keeps the minus sign on the same line as its figure.
-  return `${p.stageWords}. ${margin} Cash${NBSP}${inrSigned(money.cash).replace(MINUS, MINUS + JOINER)}.`;
+  return `${stageChip(p)}. ${margin} Cash${NBSP}${inrSigned(money.cash).replace(MINUS, MINUS + JOINER)}.`;
 }
 
-/** Milestone numbers in words: "Milestone 5", "Milestones 4 and 5". */
+/** Instalment numbers in words: "Instalment 5", "Instalments 4 and 5". */
 function milestonesWords(ns: number[]): string {
-  return ns.length === 1 ? `Milestone ${ns[0]}` : `Milestones ${listWords(ns.map(String))}`;
+  return ns.length === 1 ? `Instalment ${ns[0]}` : `Instalments ${listWords(ns.map(String))}`;
 }
 
 /**
  * The sentence that joins the figures on the Money tab: "Profitable on paper, short of cash
- * by ₹6,64,000. Milestones 4 and 5 have waited for the bank since 20 Sep and 22 Oct."
+ * by ₹6,64,000. Instalments 4 and 5 have waited for the bank since 20 Sep and 22 Oct."
  */
 export function joiningSentence(p: ProjectView, money: Money, firm: Firm): string {
   const health = healthWords(p, money);
@@ -124,8 +129,8 @@ export function joiningSentence(p: ProjectView, money: Money, firm: Firm): strin
         bank.map((l) => dayWords(l.approvedAt ?? "")),
       )}.`,
     );
-  for (const l of part) after.push(`Milestone ${l.n} is part paid; ${inr(l.total - l.received)} is still to come.`);
-  for (const l of raised) after.push(`Milestone ${l.n} is with ${p.clientWord === "Meera" ? "Meera" : "the client"}.`);
+  for (const l of part) after.push(`Instalment ${l.n} is part paid; ${inr(l.total - l.received)} is still to come.`);
+  for (const l of raised) after.push(`Instalment ${l.n} is with ${p.clientWord === "Meera" ? "Meera" : "the client"}.`);
   return [first, ...after].join(" ");
 }
 
@@ -379,7 +384,7 @@ export function cleanValue(value: string): string {
 
 /**
  * The record's sentence for a saved template: what changed, and nothing else.
- * "Changed the Farmhouse template: rate from ₹2,400 to ₹2,500 per sq ft; milestone 3 from 15% to 14%."
+ * "Changed the Farmhouse template: rate from ₹2,400 to ₹2,500 per sq ft; instalment 3 from 15% to 14%."
  */
 export function templateChangeWords(before: Template, after: Template): string | null {
   const parts: string[] = [];
@@ -388,9 +393,9 @@ export function templateChangeWords(before: Template, after: Template): string |
   for (const m of after.milestones) {
     const was = before.milestones.find((x) => x.n === m.n);
     if (!was) continue;
-    if (was.name !== m.name) parts.push(`milestone ${m.n} named '${cleanValue(m.name)}'`);
-    if (was.covers !== m.covers) parts.push(`milestone ${m.n} covers '${cleanValue(m.covers)}'`);
-    if (was.percent !== m.percent) parts.push(`milestone ${m.n} from ${was.percent}% to ${m.percent}%`);
+    if (was.name !== m.name) parts.push(`instalment ${m.n} named '${cleanValue(m.name)}'`);
+    if (was.covers !== m.covers) parts.push(`instalment ${m.n} covers '${cleanValue(m.covers)}'`);
+    if (was.percent !== m.percent) parts.push(`instalment ${m.n} from ${was.percent}% to ${m.percent}%`);
   }
   if (parts.length === 0) return null;
   return `Changed the ${after.name} template: ${parts.join("; ")}.`;

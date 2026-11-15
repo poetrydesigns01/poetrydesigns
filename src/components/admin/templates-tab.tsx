@@ -1,18 +1,19 @@
 "use client";
 
-import { useId, useMemo, useState, type FormEvent } from "react";
-import { Chip, ChipGroup, field } from "@/components/register/chips";
+import { useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { field } from "@/components/register/chips";
 import { usePause } from "@/components/register/recording-pause";
-import { SampleTag } from "@/components/register/sample-tag";
+import { StatusChip } from "@/components/register/status-chip";
 import { useDemo, useFirm } from "@/lib/demo-store";
 import type { CategoryId, Template } from "@/lib/firm-data";
 import { datePart, formatShortDate, formatTime, inr } from "@/lib/format";
+import { milestoneStage } from "@/lib/workflow-template";
 import { templateChangeWords, templatesOf, type TemplateView } from "./admin-data";
 
-// A category template: the rate per sq ft, the 5% sign-up, ten milestones with what each
-// covers and its share, and the Part B items with their formulas. The strip under the
-// milestones is drawn with each cell as wide as its share, so a gap shows before the
-// words say it. Saving waits until the shares add to 100%, and applies to new projects only.
+// A category template: the rate per sq ft (the one thing the admin edits here), the sign-up
+// share, the ten instalments at the agreed split with the milestone each opens (names and
+// contents read from the workflow, so payments and milestones always agree), and the Part B
+// items. The strip draws each share to scale. New projects only.
 
 const r1 = (v: number) => Math.round(v * 10) / 10;
 
@@ -78,40 +79,60 @@ export function TemplatesTab() {
   const [chosen, setChosen] = useState<CategoryId>("city-villa");
   const view = views.find((t) => t.id === chosen) ?? views[0];
 
+  // The category is chosen in the editor's own header, so the page keeps one row of tabs.
+  const chooser = (
+    <label className="block">
+      <span className="sr-only">Category</span>
+      <select
+        className={`${field} w-auto min-w-44 cursor-pointer font-semibold`}
+        value={chosen}
+        onChange={(e) => setChosen(e.target.value as CategoryId)}
+      >
+        {views.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
+  /* Keyed by the template and its last change, so a saved template starts a fresh draft. */
+  return <TemplateEditor key={`${view.id}-${view.changed?.at ?? "seed"}`} view={view} chooser={chooser} />;
+}
+
+function Chevron({ open }: { open: boolean }) {
   return (
-    <div className="grid gap-6">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <ChipGroup label="Category">
-          {views.map((t) => (
-            <Chip key={t.id} pressed={t.id === chosen} onClick={() => setChosen(t.id)}>
-              {t.name}
-            </Chip>
-          ))}
-        </ChipGroup>
-      </div>
-      {/* Keyed by the template and its last change, so a saved template starts a fresh draft. */}
-      <TemplateEditor key={`${view.id}-${view.changed?.at ?? "seed"}`} view={view} />
-    </div>
+    <svg
+      viewBox="0 0 20 20"
+      className={`size-4 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M5 8l5 5 5-5" />
+    </svg>
   );
 }
 
-function TemplateEditor({ view }: { view: TemplateView }) {
+function TemplateEditor({ view, chooser }: { view: TemplateView; chooser: ReactNode }) {
   const demo = useDemo();
   const firm = useFirm();
   const pause = usePause();
   const ids = useId();
   const [draft, setDraft] = useState<Template>(() => ({ ...view, milestones: view.milestones.map((m) => ({ ...m })) }));
   const [error, setError] = useState("");
+  const [opened, setOpened] = useState<number[]>([]);
+  const toggle = (n: number) => setOpened((o) => (o.includes(n) ? o.filter((x) => x !== n) : [...o, n]));
 
   const total =
     draft.signUpPercent + draft.milestones.reduce((sum, m) => sum + (Number.isFinite(m.percent) ? m.percent : 0), 0);
   const change = templateChangeWords(view, draft);
   const ready = total === 100 && change !== null;
-
-  const setMilestone = (n: number, patch: Partial<Template["milestones"][number]>) => {
-    setError("");
-    setDraft((d) => ({ ...d, milestones: d.milestones.map((m) => (m.n === n ? { ...m, ...patch } : m)) }));
-  };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -136,21 +157,19 @@ function TemplateEditor({ view }: { view: TemplateView }) {
     });
   };
 
-  const cell = "px-2 py-2 align-top";
-
   return (
-    <form onSubmit={submit} className="grid gap-6" aria-label={`${view.name} template`}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="register-title flex-1">{view.name}</h2>
-        <SampleTag>Sample, to be confirmed by Poetry</SampleTag>
+    <form onSubmit={submit} className="glass-strong grid gap-5 p-4 sm:p-5" aria-label={`${view.name} template`}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        {chooser}
+        <span className="flex flex-wrap gap-1.5">
+          <StatusChip tone="locked">New projects only</StatusChip>
+          {view.changed && (
+            <StatusChip tone="done">
+              {firm.person(view.changed.by)?.first}, {formatShortDate(datePart(view.changed.at))} {formatTime(view.changed.at)}
+            </StatusChip>
+          )}
+        </span>
       </div>
-      {view.note && <p className="text-15 text-ink-soft">{view.note}</p>}
-      {view.changed && (
-        <p className="lettering text-ink-soft">
-          Last changed by {firm.person(view.changed.by)?.name}, {formatShortDate(datePart(view.changed.at))} at{" "}
-          {formatTime(view.changed.at)}.
-        </p>
-      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -174,58 +193,62 @@ function TemplateEditor({ view }: { view: TemplateView }) {
             />
           </span>
         </div>
-        <p className="self-end text-17">Sign-up, {draft.signUpPercent}% on signing the agreement.</p>
+        <div className="glass-inner self-end px-3 py-2">
+          <p className="lettering text-ink-soft">Sign-up</p>
+          <p className="figure text-17">{draft.signUpPercent}%</p>
+        </div>
       </div>
 
-      <section aria-label="Milestones" className="grid gap-3">
-        <h3 className="text-17 font-semibold">Ten milestones</h3>
-        <div className="grid border-t border-sand">
-          {draft.milestones.map((m) => (
-            <div
-              key={m.n}
-              className="border-b border-sand py-2 grid gap-2 sm:grid-cols-[2rem_minmax(0,1fr)_minmax(0,1.4fr)_6rem] sm:items-start sm:gap-3"
-            >
-              <span className={`${cell} figure text-17`}>{m.n}</span>
-              <label className="block">
-                <span className="sr-only">Milestone {m.n} name</span>
-                <input className={field} value={m.name} onChange={(e) => setMilestone(m.n, { name: e.target.value })} />
-              </label>
-              <label className="block">
-                <span className="sr-only">What milestone {m.n} covers</span>
-                <input
-                  className={`${field} text-15`}
-                  value={m.covers}
-                  onChange={(e) => setMilestone(m.n, { covers: e.target.value })}
-                />
-              </label>
-              <label className="flex items-center gap-1.5">
-                <span className="sr-only">Milestone {m.n} share</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={100}
-                  className={`${field} text-right`}
-                  value={Number.isFinite(m.percent) ? m.percent : ""}
-                  onChange={(e) => setMilestone(m.n, { percent: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
-                />
-                <span className="text-17">%</span>
-              </label>
-            </div>
-          ))}
+      <section aria-label="Instalments" className="grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-15 font-semibold">Instalments</h3>
+          <StatusChip tone="locked">From the workflow</StatusChip>
         </div>
+        <ol className="glass-inner grid px-2">
+          {draft.milestones.map((m) => {
+            const open = opened.includes(m.n);
+            const coversId = `${ids}-covers-${m.n}`;
+            // Names and contents are the workflow's own, so payments and milestones agree.
+            const name = milestoneStage(m.n)?.short ?? m.name;
+            return (
+              <li
+                key={m.n}
+                className="grid grid-cols-[2rem_minmax(0,1fr)_auto_auto] items-center gap-x-2 border-b border-ink/10 py-1.5 last:border-b-0 sm:gap-x-3"
+              >
+                <span className="figure text-center text-15 text-ink-soft">M{m.n}</span>
+                <span className="min-w-0 truncate text-15">{name}</span>
+                <span className="figure text-15">{Number.isFinite(m.percent) ? m.percent : 0}%</span>
+                <button
+                  type="button"
+                  className="inline-grid size-11 cursor-pointer place-items-center rounded-full text-ink-soft transition-colors duration-150 hover:bg-white/60 hover:text-ink"
+                  aria-expanded={open}
+                  aria-controls={open ? coversId : undefined}
+                  aria-label={`What ${name} covers`}
+                  onClick={() => toggle(m.n)}
+                >
+                  <Chevron open={open} />
+                </button>
+                {open && (
+                  <p id={coversId} className="col-span-4 pb-1 text-13 text-ink-soft sm:col-start-2 sm:col-span-3">
+                    {m.covers || "–"}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ol>
         <ShareStrip shares={[{ percent: draft.signUpPercent }, ...draft.milestones]} />
-        <p className="text-17 font-semibold" aria-live="polite">
-          {totalWords(total)}
-        </p>
       </section>
 
       <section aria-label="Part B" className="grid gap-2">
-        <h3 className="text-17 font-semibold">Part B, outside the main contract</h3>
-        <ul className="sheet-rows ruled">
+        <h3 className="text-15 font-semibold">Part B</h3>
+        <ul className="glass-inner grid px-3">
           {draft.partB.map((item) => (
-            <li key={item.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-              <span className="text-17">{item.name}</span>
+            <li
+              key={item.id}
+              className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-ink/10 py-2 last:border-b-0"
+            >
+              <span className="text-15">{item.name}</span>
               <span className="text-15 text-ink-soft">{item.formula}</span>
             </li>
           ))}
@@ -233,7 +256,6 @@ function TemplateEditor({ view }: { view: TemplateView }) {
       </section>
 
       <div className="grid gap-2">
-        <p className="text-15 text-ink-soft">Changes apply to new projects only.</p>
         {error && (
           <p className="text-15 font-semibold text-brick" role="alert">
             {error}

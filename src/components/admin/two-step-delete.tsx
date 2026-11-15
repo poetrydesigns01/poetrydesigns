@@ -6,9 +6,8 @@ import { usePause } from "@/components/register/recording-pause";
 import { useDemo } from "@/lib/demo-store";
 import type { DeletedTarget } from "@/lib/firm-data";
 
-// Only the admin deletes, and never in one step. "Delete" asks the question and a reason;
-// the second "Delete" waits five seconds like every other record; then the line is struck,
-// with who and why, and the log keeps it. Nothing is removed from the record itself.
+// Only the admin deletes, and never in one step: "Delete" asks for a reason, the second
+// "Delete" waits five seconds, then the line is struck with who and why, and logged.
 
 export function TwoStepDelete({
   question,
@@ -64,7 +63,7 @@ export function TwoStepDelete({
       <button
         ref={startRef}
         type="button"
-        className="btn btn-quiet min-h-11"
+        className="btn btn-glass min-h-11 px-4 text-15"
         onClick={() => {
           setAsking(true);
           // The question replaces the button, so focus moves to its reason.
@@ -77,8 +76,8 @@ export function TwoStepDelete({
   }
 
   return (
-    <form onSubmit={submit} className="grid w-full gap-3 border-l-2 border-sand py-2 pl-4">
-      <p className="text-17 font-semibold">{question}</p>
+    <form onSubmit={submit} className="glass-inner grid w-full gap-3 p-4">
+      <p className="text-15 font-semibold">{question}</p>
       <label htmlFor={`${ids}-why`} className="text-15 font-semibold">
         Reason
       </label>
@@ -100,12 +99,12 @@ export function TwoStepDelete({
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
-          className="btn btn-quiet min-h-11 text-brick"
+          className="btn btn-glass min-h-11 px-4 text-15 text-brick"
           aria-disabled={pause.pending ? true : undefined}
         >
           Delete
         </button>
-        <button type="button" className="btn btn-quiet min-h-11" onClick={close}>
+        <button type="button" className="btn btn-glass min-h-11 px-4 text-15" onClick={close}>
           Keep it
         </button>
       </div>

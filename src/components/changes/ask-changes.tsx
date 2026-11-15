@@ -54,7 +54,7 @@ export function AskForChanges({
     if (sending) return;
     const text = comment.trim();
     if (text.length < 10) {
-      setError("Say what you would like changed, so the person who has to act on it can.");
+      setError("Add a comment");
       fieldRef.current?.focus();
       return;
     }
@@ -80,7 +80,7 @@ export function AskForChanges({
   return (
     <div ref={rootRef} className="contents">
       {!open && (
-        <button ref={buttonRef} type="button" className="btn btn-quiet" onClick={openQuestion}>
+        <button ref={buttonRef} type="button" className="btn btn-glass" onClick={openQuestion}>
           Ask for changes
         </button>
       )}
@@ -89,10 +89,10 @@ export function AskForChanges({
           role="group"
           data-asking=""
           aria-labelledby={fieldId}
-          className="enter-row w-full max-w-[36rem] scroll-my-3 border border-current px-[1.125rem] pb-[1.125rem] pt-4"
+          className="glass-inner enter-row w-full max-w-[36rem] scroll-my-3 p-4"
           onKeyDown={onKeyDown}
         >
-          <label htmlFor={`${fieldId}-field`} id={fieldId} className="block font-semibold">
+          <label htmlFor={`${fieldId}-field`} id={fieldId} className="block text-15 font-semibold">
             {prompt}
           </label>
           <textarea
@@ -108,10 +108,10 @@ export function AskForChanges({
             }}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className="mt-2 block min-h-[5.5rem] w-full rounded-[3px] border border-current/60 bg-transparent px-3 py-2 text-17 leading-snug"
+            className="glass-field mt-2 block min-h-[5.5rem] w-full px-3 py-2 text-17 leading-snug text-ink"
           />
           {error && (
-            <p id={errorId} className="mt-2 font-semibold">
+            <p id={errorId} className="late-text mt-2 text-15">
               {error}
             </p>
           )}
@@ -125,7 +125,7 @@ export function AskForChanges({
             >
               Send
             </button>
-            <button type="button" className="btn btn-quiet" onClick={close}>
+            <button type="button" className="btn btn-glass" onClick={close}>
               Go back
             </button>
           </div>

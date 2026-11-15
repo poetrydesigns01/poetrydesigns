@@ -19,13 +19,6 @@ export function personTitle(person: Person, firm: Firm): string {
   return head ? `${person.title}, Project Head` : person.title;
 }
 
-/** The same in a sentence: "senior architect and Project Head". */
-function titleWords(person: Person, firm: Firm): string {
-  const title = person.title.charAt(0).toLowerCase() + person.title.slice(1);
-  const head = firm.projects.some((p) => p.phase !== "draft" && p.team.head === person.id);
-  return head ? `${title} and Project Head` : title;
-}
-
 function initials(name: string): string {
   return name
     .split(" ")
@@ -79,40 +72,41 @@ export function PersonMenu({ role, variant = "button" }: { role: StaffRole; vari
     }
   };
 
-  const item = "flex min-h-11 w-full cursor-pointer items-center px-2 text-left text-17 hover:bg-sand-2";
+  const item = "flex min-h-11 w-full cursor-pointer items-center rounded-xl px-2.5 text-left text-17 hover:bg-white/70";
 
   const panel = (
     <div
       className={
         variant === "rail"
-          ? "absolute inset-x-0 top-full z-40 mt-1 grid gap-3 border border-ink bg-paper p-2 text-ink"
-          : "absolute right-0 top-full z-40 mt-2 grid w-[min(20rem,calc(100vw-32px))] gap-3 border border-ink bg-paper p-3 text-ink"
+          ? "glass-pop absolute inset-x-0 top-full z-40 mt-1 grid gap-2 p-1.5 text-ink"
+          : "glass-pop absolute right-0 top-full z-40 mt-2 grid w-[min(20rem,calc(100vw-32px))] gap-2 p-1.5 text-ink"
       }
     >
-      <p className="px-2 text-15">
-        You are {person.name}, {titleWords(person, firm)}.
-        {signedInAs && <span className="block text-ink-soft">Signed in as {signedInAs}.</span>}
+      <p className="px-2.5 pt-1.5 text-15">
+        <span className="block font-semibold">{person.name}</span>
+        <span className="block text-ink-soft">{personTitle(person, firm)}</span>
+        {signedInAs && <span className="block text-13 text-ink-soft">Signed in as {signedInAs}</span>}
       </p>
       {others.length > 0 && (
         <div role="group" aria-labelledby={`demo-${role}-${variant}`}>
-          <p id={`demo-${role}-${variant}`} className="lettering px-2 text-ink-soft">
-            Demo: see the portal as someone else
+          <p id={`demo-${role}-${variant}`} className="lettering px-2.5 text-ink-soft">
+            View as
           </p>
           <ul className="mt-1">
             {others.map((other) => (
               <li key={other.id}>
                 <button type="button" className={item} onClick={() => become(other.id)}>
-                  {other.name}, {titleWords(other, firm)}
+                  {other.name}
                 </button>
               </li>
             ))}
           </ul>
         </div>
       )}
-      <ul className="border-t border-sand pt-2">
+      <ul className="border-t border-ink/10 pt-1">
         <li>
           <Link href={`/help/${role}`} className={item} onNavigate={() => close(false)}>
-            Guide for this screen
+            Guide
           </Link>
         </li>
         <li>
@@ -127,10 +121,16 @@ export function PersonMenu({ role, variant = "button" }: { role: StaffRole; vari
       <details ref={ref} className="relative" onKeyDown={onKeyDown}>
         <summary
           ref={summaryRef}
-          className="grid cursor-pointer list-none gap-0.5 px-3 py-2 hover:bg-sand-2 [&::-webkit-details-marker]:hidden"
+          className="grid cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 rounded-xl px-2 py-2 hover:bg-white/55 [&::-webkit-details-marker]:hidden"
         >
-          <span className="text-17 font-semibold leading-snug">{person.name}</span>
-          <span className="text-15 text-ink-soft">{personTitle(person, firm)}</span>
+          <span
+            aria-hidden="true"
+            className="row-span-2 grid size-9 place-items-center rounded-full bg-rosewood text-13 font-semibold text-lime"
+          >
+            {initials(person.name)}
+          </span>
+          <span className="truncate text-15 font-semibold leading-snug">{person.name}</span>
+          <span className="truncate text-13 text-ink-soft">{personTitle(person, firm)}</span>
         </summary>
         {panel}
       </details>
@@ -141,7 +141,7 @@ export function PersonMenu({ role, variant = "button" }: { role: StaffRole; vari
     <details ref={ref} className="relative shrink-0" onKeyDown={onKeyDown}>
       <summary
         ref={summaryRef}
-        className="person-button grid size-11 cursor-pointer list-none place-items-center rounded-[3px] bg-lime/12 text-15 font-semibold hover:bg-lime/20 [&::-webkit-details-marker]:hidden"
+        className="person-button grid size-11 cursor-pointer list-none place-items-center rounded-full bg-lime/12 text-15 font-semibold hover:bg-lime/20 [&::-webkit-details-marker]:hidden"
       >
         <span aria-hidden="true">{initials(person.name)}</span>
         <span className="sr-only">{person.name}, your menu</span>

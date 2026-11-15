@@ -5,15 +5,14 @@ import type { MouseEvent, ReactNode, Ref } from "react";
 import { ChalkTick } from "@/components/staff/chalk-tick";
 
 // Chips are the staff side's answer to a select: every choice is on the screen and one tap
-// picks it. Unchosen chips are flat sand; the chosen one is filled rosewood and carries a
+// picks it. Unchosen chips are light glass; the chosen one is filled rosewood and carries a
 // tick, so the state is never colour alone. The state changes at once; nothing animates.
 
 /**
- * The look of a native field on staff screens: sand fill, an ink rule along the bottom only.
+ * The look of a native field on staff screens: a rounded glass control (see .glass-field).
  * `staff-field` gives a select its own drawn chevron and a date field its own calendar.
  */
-export const field =
-  "staff-field block min-h-12 w-full rounded-none border-0 border-b border-ink/40 bg-sand-2 px-3 text-17 text-ink placeholder:text-ink-soft";
+export const field = "staff-field glass-field block min-h-12 w-full px-3 text-17 text-ink placeholder:text-ink-soft";
 
 const COLUMNS = {
   // Two to a row from 400 px; on the narrowest phones a chip with a detail line needs the width.

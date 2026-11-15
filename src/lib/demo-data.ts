@@ -1,5 +1,8 @@
 // Fictional data for the UI/UX demo. Every person, address and amount is made up.
-// Milestone names are placeholders until Poetry sends the real list per category.
+// The payment rows follow Poetry's workflow (workflow-template.ts): the sign-up advance and
+// instalments 1 to 10, instalment n opening construction milestone n. This file imports
+// nothing, so its dates are written out; they match the plan generated for Iyer Residence
+// (pre-construction from 25 May 2026, construction week 1 from 13 Jul 2026).
 
 export const GST_RATE = 0.18;
 
@@ -13,26 +16,27 @@ export const client = {
 };
 
 export const project = {
-  code: "PD-CV-2026-014",
+  /** CFS_501_NK shape (category, running number, client initials); format to be confirmed. */
+  code: "CFS_504_MI",
   name: "Iyer Residence",
   category: "City villa",
   address: "Plot 47, Lakeside Layout, Kanakapura Road, Bengaluru 560062",
   plotArea: 2993,
   builtUpArea: 3350,
   ratePerSqFt: 2600,
-  agreementSignedOn: "2026-01-12",
+  agreementSignedOn: "2026-05-25",
   initialEstimate: 8320000,
   /** How far the house is built: 0 plinth, 1 ground floor, 2 first floor, 3 second floor, 4 roof. */
-  builtUpTo: 2,
-  /** Sample value, to be confirmed by Poetry. Consistent with milestone 10, "September 2027". */
-  handoverOn: "2027-09-30",
+  builtUpTo: 1,
+  /** The handover week of the plan: construction week 50, 21 to 27 Jun 2027. */
+  handoverOn: "2027-06-27",
 };
 
 /** What the site last reported. Sample values. */
 export const site = {
-  lastUpdatedOn: "2026-11-06",
+  lastUpdatedOn: "2026-11-10",
   lastUpdatedBy: "Suresh Gowda",
-  curing: { what: "The slab over the first floor", startedOn: "2026-11-06", days: 21 },
+  curing: { what: "The slab over the ground floor", startedOn: "2026-10-22", days: 21 },
 };
 
 export type Contact = {
@@ -75,7 +79,14 @@ export type Milestone = {
   /** Amount before GST. */
   amount: number;
   status: MilestoneStatus;
+  /**
+   * Deprecated: no longer seeded. Row n is instalment n, which falls due by week inside
+   * milestone n-1, so a row has no "work completed" date of its own; see `dueReachedOn`.
+   * Set only from a stage.done of the milestone the instalment falls inside.
+   */
   workCompletedOn?: string;
+  /** The Monday the instalment's due week came (the letter went out the same day). */
+  dueReachedOn?: string;
   paidOn?: string;
   letterNo?: string;
   letterIssuedOn?: string;
@@ -90,8 +101,10 @@ export type Milestone = {
   approvedAt?: string;
 };
 
-// Approved value is 87,10,000. The advance stays at 5% of the initial estimate;
-// the shortfall from the later addendum sits in milestone 1.
+// Approved value is 87,10,000, split 5% at sign-up (on the initial estimate) and then
+// 15, 15, 10, 10, 10, 8, 8, 8, 8, 3 percent; the shortfall from the study sits in instalment 1.
+// Row n is instalment n: it falls due in its week inside milestone n-1 and must be received
+// before milestone n starts. Milestone 4 is being built; instalment 5 is raised.
 export const milestones: Milestone[] = [
   {
     id: 0,
@@ -100,115 +113,125 @@ export const milestones: Milestone[] = [
     percent: 5,
     amount: 416000,
     status: "paid",
-    paidOn: "2026-01-14",
+    paidOn: "2026-05-27",
   },
   {
     id: 1,
-    name: "Foundation and plinth footing",
-    covers: "Excavation, footings, plinth beam and backfilling up to plinth level.",
+    name: "Footing and plinth",
+    covers: "Earthwork & site mobilisation, Footing, Pedestal, Plinth, UG sump",
     percent: 15,
     amount: 1326000,
     status: "paid",
-    workCompletedOn: "2026-05-22",
-    paidOn: "2026-06-02",
+    dueReachedOn: "2026-07-13",
+    paidOn: "2026-07-16",
     letterNo: "PD/DL/2026-27/0019",
-    letterIssuedOn: "2026-05-25",
-    acceptedAt: "2026-05-24T19:15",
-    raisedAt: "2026-05-25T10:00",
+    letterIssuedOn: "2026-07-13",
+    raisedAt: "2026-07-13T10:00",
     raisedBy: "Vikram Desai",
-    approvedAt: "2026-05-25T18:40",
+    approvedAt: "2026-07-13T18:40",
   },
   {
     id: 2,
-    name: "Ground floor structure",
-    covers: "Columns, walls, lintels and the roof slab over the ground floor.",
+    name: "Ground floor block work",
+    covers: "Ground floor block work",
     percent: 15,
     amount: 1306500,
     status: "paid",
-    workCompletedOn: "2026-08-18",
-    paidOn: "2026-08-29",
-    letterNo: "PD/DL/2026-27/0027",
-    letterIssuedOn: "2026-08-20",
-    acceptedAt: "2026-08-19T20:30",
-    raisedAt: "2026-08-20T09:40",
+    dueReachedOn: "2026-08-31",
+    paidOn: "2026-09-07",
+    letterNo: "PD/DL/2026-27/0024",
+    letterIssuedOn: "2026-08-31",
+    raisedAt: "2026-08-31T10:00",
     raisedBy: "Vikram Desai",
-    approvedAt: "2026-08-20T21:02",
+    approvedAt: "2026-09-01T21:02",
   },
   {
     id: 3,
-    name: "First floor structure",
-    covers: "Columns, walls, lintels and the roof slab over the first floor.",
+    name: "Ground floor roof slab",
+    covers: "GF roof slab",
     percent: 10,
     amount: 871000,
-    status: "awaiting-approval",
-    workCompletedOn: "2026-11-06",
-    letterNo: "PD/DL/2026-27/0034",
-    raisedAt: "2026-11-07T10:15",
+    status: "paid",
+    dueReachedOn: "2026-09-28",
+    paidOn: "2026-10-02",
+    letterNo: "PD/DL/2026-27/0027",
+    letterIssuedOn: "2026-09-28",
+    raisedAt: "2026-09-28T10:30",
     raisedBy: "Vikram Desai",
-    acceptedAt: "2026-11-07T19:42",
+    approvedAt: "2026-09-28T20:15",
   },
   {
     id: 4,
-    name: "Second floor and roof slab",
-    covers: "Second floor structure, terrace slab, parapet and the staircase headroom.",
+    name: "First floor block work",
+    covers: "FF block work",
     percent: 10,
     amount: 871000,
-    status: "in-progress",
-    expected: "January 2027",
+    status: "paid",
+    dueReachedOn: "2026-10-12",
+    paidOn: "2026-10-19",
+    letterNo: "PD/DL/2026-27/0030",
+    letterIssuedOn: "2026-10-12",
+    raisedAt: "2026-10-12T11:00",
+    raisedBy: "Vikram Desai",
+    approvedAt: "2026-10-13T19:40",
   },
   {
     id: 5,
-    name: "Brickwork and plastering",
-    covers: "Internal partition walls, internal and external plastering.",
+    name: "First floor roof slab",
+    covers: "FF roof slab",
     percent: 10,
     amount: 871000,
+    status: "awaiting-approval",
+    dueReachedOn: "2026-11-09",
+    letterNo: "PD/DL/2026-27/0034",
+    letterIssuedOn: "2026-11-09",
+    raisedAt: "2026-11-09T10:15",
+    raisedBy: "Vikram Desai",
+  },
+  {
+    id: 6,
+    name: "Second floor block work and roof slab",
+    covers: "SF block work, Roof slab",
+    percent: 8,
+    amount: 696800,
+    status: "upcoming",
+    expected: "November 2026",
+  },
+  {
+    id: 7,
+    name: "Plumbing and electrical",
+    covers: "Plumbing, Electrical",
+    percent: 8,
+    amount: 696800,
+    status: "upcoming",
+    expected: "December 2026",
+  },
+  {
+    id: 8,
+    name: "Plastering",
+    covers: "Plastering (internal & external)",
+    percent: 8,
+    amount: 696800,
+    status: "upcoming",
+    expected: "January 2027",
+  },
+  {
+    id: 9,
+    name: "Flooring and doors",
+    covers: "Flooring, Door installation",
+    percent: 8,
+    amount: 696800,
     status: "upcoming",
     expected: "March 2027",
   },
   {
-    id: 6,
-    name: "Electrical and plumbing",
-    covers: "Conduits, wiring, water supply and drainage lines, waterproofing of wet areas.",
-    percent: 8,
-    amount: 696800,
-    status: "upcoming",
-    expected: "April 2027",
-  },
-  {
-    id: 7,
-    name: "Flooring and tiling",
-    covers: "Floor finishes, wall tiling in kitchen and bathrooms, staircase cladding.",
-    percent: 8,
-    amount: 696800,
-    status: "upcoming",
-    expected: "June 2027",
-  },
-  {
-    id: 8,
-    name: "Doors, windows and joinery",
-    covers: "Door frames and shutters, windows and glazing, railings and built-in joinery.",
-    percent: 8,
-    amount: 696800,
-    status: "upcoming",
-    expected: "July 2027",
-  },
-  {
-    id: 9,
-    name: "Painting and finishing",
-    covers: "Putty, primer and paint, fixtures, fittings and external finishes.",
-    percent: 8,
-    amount: 696800,
-    status: "upcoming",
-    expected: "August 2027",
-  },
-  {
     id: 10,
-    name: "Handover",
-    covers: "Final cleaning, snag list closure and handing over the keys.",
+    name: "Windows, painting and finishes",
+    covers: "Windows installation, Painting, Finishes (sanitaryware & electrical switches), Compound wall",
     percent: 3,
     amount: 261300,
     status: "upcoming",
-    expected: "September 2027",
+    expected: "April 2027",
   },
 ];
 
@@ -251,26 +274,23 @@ export const designs: Design[] = [
     drawing: "plan",
     sheet: "A-103",
     anchor: "design:terrace-plan",
-    neededBefore: "before the second floor walls reach door height",
-    decideBy: "2026-11-20",
-    slips: "to keep the second floor walls rising on 4 Dec",
     versions: [
       {
         version: 1,
-        uploadedOn: "2026-10-24",
+        uploadedOn: "2026-06-16",
         uploadedBy: "Ananya Rao",
-        note: "First layout for the second floor family room and open terrace.",
+        note: "Second floor family room and open terrace.",
         status: "changes-requested",
-        decidedOn: "2026-10-30",
-        comment:
-          "Please make the family room open onto the terrace with a wider door, and keep the staircase headroom away from the seating side.",
+        decidedOn: "2026-06-18",
+        comment: "Please make the family room open onto the terrace with a wider door.",
       },
       {
         version: 2,
-        uploadedOn: "2026-11-09",
+        uploadedOn: "2026-06-22",
         uploadedBy: "Ananya Rao",
         note: "Terrace door widened to 3.0 m and the staircase headroom moved to the north side, as you asked.",
-        status: "awaiting",
+        status: "approved",
+        decidedOn: "2026-06-24",
       },
     ],
   },
@@ -281,17 +301,15 @@ export const designs: Design[] = [
     drawing: "spec",
     sheet: "S-204",
     anchor: "design:kitchen-spec",
-    neededBefore: "before electrical and plumbing work starts, expected April 2027",
-    decideBy: "2027-03-15",
-    slips: "to keep electrical and plumbing starting in April",
     documents: ["Kitchen specification sheet", "Sink and hob data sheet", "Chimney data sheet"],
     versions: [
       {
         version: 1,
-        uploadedOn: "2026-11-05",
+        uploadedOn: "2026-07-06",
         uploadedBy: "Ananya Rao",
         note: "Counter, sink, hob, chimney and storage finishes for the kitchen.",
-        status: "awaiting",
+        status: "approved",
+        decidedOn: "2026-07-08",
       },
     ],
   },
@@ -305,11 +323,11 @@ export const designs: Design[] = [
     versions: [
       {
         version: 4,
-        uploadedOn: "2026-03-16",
+        uploadedOn: "2026-06-26",
         uploadedBy: "Vikram Desai",
         note: "Final elevation with the cantilevered first floor and terrace railing.",
         status: "approved",
-        decidedOn: "2026-03-20",
+        decidedOn: "2026-07-01",
         comment: "Approved. We love the overhang.",
       },
     ],
@@ -324,11 +342,11 @@ export const designs: Design[] = [
     versions: [
       {
         version: 2,
-        uploadedOn: "2026-02-26",
+        uploadedOn: "2026-06-16",
         uploadedBy: "Ananya Rao",
         note: "Three bedrooms with the added study next to the master bedroom.",
         status: "approved",
-        decidedOn: "2026-03-02",
+        decidedOn: "2026-06-24",
       },
     ],
   },
@@ -342,11 +360,11 @@ export const designs: Design[] = [
     versions: [
       {
         version: 3,
-        uploadedOn: "2026-02-10",
+        uploadedOn: "2026-06-16",
         uploadedBy: "Ananya Rao",
         note: "Living, dining, kitchen, guest bedroom and the verandah facing the garden.",
         status: "approved",
-        decidedOn: "2026-02-14",
+        decidedOn: "2026-06-24",
       },
     ],
   },
@@ -412,14 +430,14 @@ export const changes: Change[] = [
     working: "Jacuzzi unit and installation ₹1,65,000, slab strengthening ₹45,000, waterproofing and plumbing ₹30,000.",
     cost: 240000,
     delayDays: 12,
-    affects: "Second floor and roof slab, then Electrical and plumbing",
+    affects: "Second floor block work and roof slab, then Plumbing and electrical",
     validUntil: "2026-11-22",
     status: "pending",
     anchor: "change:terrace-jacuzzi",
     short: "the jacuzzi",
     lands: [
-      { milestoneId: 4, amount: 45000 },
-      { milestoneId: 6, amount: 195000 },
+      { milestoneId: 6, amount: 45000 },
+      { milestoneId: 7, amount: 195000 },
     ],
   },
   {
@@ -444,23 +462,23 @@ export const changes: Change[] = [
     working: "56 sq ft beyond the allowance × ₹1,500 per sq ft.",
     cost: 84000,
     delayDays: 4,
-    affects: "Doors, windows and joinery",
+    affects: "Windows, painting and finishes",
     validUntil: "2026-11-18",
     status: "pending",
     anchor: "change:living-glazing",
     short: "the larger windows",
-    lands: [{ milestoneId: 8, amount: 84000 }],
+    lands: [{ milestoneId: 10, amount: 84000 }],
   },
   {
     id: "study-room",
     title: "Study next to the master bedroom",
     reason: "Added area",
-    raisedOn: "2026-02-20",
-    raisedAt: "2026-02-20",
+    raisedOn: "2026-06-10",
+    raisedAt: "2026-06-10T16:00",
     raisedBy: "Vikram Desai",
     revisedSpec: {
-      sheet: "A-102",
-      title: "First floor plan, version 2",
+      sheet: "Draft 3",
+      title: "Floor plan, draft 3",
       rows: [
         ["Study", "150 sq ft next to the master bedroom"],
         ["Built-up area", "3,350 sq ft, up from 3,200 sq ft"],
@@ -470,9 +488,9 @@ export const changes: Change[] = [
     working: "150 sq ft added × ₹2,600 per sq ft.",
     cost: 390000,
     delayDays: 9,
-    affects: "First floor structure",
+    affects: "Floor plan, before construction",
     status: "approved",
-    decidedOn: "2026-03-28",
+    decidedOn: "2026-06-12",
     addendum: "Addendum 1",
     anchor: "change:study-room",
     short: "the study",
@@ -489,10 +507,10 @@ export const credits = {
     { date: "2026-10-21", phase: "Construction", topic: "Electrical points for the first floor", with: "Vikram Desai", hours: 2 },
     { date: "2026-09-30", phase: "Construction", topic: "Railing height and design for the terrace", with: "Ananya Rao", hours: 1 },
     { date: "2026-09-12", phase: "Construction", topic: "Plumbing layout for the bathrooms", with: "Ananya Rao", hours: 1 },
-    { date: "2026-03-18", phase: "Before construction", topic: "Final walkthrough of the elevation", with: "Vikram Desai", hours: 2 },
-    { date: "2026-02-24", phase: "Before construction", topic: "First floor layout with the study", with: "Ananya Rao", hours: 3 },
-    { date: "2026-02-06", phase: "Before construction", topic: "Ground floor plan, third revision", with: "Ananya Rao", hours: 3.5 },
-    { date: "2026-01-22", phase: "Before construction", topic: "Brief, site visit and first concepts", with: "Vikram Desai", hours: 3.5 },
+    { date: "2026-06-30", phase: "Before construction", topic: "Final walkthrough of the elevation", with: "Vikram Desai", hours: 2 },
+    { date: "2026-06-10", phase: "Before construction", topic: "Floor plan with the study", with: "Ananya Rao", hours: 3 },
+    { date: "2026-06-03", phase: "Before construction", topic: "Floor plan, first draft", with: "Ananya Rao", hours: 3.5 },
+    { date: "2026-05-28", phase: "Before construction", topic: "Brief, site visit and soil test", with: "Vikram Desai", hours: 3.5 },
   ],
 };
 

@@ -1,97 +1,73 @@
 "use client";
 
-import { ClientPage, Sheet } from "@/components/page-band";
-import { AgreementPages, type House } from "@/components/record/agreement-pages";
+import { AgreementPages } from "@/components/record/agreement-pages";
 import { DecisionLog } from "@/components/record/decision-log";
-import { useDemo, useFirm, useProjection } from "@/lib/demo-store";
+import { useFirm, useProjection } from "@/lib/demo-store";
 import { datePart, formatDate, inr, inrDelta } from "@/lib/format";
 
-// Her agreement and every decision since, for the house she is looking at. Nothing here can
-// be changed: the agreement is view only, the value history only grows, and the log has no
-// edit or delete controls.
-
-const OTHER: Record<House, House> = { iyer: "iyer-cottage", "iyer-cottage": "iyer" };
+// Her agreement and every decision since, as proof. Nothing here can be changed: the
+// agreement is view only, the value history only grows, and the log has no edit or delete.
+// Each client project stays on its own: this is always Iyer Residence.
 
 export default function RecordPage() {
-  const demo = useDemo();
   const firm = useFirm();
   const projection = useProjection();
-  const house: House = demo.clientProject;
-  const project = firm.project(house);
-  const other = firm.project(OTHER[house]);
+  const project = firm.project("iyer");
   if (!project) return null;
 
-  const signedOn = project.signedOn ?? "";
   const area = Math.round(project.originalValue / project.ratePerSqFt);
-  const now = house === "iyer" ? projection.agreedValue : project.contractValue;
-  const signUp = project.milestones.find((m) => m.n === 0);
-  // The Iyer log is the client's own view of it. For the cottage only her own decisions are
-  // shown: staff lines on a project (bills, orders) are never for the client's eyes.
-  const entries =
-    house === "iyer"
-      ? projection.log
-      : firm.log.filter((entry) => entry.projectId === "iyer-cottage" && entry.kind === "client");
+  const now = projection.agreedValue;
+  const history = project.valueHistory;
 
   return (
-    <ClientPage
-      head={
-        <>
-          <h1 className="display display-xl max-w-[16ch] text-balance">Your agreement and every decision</h1>
-          <p className="mt-4 max-w-[52ch] text-17 text-lime/80">
-            Nothing here can be edited or deleted, by you or by anyone at Poetry.
-          </p>
-          {other && (
-            <button
-              type="button"
-              className="link mt-3 inline-flex min-h-11 items-center text-17 text-lime/80 hover:text-lime"
-              onClick={() => demo.setClientProject(OTHER[house])}
-            >
-              See the record for {other.name}
-            </button>
-          )}
-        </>
-      }
-    >
-      <Sheet title="Your agreement">
-        <p className="text-17">Signed on {formatDate(signedOn)}.</p>
-        <div className="mt-5">
-          <AgreementPages key={house} house={house} />
-        </div>
-      </Sheet>
+    <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:py-10">
+      <header className="px-1">
+        <h1 className="display text-32 text-ink">Agreement and record</h1>
+      </header>
 
-      <Sheet title={house === "iyer" ? "What your home costs now" : "What your cottage costs now"} tone="sand" ruled>
-        <ul className="sheet-rows">
-          {project.valueHistory.map((row, i) => (
-            <li key={`${row.label}-${row.at}`} className="flex items-baseline justify-between gap-4">
-              <span className="min-w-0">
-                <span className="block text-17">
-                  {i === 0
-                    ? `Signed, ${area.toLocaleString("en-IN")} sq ft at ${inr(project.ratePerSqFt)}`
-                    : row.label}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+        <section aria-labelledby="record-value" className="glass-dark grid content-start gap-4 p-5 sm:p-6">
+          <div>
+            <h2 id="record-value" className="lettering text-lime/75">
+              Contract value now
+            </h2>
+            <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
+              <span className="figure display-lg">{inr(now)}</span>
+              <span className="text-15 text-lime/75">+ GST</span>
+            </p>
+          </div>
+          <ul aria-label="Value history" className="grid gap-2 border-t border-lime/15 pt-3">
+            {history.map((row, i) => (
+              <li key={`${row.label}-${row.at}`} className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block text-15">{i === 0 ? `Signed · ${area.toLocaleString("en-IN")} sq ft` : row.label}</span>
+                  <span className="block text-13 text-lime/75">
+                    {i === 0 ? `${inr(project.ratePerSqFt)} per sq ft` : row.at ? formatDate(datePart(row.at)) : ""}
+                  </span>
                 </span>
-                {i > 0 && row.at && (
-                  <span className="block text-15 text-ink-soft">Approved on {formatDate(datePart(row.at))}</span>
-                )}
-              </span>
-              <span className="figure whitespace-nowrap text-17">{i === 0 ? inr(row.amount) : inrDelta(row.amount)}</span>
-            </li>
-          ))}
-          <li className="flex items-baseline justify-between gap-4">
-            <span className="text-17 font-semibold">Now, before GST</span>
-            <span className="figure whitespace-nowrap text-22">{inr(now)}</span>
-          </li>
-        </ul>
-        {signUp && (
-          <p className="mt-5 text-15 text-ink-soft">
-            Sign-up advance {inr(signUp.amount)} before GST
-            {signUp.paidOn ? `, paid on ${formatDate(signUp.paidOn)}.` : "."}
-          </p>
-        )}
-      </Sheet>
+                <span className="figure whitespace-nowrap text-15">{i === 0 ? inr(row.amount) : inrDelta(row.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-      <Sheet title="Every decision">
-        <DecisionLog key={house} entries={entries} />
-      </Sheet>
-    </ClientPage>
+        <section aria-labelledby="record-agreement" className="glass-strong grid content-start gap-3 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <h2 id="record-agreement" className="lettering text-ink-soft">
+              Agreement
+            </h2>
+            <span className="glass-chip chip-locked">View only</span>
+          </div>
+          <AgreementPages house="iyer" />
+        </section>
+      </div>
+
+      <section aria-labelledby="record-log" className="glass-strong grid gap-2 p-2 sm:p-3">
+        <h2 id="record-log" className="lettering px-3 pt-2 text-ink-soft">
+          Decisions
+        </h2>
+        <DecisionLog entries={projection.log} />
+      </section>
+    </div>
   );
 }

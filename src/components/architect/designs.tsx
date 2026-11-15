@@ -1,533 +1,625 @@
 "use client";
 
-import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
-import { FloorPlan } from "@/components/floor-plan";
-import { Chip, ChipGroup, field } from "@/components/register/chips";
+import { useEffect, useId, useRef, useState } from "react";
+import { field } from "@/components/register/chips";
 import { DropZone } from "@/components/register/drop-zone";
-import { EmailPreview } from "@/components/register/email-preview";
-import { Field } from "@/components/register/field";
 import { projectsFor } from "@/components/register/project-switch";
 import { usePause } from "@/components/register/recording-pause";
-import { Register, RegisterRow } from "@/components/register/register";
 import { StaffBoard } from "@/components/register/staff-board";
-import { useDemo, useFirm, useProjection } from "@/lib/demo-store";
-import { ageWords, daysSince, type Firm } from "@/lib/firm";
+import { StatusChip } from "@/components/register/status-chip";
+import { useDemo, useFirm } from "@/lib/demo-store";
+import type { Firm, ProjectView } from "@/lib/firm";
 import type { PersonId, ProjectId } from "@/lib/firm-data";
-import { datePart, formatShortDate, formatStamp } from "@/lib/format";
-import { useArchitect } from "./common";
-import { shelfWords, VersionShelf, type ShelfVersion } from "./version-shelf";
+import type { DesignItemView, Tone } from "@/lib/portal";
+import type { PlanStageView, PlanTaskView, PlanView } from "@/lib/workflow-plan";
+import { useArchitect, type ArchitectView } from "./common";
+import { day, dayTime, Empty, IconChat, IconCheck, IconEye, IconHistory, IconUpload, Panel, rowBtn } from "./glass-ui";
+import { inWeek, lateWords, planChip, weekNowLabel, weeksLabel } from "./plan-bits";
 
-// The studio's designs: one row per sheet, holding its version shelf. Approved versions
-// carry the client's seal, a version she asked to change has her words under it, and the
-// one waiting for her has a peg. A new version is uploaded inline and sent to the client
-// after the five-second pause; it waits for her decision and is posted in Updates.
+// The design track of one project, as Poetry's workflow lays it out: drafts and options,
+// approvals and the BOM, technical drawings, MEP, and the selections each milestone needs.
+// Each task shows its planned weeks, who has it and where it stands; a client item also
+// shows its version, when the client viewed it and what they decided. The next draft or
+// option is uploaded in its row.
 
-type Version = ShelfVersion & {
-  uploadedOn: string;
-  uploadedBy: string;
-  note: string;
-  decidedOn?: string;
-  comment?: string;
-};
+export const DESIGNS_HREF = "/staff/architect/designs";
 
-/** A sheet as the studio sees it, on any project. */
-type Sheet = {
-  projectId: ProjectId;
-  designId: string;
-  title: string;
-  sheet: string;
-  kind: "Drawing" | "Specification";
-  drawing: "plan" | "elevation" | "spec";
-  neededBefore?: string;
-  versions: Version[];
-  /** When the client approved the latest version. */
-  approvedAt?: string;
-};
+/** Columns from 1280 px: task, weeks, version, viewed, status, actions. */
+const COLS = "xl:grid xl:grid-cols-[minmax(0,1fr)_4.5rem_2.75rem_5.75rem_9.5rem_7.5rem]";
 
-function slug(text: string): string {
-  return text
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean)
-    .join("-");
+/** The design and approval tasks of the workbook. */
+export function isDesignTrack(t: Pick<PlanTaskView, "track">): boolean {
+  return t.track === "design" || t.track === "approval";
 }
 
-/** Every sheet on the viewer's projects: Iyer's in full, others as far as the portal holds them. */
-function useSheets(): Sheet[] {
-  const firm = useFirm();
-  const demo = useDemo();
-  const projection = useProjection();
-  const me = useArchitect();
-  const mine = projectsFor("architect", me.id, firm).map((p) => p.id);
-  const sheets: Sheet[] = [];
+/** A client design item's state as one chip, with the plan's timing when nothing is uploaded. */
+export function itemChip(item: DesignItemView, plan: PlanView, t: PlanTaskView | undefined): { tone: Tone; words: string } {
+  if (item.status === "approved") return { tone: "done", words: item.decidedAt ? `Approved ${day(item.decidedAt)}` : "Approved" };
+  if (item.status === "waiting") return { tone: "waiting", words: "With client" };
+  if (item.status === "modify") return { tone: "progress", words: "Modify asked" };
+  if (t?.late) return { tone: "late", words: lateWords(t.daysLate) };
+  if (t && inWeek(plan, t)) return { tone: "waiting", words: "Upload this week" };
+  return { tone: "locked", words: "To upload" };
+}
 
-  if (mine.includes("iyer")) {
-    for (const d of projection.designs) {
-      const last = d.design.versions.length - 1;
-      sheets.push({
-        projectId: "iyer",
-        designId: d.design.id,
-        title: d.design.title,
-        sheet: d.design.sheet,
-        kind: d.design.kind,
-        drawing: d.design.drawing,
-        neededBefore: d.design.neededBefore,
-        versions: d.design.versions.map((v, i) => ({
-          version: v.version,
-          status: i === last ? d.status : v.status === "awaiting" ? "superseded" : v.status,
-          uploadedOn: v.uploadedOn,
-          uploadedBy: v.uploadedBy,
-          note: v.note,
-          decidedOn: i === last ? d.latest.decidedOn : v.decidedOn,
-          comment: i === last ? d.latest.comment : v.comment,
-        })),
-        approvedAt: d.status === "approved" ? projection.approvedAt[d.design.anchor] : undefined,
-      });
+/** Design items by their template id, with whether they are locked (their stage, or an earlier draft or option still open). */
+function itemsOf(firm: Firm, id: ProjectId): Map<string, { item: DesignItemView; locked: boolean }> {
+  const map = new Map<string, { item: DesignItemView; locked: boolean }>();
+  for (const s of firm.designStages(id)) {
+    // Drafts and options go in order: one not uploaded waits for the one before to be approved.
+    const ordered = s.stage === "floor-plan" || s.stage === "elevation";
+    let waiting = false;
+    for (const item of s.items) {
+      map.set(item.id, { item, locked: s.locked || (ordered && waiting && item.status === "not-uploaded") });
+      if (item.status !== "approved") waiting = true;
     }
   }
-  for (const d of firm.designs) {
-    if (d.projectId === "iyer" || !mine.includes(d.projectId)) continue;
-    sheets.push({
-      projectId: d.projectId,
-      designId: d.designId,
-      title: d.title,
-      sheet: "",
-      kind: "Drawing",
-      drawing: "plan",
-      versions: [{ version: d.version, status: d.status, uploadedOn: datePart(d.sentAt), uploadedBy: d.by, note: "" }],
-    });
-  }
-  // New sheets started in this tab: every version waits for the client.
-  for (const e of demo.events) {
-    if (e.kind !== "design.uploaded" || !mine.includes(e.projectId)) continue;
-    if (sheets.some((s) => s.projectId === e.projectId && s.designId === e.designId && !s.designId.startsWith("new-"))) continue;
-    let sheet = sheets.find((s) => s.projectId === e.projectId && s.designId === e.designId);
-    if (!sheet) {
-      const parts = /^new-(.+?)~(.*)$/.exec(e.designId);
-      const title = parts?.[1] ?? e.designId;
-      const code = parts?.[2] ?? "";
-      sheet = {
-        projectId: e.projectId,
-        designId: e.designId,
-        title: title.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()),
-        sheet: code.toUpperCase(),
-        kind: e.files.length > 1 ? "Specification" : "Drawing",
-        drawing: e.files.length > 1 ? "spec" : "plan",
-        versions: [],
-      };
-      sheets.push(sheet);
+  return map;
+}
+
+/**
+ * The next draft, option or selection to upload: a version the client asked to modify,
+ * else the first not uploaded in an open stage. Drafts and options go in order, so the
+ * one before must be approved first.
+ */
+export function nextUpload(firm: Firm, id: ProjectId): DesignItemView | null {
+  const stages = firm.designStages(id).filter((s) => !s.locked);
+  const all = stages.flatMap((s) => s.items);
+  const modify = all.find((i) => i.status === "modify");
+  if (modify) return modify;
+  for (const s of stages) {
+    const ordered = s.stage === "floor-plan" || s.stage === "elevation";
+    for (let i = 0; i < s.items.length; i++) {
+      const item = s.items[i];
+      if (item.status !== "not-uploaded") continue;
+      if (ordered && i > 0 && s.items[i - 1].status !== "approved") break;
+      return item;
     }
-    for (const v of sheet.versions) if (v.status === "awaiting") v.status = "superseded";
-    sheet.versions.push({
-      version: e.version,
-      status: "awaiting",
-      uploadedOn: datePart(e.at),
-      uploadedBy: firm.person(e.by)?.name ?? e.by,
-      note: e.note,
-    });
   }
-  return sheets.filter((s) => me.scope === "all" || s.projectId === me.scope);
+  return null;
 }
 
-function clientOf(projectId: ProjectId, firm: Firm): { first: string; full: string; email: string } {
-  const p = firm.project(projectId);
-  if (projectId === "iyer" || projectId === "iyer-cottage") return { first: "Meera", full: "Meera Iyer", email: p?.clientEmail ?? "" };
-  return { first: "the client", full: p?.clients.join(" and ") ?? "the client", email: p?.clientEmail ?? "" };
-}
-
-// ---- The upload panel ----
-
-function UploadPanel({
-  sheets,
-  initial,
-  by,
-  onDone,
-}: {
-  sheets: Sheet[];
-  initial: string | null;
-  by: PersonId;
-  onDone: () => void;
-}) {
-  const firm = useFirm();
+function UploadForm({ item, by, onDone }: { item: DesignItemView; by: PersonId; onDone: () => void }) {
   const demo = useDemo();
   const pause = usePause();
-  const me = useArchitect();
-  const ids = useId();
-  const projects = projectsFor("architect", me.id, firm).filter((p) => me.scope === "all" || p.id === me.scope);
-  const keyOf = (s: Sheet) => `${s.projectId}:${s.designId}`;
-
-  const [choice, setChoice] = useState<string>(initial ?? (sheets[0] ? keyOf(sheets[0]) : "new"));
-  const chosen = sheets.find((s) => keyOf(s) === choice) ?? null;
-  const [newProject, setNewProject] = useState<ProjectId>(projects[0]?.id ?? "iyer");
-  const [newTitle, setNewTitle] = useState("");
-  const [newCode, setNewCode] = useState("");
-  const [packageChoice, setPackageChoice] = useState<boolean | null>(null);
+  const noteId = useId();
+  const version = (item.version ?? 0) + 1;
   const [files, setFiles] = useState<string[]>([]);
-  const [changed, setChanged] = useState("");
-  const [neededBefore, setNeededBefore] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const projectId = chosen ? chosen.projectId : newProject;
-  const version = chosen ? Math.max(...chosen.versions.map((v) => v.version)) + 1 : 1;
-  const isPackage = packageChoice ?? chosen?.kind === "Specification";
-  const code = chosen ? chosen.sheet : newCode.trim().toUpperCase();
-  const title = chosen ? chosen.title : newTitle.trim();
-  const client = clientOf(projectId, firm);
-  const stem = code || "Sheet";
-  const samples = isPackage
-    ? [`${stem} v${version} specification sheet.pdf`, `${stem} v${version} data sheet.pdf`, `${stem} v${version} finishes.png`]
-    : [`${stem} v${version}.pdf`, `${stem} v${version} page 2.png`];
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  const stem = `${item.sheet} v${version}`;
 
   const send = (origin: HTMLElement) => {
-    // Set aside, not disabled, while a pause runs, so the button keeps focus for Cancel.
     if (pause.pending !== null) return;
-    const next: Record<string, string> = {};
-    if (!chosen && newTitle.trim().length < 3) next.title = "Give the sheet a name.";
-    if (files.length === 0) next.files = "Choose the file you are sending.";
-    if (changed.trim().length < 5) next.changed = `Say what changed, in words ${client.first === "Meera" ? "Meera" : "the client"} will follow.`;
-    setErrors(next);
-    if (Object.keys(next).length > 0) return;
-    const designId = chosen ? chosen.designId : `new-${slug(newTitle)}~${slug(newCode)}`;
-    const note = changed.trim();
-    const before = neededBefore.trim() || undefined;
-    const sent = [...files];
+    if (files.length === 0) return setError("Choose the file");
+    if (version > 1 && note.trim().length < 3) return setError("Say what changed");
+    setError("");
     const { record } = demo;
+    const chosen = [...files];
+    const words = note.trim();
     pause.start({
-      what: `${title}, version ${version}, to ${client.full}`,
+      what: `${item.title} v${version}, sent to the client`,
       origin,
       commit: () => {
-        record({ kind: "design.uploaded", projectId, designId, version, note, neededBefore: before, files: sent, by });
-        setFiles([]);
-        setChanged("");
-        setNeededBefore("");
+        record({
+          kind: "design.uploaded",
+          projectId: item.projectId,
+          designId: item.id,
+          version,
+          note: words,
+          files: chosen,
+          ...(item.neededBy ? { neededBefore: item.neededBy } : {}),
+          by,
+        });
         onDone();
       },
     });
   };
 
   return (
-    <div className="grid max-w-[720px] gap-6 border-l-2 border-rosewood py-2 pl-4">
-      <ChipGroup label="Which sheet">
-        {sheets.map((s) => (
-          <Chip
-            key={keyOf(s)}
-            pressed={choice === keyOf(s)}
-            onClick={() => setChoice(keyOf(s))}
-            detail={choice === keyOf(s) ? `This will be version ${Math.max(...s.versions.map((v) => v.version)) + 1}` : undefined}
-          >
-            {s.title}
-          </Chip>
-        ))}
-        <Chip pressed={choice === "new"} onClick={() => setChoice("new")}>
-          A new sheet
-        </Chip>
-      </ChipGroup>
-
-      {!chosen && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {projects.length > 1 && (
-            <div className="sm:col-span-2">
-              <ChipGroup label="Project">
-                {projects.map((p) => (
-                  <Chip key={p.id} pressed={newProject === p.id} onClick={() => setNewProject(p.id)}>
-                    {p.name}
-                  </Chip>
-                ))}
-              </ChipGroup>
-            </div>
-          )}
-          <Field label="Sheet name" error={errors.title} htmlFor={`${ids}-title`}>
-            <input id={`${ids}-title`} className={field} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-          </Field>
-          <Field label="Sheet number" hint="For example A-104." htmlFor={`${ids}-code`}>
-            <input id={`${ids}-code`} className={field} value={newCode} onChange={(e) => setNewCode(e.target.value)} />
-          </Field>
-        </div>
-      )}
-
-      <ChipGroup label="What you are sending">
-        <Chip pressed={!isPackage} onClick={() => setPackageChoice(false)}>
-          One drawing
-        </Chip>
-        <Chip pressed={isPackage} onClick={() => setPackageChoice(true)} detail="Several files, approved together">
-          This is a specification package
-        </Chip>
-      </ChipGroup>
-
-      <div className="grid gap-1.5">
-        <DropZone
-          label={isPackage ? "The files in the package" : "The drawing"}
-          samples={samples}
-          accept="pdf-or-images"
-          chosen={files}
-          onChoose={(next) => {
-            setFiles(next);
-            if (errors.files) setErrors({ ...errors, files: "" });
-          }}
-          multiple={isPackage}
-        />
-        {errors.files && (
-          <p className="text-15 font-semibold text-brick" role="alert">
-            {errors.files}
-          </p>
-        )}
-      </div>
-
-      <Field
-        label="What changed"
-        hint={`In ${client.first === "Meera" ? "Meera's" : "the client's"} words: what she will see is different.`}
-        error={errors.changed}
-        htmlFor={`${ids}-changed`}
-      >
-        <textarea
-          id={`${ids}-changed`}
-          className={`${field} min-h-24 py-2`}
-          value={changed}
-          onChange={(e) => setChanged(e.target.value)}
-        />
-      </Field>
-
-      <Field label="Needed before (optional)" hint="A building event, such as before the second floor walls rise." htmlFor={`${ids}-before`}>
-        <input id={`${ids}-before`} className={field} value={neededBefore} onChange={(e) => setNeededBefore(e.target.value)} />
-      </Field>
-
-      <EmailPreview
-        to={`${client.full}${client.email ? `, ${client.email}` : ""}`}
-        subject={`${title || "A new sheet"}, version ${version}, is ready for you`}
-        body={[
-          `${title || "A new sheet"}, version ${version}, is in your portal.`,
-          changed.trim() || "What changed will be written here.",
-          "Open Designs to approve it or ask for changes. It is also posted in Updates.",
-        ]}
+    <div className="glass-inner mt-2 grid gap-3 p-3 sm:grid-cols-2">
+      <DropZone
+        label={`${item.sheet}, version ${version}`}
+        samples={[`${stem}.pdf`, `${stem} render.png`]}
+        accept="pdf-or-images"
+        chosen={files}
+        onChoose={(next) => {
+          setFiles(next);
+          setError("");
+        }}
       />
-
-      <div>
+      <div className="grid content-start gap-1.5">
+        <label htmlFor={noteId} className="text-15 font-semibold">
+          {version > 1 ? "What changed" : "Note"}
+        </label>
+        <textarea id={noteId} className={`${field} min-h-20 py-2`} value={note} onChange={(e) => setNote(e.target.value)} />
+      </div>
+      {error && (
+        <p className="text-15 font-semibold text-brick sm:col-span-2" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2 sm:col-span-2">
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn btn-primary min-h-11 gap-1.5 px-4 text-15"
           aria-disabled={pause.pending !== null}
-          onClick={(event) => send(event.currentTarget)}
+          onClick={(e) => send(e.currentTarget)}
         >
-          {client.first === "Meera" ? "Send to Meera" : "Send to the client"}
+          <IconUpload /> Send v{version}
+        </button>
+        <button
+          type="button"
+          className="btn btn-glass min-h-11 px-4 text-15"
+          onClick={() => {
+            if (pause.pending !== null) pause.cancel();
+            onDone();
+          }}
+        >
+          Cancel
         </button>
       </div>
     </div>
   );
 }
 
-// ---- Compare ----
-
-function Compare({ sheet }: { sheet: Sheet }) {
-  const [was, now] = sheet.versions.slice(-2);
-  const caption = (v: Version) =>
-    `Version ${v.version}, ${
-      { approved: "approved", awaiting: "waiting", "changes-requested": "changes asked", superseded: "replaced" }[v.status]
-    }`;
-  // The two versions stand one above the other, each drawing at a width its room names and
-  // dimensions can be read at: never over 720 px, and in a column under 544 px it is drawn
-  // at 640 px and scrolls sideways. Where the panel is wide, the caption and note stand
-  // beside the drawing.
-  const beside =
-    sheet.drawing === "plan" ? "@min-[56rem]:grid-cols-[minmax(0,45rem)_minmax(0,1fr)] @min-[56rem]:grid-rows-[auto_auto_1fr] @min-[56rem]:gap-x-6" : "";
-  const side = (v: Version, changedFrom?: number) => (
-    <figure className={`grid content-start gap-2 ${beside}`}>
-      <figcaption className={`text-15 font-semibold ${sheet.drawing === "plan" ? "@min-[56rem]:col-start-2 @min-[56rem]:row-start-1" : ""}`}>
-        {caption(v)}
-      </figcaption>
-      {sheet.drawing === "plan" ? (
-        <div className="grid max-w-[45rem] gap-1 @min-[56rem]:col-start-1 @min-[56rem]:row-span-3 @min-[56rem]:row-start-1">
-          <div
-            className="overflow-x-auto border border-sand bg-paper"
-            tabIndex={0}
-            role="group"
-            aria-label={`${caption(v)}, the drawing`}
-          >
-            <div className="min-w-[40rem] @min-[34rem]:min-w-0">
-              <FloorPlan designId={sheet.designId} title={sheet.title} sheet={sheet.sheet} version={v.version} changedFrom={changedFrom} />
-            </div>
-          </div>
-          <p className="lettering text-ink-soft @min-[34rem]:hidden">Scroll sideways for the whole sheet.</p>
-        </div>
-      ) : (
-        <p className="max-w-[68ch] bg-sand-2 px-3 py-2 text-15">{v.note || "No notes were sent with this version."}</p>
-      )}
-      {sheet.drawing === "plan" && v.note && (
-        <p className="max-w-[68ch] text-15 text-ink-soft @min-[56rem]:col-start-2 @min-[56rem]:row-start-2">{v.note}</p>
-      )}
-    </figure>
-  );
+/** Every version with its dates: the proof of what the client saw and decided. */
+function History({ item }: { item: DesignItemView }) {
   return (
-    <div className="@container pt-2">
-      <div className="grid gap-8">
-        {side(was)}
-        {side(now, was.version)}
+    <ol className="glass-inner mt-2 grid gap-1 p-2" aria-label={`${item.title}, versions`}>
+      {[...item.versions].reverse().map((v) => (
+        <li key={v.version} className="grid gap-1 rounded-xl px-2 py-1.5 sm:grid-cols-[3rem_minmax(0,1fr)]">
+          <span className="figure text-15 text-ink">v{v.version}</span>
+          <div className="grid gap-1">
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-13 text-ink-soft">
+              <span className="inline-flex items-center gap-1.5">
+                <IconUpload label="Uploaded" /> {dayTime(v.uploadedAt)}
+              </span>
+              {v.viewedAt && (
+                <span className="inline-flex items-center gap-1.5">
+                  <IconEye label="Viewed" /> {dayTime(v.viewedAt)}
+                </span>
+              )}
+              {v.decidedAt && v.status !== "waiting" && (
+                <StatusChip tone={v.status === "approved" ? "done" : "progress"}>
+                  {v.status === "approved" ? "Approved" : "Modify"} {dayTime(v.decidedAt)}
+                </StatusChip>
+              )}
+            </p>
+            {v.comment && (
+              <p className="flex items-start gap-1.5 text-15 text-ink">
+                <IconChat className="mt-1 text-ink-soft" />
+                <q>{v.comment}</q>
+              </p>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+type Open = { id: string; kind: "upload" | "history" } | null;
+
+function TaskRow({
+  t,
+  plan,
+  entry,
+  me,
+  head,
+  open,
+  setOpen,
+  rowRef,
+}: {
+  t: PlanTaskView;
+  plan: PlanView;
+  entry: { item: DesignItemView; locked: boolean } | undefined;
+  me: ArchitectView;
+  head: boolean;
+  open: Open;
+  setOpen: (o: Open) => void;
+  rowRef: (el: HTMLLIElement | null) => void;
+}) {
+  const firm = useFirm();
+  const demo = useDemo();
+  const pause = usePause();
+  const item = entry?.item;
+  const mine = t.assignee === me.id || item?.preparedBy === me.id;
+  const canAct = me.senior || head || mine;
+  const who = t.assignee ? (firm.person(t.assignee)?.first ?? "") : "";
+  const chip = item ? itemChip(item, plan, t) : planChip(plan, t);
+  const kind = open && open.id === t.id ? open.kind : null;
+  const canUpload = !!item && canAct && !entry?.locked && item.status !== "approved";
+  // Plain tasks are marked done by whoever has them, or by the Project Head when the architect manages them.
+  const canFinish =
+    !item && t.state !== "done" && t.state !== "locked" && (t.assignee === me.id || (t.manager === "architect" && (me.senior || head)));
+  const next = (item?.version ?? 0) + 1;
+
+  const toggle = (k: "upload" | "history") => {
+    if (kind === "upload" && pause.pending !== null) pause.cancel();
+    setOpen(kind === k ? null : { id: t.id, kind: k });
+  };
+
+  const finish = (origin: HTMLElement) => {
+    if (pause.pending !== null) return;
+    const { record } = demo;
+    pause.start({
+      what: `${t.name}, done`,
+      origin,
+      commit: () => record({ kind: "site-task.progress", projectId: t.projectId, taskId: t.id, percent: 100, by: me.id }),
+    });
+  };
+
+  return (
+    <li ref={rowRef} className="glass-row scroll-mt-28 px-3 py-2.5">
+      <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 xl:gap-x-3 ${COLS} xl:items-center`}>
+        <div className="min-w-0 basis-full xl:basis-auto">
+          <p className="truncate text-15 font-semibold text-ink">{item?.title ?? t.name}</p>
+          <p className="truncate text-13 text-ink-soft">{[item?.sheet, who].filter(Boolean).join(" · ") || "—"}</p>
+        </div>
+        <span className="figure text-13 text-ink">{weeksLabel(t.clock, t.fromWeek, t.toWeek)}</span>
+        <span className="figure text-15 text-ink">{item?.version ? `v${item.version}` : <span className="text-ink-soft">—</span>}</span>
+        {item ? (
+          <span className={`inline-flex items-center gap-1.5 text-13 ${item.viewed ? "text-ink" : "text-ink-soft"}`}>
+            <IconEye label={item.viewed ? "Viewed" : "Not viewed"} className={item.viewed ? "text-kota" : ""} />
+            {item.viewedAt ? day(item.viewedAt) : "—"}
+          </span>
+        ) : (
+          <span className="hidden xl:block" />
+        )}
+        <span>
+          <StatusChip tone={chip.tone}>{chip.words}</StatusChip>
+        </span>
+        <span className="ml-auto flex justify-end gap-2 xl:ml-0">
+          {item && item.versions.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-glass size-11 min-h-11 shrink-0 p-0"
+              aria-expanded={kind === "history"}
+              aria-label={`${item.title}, history`}
+              title="History"
+              onClick={() => toggle("history")}
+            >
+              <IconHistory />
+            </button>
+          )}
+          {canUpload && (
+            <button
+              type="button"
+              className={rowBtn}
+              aria-expanded={kind === "upload"}
+              aria-label={`Upload ${item.title}, version ${next}`}
+              onClick={() => toggle("upload")}
+            >
+              <IconUpload /> v{next}
+            </button>
+          )}
+          {canFinish && (
+            <button
+              type="button"
+              className={rowBtn}
+              aria-disabled={pause.pending !== null}
+              aria-label={`Mark ${t.name} done`}
+              onClick={(e) => finish(e.currentTarget)}
+            >
+              <IconCheck /> Done
+            </button>
+          )}
+        </span>
       </div>
+      {item?.status === "modify" && item.comment && kind !== "history" && (
+        <p className="mt-2 flex items-start gap-1.5 text-15 text-ink">
+          <IconChat className="mt-1 text-ink-soft" />
+          <q>{item.comment}</q>
+        </p>
+      )}
+      {item && kind === "history" && <History item={item} />}
+      {item && kind === "upload" && <UploadForm item={item} by={me.id} onDone={() => setOpen(null)} />}
+    </li>
+  );
+}
+
+/** A stage's design tasks: how many are done, and one chip for where they stand. */
+function stageSummary(plan: PlanView, s: PlanStageView, tasks: PlanTaskView[], done: (t: PlanTaskView) => boolean) {
+  const count = tasks.filter(done).length;
+  const late = tasks.filter((t) => !done(t) && t.late).length;
+  let chip: { tone: Tone; words: string };
+  if (count === tasks.length) chip = { tone: "done", words: "Done" };
+  else if (late > 0) chip = { tone: "late", words: `${late} late` };
+  else if (tasks.some((t) => !done(t) && inWeek(plan, t))) chip = { tone: "waiting", words: "This week" };
+  else chip = { tone: s.state === "current" ? "progress" : "locked", words: s.state === "current" ? "Under way" : "Upcoming" };
+  return { count, late, chip };
+}
+
+function Track({ p, me, focus }: { p: ProjectView; me: ArchitectView; focus: string | null }) {
+  const firm = useFirm();
+  const plan = firm.plan(p.id);
+  const items = itemsOf(firm, p.id);
+  const head = p.team.head === me.id;
+  const rows = useRef(new Map<string, HTMLLIElement>());
+
+  const doneOf = (t: PlanTaskView) => {
+    const entry = items.get(t.templateId);
+    return entry ? entry.item.status === "approved" : t.state === "done";
+  };
+  const stages = (plan?.stages ?? [])
+    .map((s) => ({ s, tasks: s.tasks.filter(isDesignTrack) }))
+    .filter((x) => x.tasks.length > 0);
+
+  const next = nextUpload(firm, p.id);
+  const focusTask = focus ? plan?.tasks.find((t) => t.templateId === focus) : undefined;
+
+  const [open, setOpen] = useState<Open>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const start = new Set<string>();
+    if (!plan) return start;
+    for (const { s, tasks } of stages) {
+      const live = tasks.filter((t) => !doneOf(t));
+      if (live.some((t) => t.late || inWeek(plan, t) || items.get(t.templateId)?.item.status === "modify")) start.add(s.id);
+      if (s.state === "current" && live.length > 0) start.add(s.id);
+    }
+    if (focusTask) start.add(focusTask.stage);
+    if (start.size === 0) {
+      const first = stages.find(({ tasks }) => tasks.some((t) => !doneOf(t)));
+      if (first) start.add(first.s.id);
+    }
+    return start;
+  });
+
+  // A row asked for from the desk: scroll to it once.
+  const focusId = focusTask?.id ?? null;
+  useEffect(() => {
+    if (focusId) rows.current.get(focusId)?.scrollIntoView({ block: "center" });
+  }, [focusId]);
+
+  if (!plan) {
+    return (
+      <section className="glass p-4">
+        <Empty>No plan yet</Empty>
+      </section>
+    );
+  }
+
+  const designTasks = stages.flatMap((x) => x.tasks);
+  const approved = designTasks.filter(doneOf).length;
+  const withClient = [...items.values()].filter((e) => e.item.status === "waiting");
+  const viewed = withClient.filter((e) => e.item.viewed).length;
+  const late = designTasks.filter((t) => !doneOf(t) && t.late).length;
+  const nextTask = next ? plan.tasks.find((t) => t.templateId === next.id) : undefined;
+  const drawings = firm.siteDrawings.filter((d) => d.projectId === p.id && d.status === "awaited");
+  const drawingsLate = drawings.filter((d) => d.daysLate > 0).length;
+
+  const toggleStage = (id: string) => {
+    setExpanded((prev) => {
+      const out = new Set(prev);
+      if (out.has(id)) out.delete(id);
+      else out.add(id);
+      return out;
+    });
+  };
+
+  const uploadNext = () => {
+    if (!nextTask || !next) return;
+    setExpanded((prev) => new Set(prev).add(nextTask.stage));
+    setOpen({ id: nextTask.id, kind: "upload" });
+    requestAnimationFrame(() => rows.current.get(nextTask.id)?.scrollIntoView({ block: "center", behavior: "smooth" }));
+  };
+
+  const canUploadNext =
+    !!next && (me.senior || head || next.preparedBy === me.id || nextTask?.assignee === me.id);
+
+  return (
+    <div className="grid gap-4">
+      <section className="glass-dark grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end" aria-label="Design track">
+        <div className="grid min-w-0 gap-1">
+          <p className="lettering text-lime/75">
+            {p.code} · {weekNowLabel(plan)}
+          </p>
+          {next ? (
+            <>
+              <p className="display text-22 text-lime sm:text-32">{next.title}</p>
+              <p className="flex flex-wrap items-center gap-2 text-15 text-lime/75">
+                <span>
+                  {[`v${(next.version ?? 0) + 1}`, next.milestone ? `Milestone ${next.milestone}` : next.stageLabel, next.neededBy ? `by ${day(next.neededBy)}` : null]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+                {next.status === "modify" && <StatusChip tone="progress">Modify asked</StatusChip>}
+              </p>
+            </>
+          ) : (
+            <p className="display flex items-center gap-2 text-22 text-lime sm:text-32">
+              {withClient.length > 0 ? (
+                <>
+                  <IconEye /> With the client
+                </>
+              ) : (
+                <>
+                  <IconCheck /> All uploaded
+                </>
+              )}
+            </p>
+          )}
+        </div>
+        <dl className="grid grid-cols-3 gap-2 text-lime lg:min-w-[22rem]">
+          <div className="glass-inner p-2.5">
+            <dt className="lettering text-lime/75">Done</dt>
+            <dd className="figure text-22">
+              {approved}/{designTasks.length}
+            </dd>
+          </div>
+          <div className="glass-inner p-2.5">
+            <dt className="lettering text-lime/75">Client</dt>
+            <dd className="figure flex items-center gap-1.5 text-22">
+              {withClient.length}
+              {withClient.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-13">
+                  <IconEye label="Viewed" /> {viewed}
+                </span>
+              )}
+            </dd>
+          </div>
+          <div className="glass-inner p-2.5">
+            <dt className="lettering text-lime/75">Site waits</dt>
+            <dd className="figure flex items-center gap-1.5 text-22">
+              {drawings.length}
+              {drawingsLate > 0 && <span className="text-13 text-brass-light">{drawingsLate} late</span>}
+            </dd>
+          </div>
+        </dl>
+        {next && canUploadNext && (
+          <div className="lg:col-span-2">
+            <button type="button" className="btn btn-primary min-h-12 gap-2" onClick={uploadNext}>
+              <IconUpload /> Upload v{(next.version ?? 0) + 1}
+            </button>
+          </div>
+        )}
+      </section>
+
+      <Panel title="Design track" aside={late > 0 ? <StatusChip tone="late">{`${late} late`}</StatusChip> : undefined}>
+        <div aria-hidden="true" className={`lettering hidden gap-x-3 px-3 pb-1 text-ink-soft ${COLS}`}>
+          <span>Task</span>
+          <span>Weeks</span>
+          <span>Ver.</span>
+          <span>Viewed</span>
+          <span>Status</span>
+          <span />
+        </div>
+        <ol className="grid gap-2">
+          {stages.map(({ s, tasks }) => {
+            const sum = stageSummary(plan, s, tasks, doneOf);
+            const isOpen = expanded.has(s.id);
+            const panelId = `stage-${p.id}-${s.id}`;
+            return (
+              <li key={s.id} className="grid gap-1">
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  aria-controls={panelId}
+                  onClick={() => toggleStage(s.id)}
+                  className="flex min-h-12 w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2 text-left hover:bg-white/45"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width={16}
+                    height={16}
+                    aria-hidden="true"
+                    className={`shrink-0 text-ink-soft transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m6 3.5 4.5 4.5L6 12.5" />
+                  </svg>
+                  <span className="min-w-0 flex-[1_1_10rem]">
+                    <span className="block truncate text-15 font-semibold text-ink">{s.name}</span>
+                    {s.milestone !== null && <span className="block truncate text-13 text-ink-soft">{s.short}</span>}
+                  </span>
+                  <span className="figure text-13 text-ink-soft">{weeksLabel(s.clock, s.fromWeek, s.toWeek)}</span>
+                  <span className="figure text-15 text-ink">
+                    {sum.count}/{tasks.length}
+                  </span>
+                  <StatusChip tone={sum.chip.tone}>{sum.chip.words}</StatusChip>
+                </button>
+                {isOpen && (
+                  <ul id={panelId} className="grid grid-cols-1 gap-1">
+                    {tasks.map((t) => (
+                      <TaskRow
+                        key={`${t.id}-${items.get(t.templateId)?.item.version ?? 0}`}
+                        t={t}
+                        plan={plan}
+                        entry={items.get(t.templateId)}
+                        me={me}
+                        head={head}
+                        open={open}
+                        setOpen={setOpen}
+                        rowRef={(el) => {
+                          if (el) rows.current.set(t.id, el);
+                          else rows.current.delete(t.id);
+                        }}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </Panel>
     </div>
   );
 }
 
-// ---- The page ----
+/** The project with the most design work in hand now, the architect's own counting double. */
+function busiest(firm: Firm, projects: ProjectView[], me: PersonId): ProjectView | undefined {
+  const score = (p: ProjectView) => {
+    const plan = firm.plan(p.id);
+    if (!plan) return -1;
+    const items = itemsOf(firm, p.id);
+    let total = 0;
+    for (const t of plan.tasks) {
+      if (!isDesignTrack(t) || t.state === "done" || t.state === "locked") continue;
+      const item = items.get(t.templateId)?.item;
+      if (item?.status === "approved") continue;
+      if (!(t.late || inWeek(plan, t) || item?.status === "modify")) continue;
+      total += t.assignee === me || item?.preparedBy === me ? 2 : 1;
+    }
+    return total;
+  };
+  return [...projects].sort((a, b) => score(b) - score(a))[0];
+}
 
 export function ArchitectDesigns() {
   const firm = useFirm();
-  const pause = usePause();
+  const demo = useDemo();
   const me = useArchitect();
-  const sheets = useSheets();
-  // Which panel is open: the upload at the top, an upload in a row, or a comparison.
-  const [panel, setPanel] = useState<{ kind: "upload" | "compare"; at: string } | null>(null);
+  const projects = projectsFor("architect", me.id, firm).filter(
+    (p) => (me.scope === "all" || p.id === me.scope) && firm.plan(p.id) !== null,
+  );
 
-  const scoped = me.scope === "all" ? null : firm.project(me.scope);
-  const headline = scoped ? `${scoped.name} designs` : "Designs on your projects";
+  // A row asked for from the desk ("iyer:m4-door-frames"), kept for this visit.
+  const asked = demo.focusRow && demo.focusRow.href === DESIGNS_HREF ? demo.focusRow.id : null;
+  const [focus] = useState(asked);
+  const [picked, setPicked] = useState<ProjectId | null>(() => (asked ? (asked.split(":")[0] as ProjectId) : null));
+  const { setFocusRow } = demo;
+  useEffect(() => {
+    if (asked) setFocusRow(null);
+  }, [asked, setFocusRow]);
 
-  // "2 are with Meera." counted per client.
-  const waitingBy = new Map<ProjectId, number>();
-  for (const s of sheets) {
-    if (s.versions[s.versions.length - 1]?.status === "awaiting") waitingBy.set(s.projectId, (waitingBy.get(s.projectId) ?? 0) + 1);
-  }
-  const parts = [...waitingBy.entries()].map(([id, n]) => ({ n, who: id === "iyer" || id === "iyer-cottage" ? "Meera" : `the ${firm.project(id)?.name ?? ""} clients` }));
-  const state =
-    parts.length === 0
-      ? "None are waiting on a client."
-      : `${parts[0].n} ${parts[0].n === 1 ? "is" : "are"} with ${parts[0].who}${parts
-          .slice(1)
-          .map((p) => `, ${p.n} with ${p.who}`)
-          .join("")}.`;
-
-  const close = (rowId: string | null) => {
-    if (pause.pending !== null && pause.pending.rowId === rowId) pause.cancel();
-    setPanel(null);
-  };
-
-  const row = (s: Sheet) => {
-    const rowId = `design:${s.projectId}:${s.designId}`;
-    const latest = s.versions[s.versions.length - 1];
-    const client = clientOf(s.projectId, firm);
-    const p = firm.project(s.projectId);
-    const open = panel?.at === rowId ? panel.kind : null;
-    const canCompare = s.versions.length >= 2;
-
-    let margin = "Approved";
-    let marginSub: string | undefined;
-    let sentence: ReactNode;
-    if (latest.status === "awaiting") {
-      margin = `With ${client.first === "Meera" ? "Meera" : "client"}`;
-      marginSub = ageWords(daysSince(latest.uploadedOn));
-      sentence = `Version ${latest.version} sent on ${formatShortDate(latest.uploadedOn)} by ${latest.uploadedBy}.${
-        s.neededBefore ? ` Needed ${s.neededBefore}.` : ""
-      }`;
-    } else if (latest.status === "changes-requested") {
-      margin = "Yours";
-      sentence = `${client.first === "Meera" ? "Meera" : "The client"} asked for changes${
-        latest.decidedOn ? ` on ${formatShortDate(latest.decidedOn)}` : ""
-      }. Upload the next version.`;
-    } else {
-      sentence = s.approvedAt
-        ? `Approved by ${client.full} on ${formatStamp(s.approvedAt)}.`
-        : `Approved by ${client.full}${latest.decidedOn ? ` on ${formatShortDate(latest.decidedOn)}` : ""}.`;
-    }
-    const asked = s.versions.filter((v) => v.status === "changes-requested" && v.comment);
-
-    const toggle = (kind: "upload" | "compare") => {
-      if (open) close(rowId);
-      else setPanel({ kind, at: rowId });
-    };
-
-    return (
-      <RegisterRow
-        key={rowId}
-        id={rowId}
-        margin={margin}
-        marginSub={marginSub}
-        client={latest.status === "awaiting"}
-        title={
-          <>
-            {s.title}
-            {s.sheet ? `, ${s.sheet}` : ""}
-            {me.scope === "all" && p && (
-              <>
-                {", "}
-                <Link href={`/staff/projects/${p.id}`} className="link -my-3 inline-flex min-h-11 items-center font-normal">
-                  {p.name}
-                </Link>
-              </>
-            )}
-          </>
-        }
-        sentence={
-          <>
-            {sentence}
-            {asked.map((v) => (
-              <span key={v.version} className="mt-2 block bg-sand-2 px-3 py-2 text-ink">
-                <span className="lettering block text-ink-soft">Version {v.version}, {client.first === "Meera" ? "Meera" : "the client"}</span>
-                <q>{v.comment}</q>
-              </span>
-            ))}
-            <span className="sr-only"> {shelfWords(s.versions, client.first === "Meera" ? "Meera" : "the client")}</span>
-          </>
-        }
-        instrument={<VersionShelf versions={s.versions} />}
-        stamps={firm.stampsFor(rowId)}
-        action={
-          <button
-            type="button"
-            className="btn btn-quiet"
-            aria-expanded={open !== null}
-            onClick={() => toggle(canCompare ? "compare" : "upload")}
-          >
-            {open ? "Close" : canCompare ? "Compare the latest two" : "Upload a new version"}
-          </button>
-        }
-      >
-        {open === "compare" && <Compare sheet={s} />}
-        {open === "upload" && (
-          <div className="pt-2">
-            <UploadPanel
-              sheets={sheets}
-              initial={`${s.projectId}:${s.designId}`}
-              by={me.id}
-              onDone={() => setPanel(null)}
-            />
-          </div>
-        )}
-      </RegisterRow>
-    );
-  };
-
-  const topOpen = panel?.kind === "upload" && panel.at === "top";
-  // A comparison open in a row gives way to the upload at the top.
-  const openUpload = () => {
-    if (panel) close(panel.at);
-    setPanel({ kind: "upload", at: "top" });
-  };
+  const current = projects.find((p) => p.id === picked) ?? busiest(firm, projects, me.id);
+  const focusItem = focus && current && focus.startsWith(`${current.id}:`) ? focus.slice(current.id.length + 1) : null;
 
   return (
     <>
-      <StaffBoard
-        place="Designs"
-        headline={headline}
-        state={state}
-        primary={panel?.kind !== "upload" ? { label: "Upload a new version", onClick: openUpload } : undefined}
-      />
-      {topOpen && (
-        <section aria-label="Upload a new version" className="mt-8 grid gap-3">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="register-title flex-1">Upload a new version</h2>
-            <button type="button" className="btn btn-quiet" onClick={() => close(null)}>
-              Close
-            </button>
-          </div>
-          <UploadPanel sheets={sheets} initial={null} by={me.id} onDone={() => setPanel(null)} />
-        </section>
-      )}
-      <div className="mt-8">
-        <Register
-          title="Sheets and their versions"
-          empty={scoped ? `No drawings for ${scoped.name} are in the portal yet.` : "No drawings are in the portal yet."}
-          limit={8}
-        >
-          {sheets.map(row)}
-        </Register>
+      <StaffBoard place="Designs" headline={current ? current.name : "Design track"} />
+      <div className="mt-6 grid gap-4 lg:mt-8">
+        {projects.length > 1 && (
+          <nav aria-label="Projects" className="glass flex gap-1.5 overflow-x-auto p-1.5">
+            {projects.map((p) => {
+              const on = p.id === current?.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setPicked(p.id)}
+                  className={`min-h-11 shrink-0 rounded-xl px-3.5 text-left text-15 ${on ? "bg-rosewood text-lime" : "text-ink hover:bg-white/55"}`}
+                >
+                  {p.name}
+                </button>
+              );
+            })}
+          </nav>
+        )}
+        {current ? (
+          <Track key={current.id} p={current} me={me} focus={focusItem} />
+        ) : (
+          <section className="glass p-4">
+            <Empty>No design work here yet</Empty>
+          </section>
+        )}
       </div>
     </>
   );

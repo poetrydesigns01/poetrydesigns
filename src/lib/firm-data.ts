@@ -9,6 +9,8 @@ import {
   type Task,
 } from "./demo-data";
 import type { StoreyGroup } from "./projection";
+import { projectCode, type PlanSeed } from "./workflow-plan";
+import { milestoneStage, WORKFLOW_TEMPLATE } from "./workflow-template";
 
 // Fictional data for the whole firm: eight projects, fifteen people, their requests,
 // orders, bills, tasks and records. Every person, address, GSTIN, phone and amount is
@@ -305,24 +307,25 @@ const PART_B: Template["partB"] = [
   { id: "landscape", name: "Landscape", formula: "Priced for each project" },
 ];
 
-const cityVillaMilestones: TemplateMilestone[] = iyerMilestones
-  .filter((m) => m.id > 0)
-  .map((m) => ({ n: m.id, name: m.name, covers: m.covers, percent: m.percent }));
+// Every category follows Poetry's one workflow (workflow-template.ts): ten construction
+// milestones, each opened by its instalment, at the agreed split.
+const workflowMilestones: TemplateMilestone[] = WORKFLOW_TEMPLATE.instalments
+  .filter((i) => i.n > 0)
+  .map((i) => {
+    const stage = milestoneStage(i.n);
+    return {
+      n: i.n,
+      name: stage?.short ?? `Milestone ${i.n}`,
+      covers: (stage?.tasks ?? [])
+        .filter((t) => t.track === "engineering")
+        .map((t) => t.name)
+        .join(", "),
+      percent: i.percent,
+    };
+  });
+const cityVillaMilestones = workflowMilestones;
+const farmhouseMilestones = workflowMilestones;
 
-const farmhouseMilestones: TemplateMilestone[] = [
-  { n: 1, name: "Foundation and plinth", covers: "Excavation, footings and plinth beam.", percent: 12 },
-  { n: 2, name: "Ground floor walls and columns", covers: "Columns, load-bearing walls and lintels.", percent: 13 },
-  { n: 3, name: "Roof slab and verandah roof", covers: "The main roof slab and the verandah roof.", percent: 15 },
-  { n: 4, name: "Brickwork and plastering", covers: "Partition walls, internal and external plastering.", percent: 10 },
-  { n: 5, name: "Electrical and plumbing", covers: "Conduits, wiring, water supply and drainage lines.", percent: 10 },
-  { n: 6, name: "Flooring and tiling", covers: "Floor finishes, verandah and wet area tiling.", percent: 10 },
-  { n: 7, name: "Doors, windows and joinery", covers: "Frames, shutters, windows and built-in joinery.", percent: 8 },
-  { n: 8, name: "Roof tiles and rainwater gutters", covers: "Clay roof tiles, gutters and downpipes.", percent: 8 },
-  { n: 9, name: "Painting and finishing", covers: "Putty, primer, paint, fixtures and fittings.", percent: 6 },
-  { n: 10, name: "Handover", covers: "Final cleaning, snag list closure and the keys.", percent: 3 },
-];
-
-const SAME_SPLIT = "Same split as a city villa until Poetry sends its own.";
 
 export const templates: Template[] = [
   { id: "city-villa", name: "City villa", ratePerSqFt: 2600, signUpPercent: 5, milestones: cityVillaMilestones, partB: PART_B },
@@ -334,7 +337,6 @@ export const templates: Template[] = [
     signUpPercent: 5,
     milestones: cityVillaMilestones,
     partB: PART_B,
-    note: SAME_SPLIT,
   },
   {
     id: "cement-blocks",
@@ -343,7 +345,6 @@ export const templates: Template[] = [
     signUpPercent: 5,
     milestones: cityVillaMilestones,
     partB: PART_B,
-    note: SAME_SPLIT,
   },
 ];
 
@@ -504,20 +505,26 @@ export const vendors: Vendor[] = [
 
 export type ProjectId = "iyer" | "iyer-cottage" | "nair" | "dsouza" | "bhat" | "fernandes" | "sharma" | "kulkarni";
 
+/**
+ * A payment row's money state. Row 0 is the sign-up advance; row n (1 to 10) is instalment n,
+ * which falls due inside milestone n-1 and must be received before milestone n starts.
+ * done: its due week is reached, the letter is not raised yet. under-way: the milestone it
+ * falls inside is being built. to-come: neither.
+ */
 export type MilestoneState = "paid" | "part-paid" | "approved" | "raised" | "done" | "under-way" | "to-come";
 
 export type PhotoKind = "slab-pour" | "shuttering" | "curing" | "columns" | "blocks" | "tiles" | "steel" | "sand";
 
 export type MilestoneSeed = {
   n: number;
-  /** From the category template; "Sign-up" for n 0. */
+  /** The construction milestone the row opens ("First floor block work"); "Sign-up" for n 0. */
   name: string;
   covers: string;
   percent: number;
   /** Before GST. */
   amount: number;
   state: MilestoneState;
-  /** A plain date, or "YYYY-MM-DDTHH:mm" when the time is known. */
+  /** When the instalment's due point was reached. A plain date, or "YYYY-MM-DDTHH:mm". */
   doneOn?: string;
   doneBy?: PersonId;
   acceptedAt?: string;
@@ -526,7 +533,7 @@ export type MilestoneSeed = {
   approvedAt?: string;
   letterNo?: string;
   paidOn?: string;
-  /** A month, "January 2027". */
+  /** A month, "January 2027". Older screens only; the plan gives the dates now. */
   expected?: string;
   startedOn?: string;
   /** What the site says about the work, when it bears on the next step: "the tiling finished on 10 Nov". */
@@ -537,7 +544,7 @@ export type MilestoneSeed = {
 
 export type ProjectSeed = {
   id: ProjectId;
-  /** Sample format, open question 4. Empty until a workspace is opened. */
+  /** CFS_501_NK shape: category code, running number, client initials. Empty until a workspace is opened. */
   code: string;
   name: string;
   category: CategoryId;
@@ -564,20 +571,22 @@ export type ProjectSeed = {
   /** BD's note to the Project Head. */
   handoff: string;
   phase: "draft" | "invited" | "in-design" | "building" | "handed-over";
-  /** 11 rows, n 0 to 10; empty for a draft. */
+  /** 11 rows, n 0 to 10 (sign-up and instalments 1 to 10); empty for a draft. */
   milestones: MilestoneSeed[];
   /** Bills entered before the demo, by milestone, before GST. */
   billsBefore: Record<number, number>;
   handedOverOn?: string;
   /** Why the figures look the way they do, in one sentence, when that matters. */
   costNote?: string;
+  /** The project plan generated from the workflow template, and how far it has got. */
+  plan?: PlanSeed;
 };
 
 function mapsLink(lat: number, lng: number): string {
   return `https://www.google.com/maps?q=${lat},${lng}`;
 }
 
-/** Milestone rows for a category at a contract value, with the given facts laid over them. */
+/** Payment rows for a category at a contract value (the sign-up and instalments 1 to 10), with the given facts laid over them. */
 function schedule(
   category: CategoryId,
   value: number,
@@ -592,6 +601,13 @@ function schedule(
     amount: Math.round((value * row.percent) / 100),
     ...(facts[row.n] ?? { state: "to-come" }),
   }));
+}
+
+/** Instalments received in full, each a few days after its due week began. */
+function paidRows(dates: Record<number, [due: string, paid: string]>): Record<number, Partial<MilestoneSeed> & { state: MilestoneState }> {
+  const facts: Record<number, Partial<MilestoneSeed> & { state: MilestoneState }> = {};
+  for (const [n, [due, paid]] of Object.entries(dates)) facts[Number(n)] = { state: "paid", doneOn: due, paidOn: paid };
+  return facts;
 }
 
 const IYER_STATE: Record<Milestone["status"], MilestoneState> = {
@@ -609,18 +625,27 @@ const iyerRows: MilestoneSeed[] = iyerMilestones.map((m) => ({
   percent: m.percent,
   amount: m.amount,
   state: IYER_STATE[m.status],
-  doneOn: m.id === 3 ? "2026-11-06T17:30" : m.workCompletedOn,
-  doneBy: m.workCompletedOn ? "suresh" : undefined,
+  // The due point: the instalment's week came. Nobody marked a stage done for it.
+  doneOn: m.dueReachedOn,
   acceptedAt: m.acceptedAt,
   raisedAt: m.raisedAt,
   raisedBy: m.raisedBy ? "vikram" : undefined,
   approvedAt: m.approvedAt,
   letterNo: m.letterNo,
   paidOn: m.paidOn,
-  expected: m.expected,
-  startedOn: m.id === 4 ? "2026-11-06" : undefined,
-  photos: m.id === 3 ? ["slab-pour", "shuttering", "curing"] : undefined,
 }));
+
+/** Running numbers in the project codes, in signing order. Sample, to be confirmed. */
+const CODE_NUMBERS: Record<ProjectId, number> = {
+  fernandes: 501,
+  nair: 502,
+  bhat: 503,
+  iyer: 504,
+  dsouza: 505,
+  "iyer-cottage": 506,
+  sharma: 507,
+  kulkarni: 508,
+};
 
 export const projects: ProjectSeed[] = [
   {
@@ -635,13 +660,13 @@ export const projects: ProjectSeed[] = [
     lng: 77.54,
     clients: ["Meera Iyer", "Arjun Iyer"],
     clientEmail: "meera.iyer@example.com",
-    clientSignedInOn: "2026-01-13",
-    invitedAt: "2026-01-12T11:30",
+    clientSignedInOn: "2026-05-26",
+    invitedAt: "2026-05-25T11:30",
     builtUpArea: iyerProject.builtUpArea,
     ratePerSqFt: iyerProject.ratePerSqFt,
     plotPerimeter: 228,
     signedOn: iyerProject.agreementSignedOn,
-    onboardedOn: "2026-01-12",
+    onboardedOn: "2026-05-25",
     onboardedBy: "rohan",
     originalValue: iyerProject.initialEstimate,
     revisions: [
@@ -650,7 +675,7 @@ export const projects: ProjectSeed[] = [
         label: "Addendum 1, study next to the master bedroom",
         amount: 390000,
         days: 9,
-        approvedAt: "2026-03-28T20:05",
+        approvedAt: "2026-06-12T20:05",
       },
     ],
     team: { poc: "kavya", head: "vikram", architects: ["ananya"], engineers: ["suresh", "manjunath"], procurement: ["prakash"] },
@@ -658,10 +683,22 @@ export const projects: ProjectSeed[] = [
     phase: "building",
     milestones: iyerRows,
     billsBefore: { 0: 310000, 1: 1090000, 2: 1085000, 3: 488200, 4: 0 },
+    // Construction milestone 4 (first floor block work) under way; instalment 5 raised.
+    plan: {
+      preStart: "2026-05-25",
+      constructionStart: "2026-07-13",
+      generatedAt: "2026-05-25T12:10",
+      generatedBy: "shalini",
+      codeNumber: CODE_NUMBERS.iyer,
+      progress: {
+        doneThrough: "m3",
+        tasks: { "m4-ff-blocks": { percent: 60, startedOn: "2026-10-26" } },
+      },
+    },
   },
   {
     id: "iyer-cottage",
-    code: "PD-FH-2026-021",
+    code: projectCode("farmhouse", CODE_NUMBERS["iyer-cottage"], "Meera Iyer"),
     name: "Iyer Farm Cottage",
     category: "farmhouse",
     place: "Chikkaballapur",
@@ -687,10 +724,18 @@ export const projects: ProjectSeed[] = [
     milestones: schedule("farmhouse", 4320000, { 0: { state: "paid", paidOn: "2026-10-06" } }),
     // Itemised in `cottageBills`.
     billsBefore: {},
+    // Final approval: the estimate is with the client.
+    plan: {
+      preStart: "2026-09-28",
+      generatedAt: "2026-10-02T12:30",
+      generatedBy: "shalini",
+      codeNumber: CODE_NUMBERS["iyer-cottage"],
+      progress: { doneThrough: "planning-design", tasks: { "fa-bom": { percent: 100, doneOn: "2026-11-06" } } },
+    },
   },
   {
     id: "nair",
-    code: "PD-FH-2025-009",
+    code: projectCode("farmhouse", CODE_NUMBERS.nair, "Anil Nair"),
     name: "Nair Farmhouse",
     category: "farmhouse",
     place: "Devanahalli",
@@ -700,13 +745,13 @@ export const projects: ProjectSeed[] = [
     lng: 77.712,
     clients: ["Anil Nair", "Priya Nair"],
     clientEmail: "anil.nair@example.com",
-    clientSignedInOn: "2025-11-11",
-    invitedAt: "2025-11-10T12:00",
+    clientSignedInOn: "2026-01-27",
+    invitedAt: "2026-01-26T12:00",
     builtUpArea: 4200,
     ratePerSqFt: 2400,
     plotPerimeter: 610,
-    signedOn: "2025-11-10",
-    onboardedOn: "2025-11-10",
+    signedOn: "2026-01-26",
+    onboardedOn: "2026-01-26",
     onboardedBy: "rohan",
     originalValue: 10080000,
     revisions: [],
@@ -719,42 +764,36 @@ export const projects: ProjectSeed[] = [
     },
     handoff: "Priya decides finishes and Anil decides money. Their bank releases in two parts per stage.",
     phase: "building",
+    // Construction milestone 8 (plastering) under way; instalment 9 falls due next week.
     milestones: schedule("farmhouse", 10080000, {
-      0: { state: "paid", paidOn: "2025-11-18" },
-      1: { state: "paid", doneOn: "2026-01-20", doneBy: "suresh", paidOn: "2026-02-04" },
-      2: { state: "paid", doneOn: "2026-03-18", doneBy: "suresh", paidOn: "2026-04-02" },
-      3: { state: "paid", doneOn: "2026-05-26", doneBy: "suresh", paidOn: "2026-06-12" },
-      4: {
-        state: "approved",
-        doneOn: "2026-09-10",
-        doneBy: "suresh",
-        acceptedAt: "2026-09-12T18:20",
-        raisedAt: "2026-09-14T11:00",
-        raisedBy: "vikram",
-        approvedAt: "2026-09-20T20:10",
-        letterNo: "PD/DL/2026-27/0029",
-      },
-      5: {
-        state: "approved",
-        doneOn: "2026-10-15",
-        doneBy: "suresh",
-        acceptedAt: "2026-10-17T19:00",
-        raisedAt: "2026-10-19T10:30",
-        raisedBy: "vikram",
-        approvedAt: "2026-10-22T21:15",
-        letterNo: "PD/DL/2026-27/0032",
-      },
-      6: { state: "under-way", startedOn: "2026-10-15", expected: "November 2026", siteNote: "the tiling finished on 10 Nov", siteNoteOn: "2026-11-10" },
-      7: { state: "to-come", expected: "March 2027" },
-      8: { state: "to-come", expected: "April 2027" },
-      9: { state: "to-come", expected: "May 2027" },
-      10: { state: "to-come", expected: "June 2027" },
+      0: { state: "paid", paidOn: "2026-01-28" },
+      ...paidRows({
+        1: ["2026-03-16", "2026-03-19"],
+        2: ["2026-05-04", "2026-05-12"],
+        3: ["2026-06-01", "2026-06-05"],
+        4: ["2026-06-15", "2026-06-24"],
+        5: ["2026-07-13", "2026-07-17"],
+        6: ["2026-07-27", "2026-08-05"],
+        7: ["2026-08-31", "2026-09-04"],
+        8: ["2026-09-14", "2026-09-24"],
+      }),
     }),
-    billsBefore: { 0: 410000, 1: 960000, 2: 1040000, 3: 1230000, 4: 810000, 5: 750000 },
+    billsBefore: { 0: 410000, 1: 960000, 2: 1040000, 3: 1230000, 4: 810000, 5: 750000, 6: 690000, 7: 640000, 8: 420000 },
+    plan: {
+      preStart: "2026-01-26",
+      constructionStart: "2026-03-16",
+      generatedAt: "2026-01-26T12:30",
+      generatedBy: "shalini",
+      codeNumber: CODE_NUMBERS.nair,
+      progress: {
+        doneThrough: "m7",
+        tasks: { "m8-plastering": { percent: 75, startedOn: "2026-09-28" } },
+      },
+    },
   },
   {
     id: "dsouza",
-    code: "PD-CV-2026-017",
+    code: projectCode("city-villa", CODE_NUMBERS.dsouza, "Ryan D'Souza"),
     name: "D'Souza Villa",
     category: "city-villa",
     place: "Sarjapur Road",
@@ -764,47 +803,45 @@ export const projects: ProjectSeed[] = [
     lng: 77.687,
     clients: ["Ryan D'Souza", "Leah D'Souza"],
     clientEmail: "ryan.dsouza@example.com",
-    clientSignedInOn: "2026-04-21",
-    invitedAt: "2026-04-20T12:00",
+    clientSignedInOn: "2026-07-14",
+    invitedAt: "2026-07-13T12:00",
     builtUpArea: 2950,
     ratePerSqFt: 2600,
     plotPerimeter: 220,
-    signedOn: "2026-04-20",
-    onboardedOn: "2026-04-20",
+    signedOn: "2026-07-13",
+    onboardedOn: "2026-07-13",
     onboardedBy: "rohan",
     originalValue: 7670000,
     revisions: [],
     team: { poc: "kavya", head: "lakshmi", architects: ["ananya", "karan"], engineers: ["ravi"], procurement: ["prakash"] },
     handoff: "Leah works from home and wants the study away from the road.",
     phase: "building",
+    // Construction milestone 2 (ground floor block work) under way.
     milestones: schedule("city-villa", 7670000, {
-      0: { state: "paid", paidOn: "2026-04-22" },
+      0: { state: "paid", paidOn: "2026-07-15" },
       1: {
         state: "paid",
-        doneOn: "2026-08-12",
-        doneBy: "ravi",
-        acceptedAt: "2026-08-13T19:30",
-        raisedAt: "2026-08-13T11:00",
+        doneOn: "2026-08-31",
+        raisedAt: "2026-08-31T11:00",
         raisedBy: "lakshmi",
-        approvedAt: "2026-08-14T20:00",
+        approvedAt: "2026-09-01T20:00",
         letterNo: "PD/DL/2026-27/0026",
-        paidOn: "2026-08-28",
+        paidOn: "2026-09-03",
       },
-      2: { state: "under-way", startedOn: "2026-10-01", expected: "December 2026" },
-      3: { state: "to-come", expected: "February 2027" },
-      4: { state: "to-come", expected: "April 2027" },
-      5: { state: "to-come", expected: "May 2027" },
-      6: { state: "to-come", expected: "June 2027" },
-      7: { state: "to-come", expected: "July 2027" },
-      8: { state: "to-come", expected: "August 2027" },
-      9: { state: "to-come", expected: "October 2027" },
-      10: { state: "to-come", expected: "December 2027" },
+      2: { state: "paid", doneOn: "2026-10-19", paidOn: "2026-10-27" },
     }),
     billsBefore: { 0: 290000, 1: 920000 },
+    plan: {
+      preStart: "2026-07-13",
+      generatedAt: "2026-07-13T12:30",
+      generatedBy: "shalini",
+      codeNumber: CODE_NUMBERS.dsouza,
+      progress: { doneThrough: "m1", tasks: { "m2-gf-blocks": { percent: 40, startedOn: "2026-11-02" } } },
+    },
   },
   {
     id: "bhat",
-    code: "PD-CV-2025-011",
+    code: projectCode("city-villa", CODE_NUMBERS.bhat, "Sunil Bhat"),
     name: "Bhat Residence",
     category: "city-villa",
     place: "Jayanagar",
@@ -814,47 +851,51 @@ export const projects: ProjectSeed[] = [
     lng: 77.584,
     clients: ["Sunil Bhat", "Kavitha Bhat"],
     clientEmail: "sunil.bhat@example.com",
-    clientSignedInOn: "2025-08-05",
-    invitedAt: "2025-08-04T12:00",
+    clientSignedInOn: "2026-05-12",
+    invitedAt: "2026-05-11T12:00",
     builtUpArea: 2700,
     ratePerSqFt: 2600,
     plotPerimeter: 210,
-    signedOn: "2025-08-04",
-    onboardedOn: "2025-08-04",
+    signedOn: "2026-05-11",
+    onboardedOn: "2026-05-11",
     onboardedBy: "rohan",
     originalValue: 7020000,
     revisions: [],
     team: { poc: "kavya", head: "lakshmi", architects: ["karan"], engineers: ["ravi"], procurement: ["prakash"] },
     handoff: "Loaded at launch.",
     phase: "building",
+    // Construction milestone 5 (first floor roof slab) under way; instalment 6 part paid by the bank.
     milestones: schedule("city-villa", 7020000, {
-      0: { state: "paid", paidOn: "2025-08-06" },
-      1: { state: "paid", doneOn: "2025-11-05", doneBy: "ravi", paidOn: "2025-11-20" },
-      2: { state: "paid", doneOn: "2026-02-03", doneBy: "ravi", paidOn: "2026-02-18" },
-      3: { state: "paid", doneOn: "2026-05-25", doneBy: "ravi", paidOn: "2026-06-10" },
-      4: { state: "paid", doneOn: "2026-08-20", doneBy: "ravi", paidOn: "2026-09-30" },
-      5: {
+      0: { state: "paid", paidOn: "2026-05-13" },
+      ...paidRows({
+        1: ["2026-06-29", "2026-07-02"],
+        2: ["2026-08-17", "2026-08-25"],
+        3: ["2026-09-14", "2026-09-18"],
+        4: ["2026-09-28", "2026-10-06"],
+        5: ["2026-10-26", "2026-10-30"],
+      }),
+      6: {
         state: "part-paid",
-        doneOn: "2026-09-28",
-        doneBy: "ravi",
-        acceptedAt: "2026-09-30T18:45",
-        raisedAt: "2026-10-01T10:00",
+        doneOn: "2026-11-09",
+        raisedAt: "2026-11-09T09:30",
         raisedBy: "lakshmi",
-        approvedAt: "2026-10-03T19:30",
-        letterNo: "PD/DL/2026-27/0031",
+        approvedAt: "2026-11-09T19:30",
+        letterNo: "PD/DL/2026-27/0033",
       },
-      6: { state: "under-way", startedOn: "2026-10-01", expected: "December 2026" },
-      7: { state: "to-come", expected: "January 2027" },
-      8: { state: "to-come", expected: "February 2027" },
-      9: { state: "to-come", expected: "April 2027" },
-      10: { state: "to-come", expected: "May 2027" },
     }),
     billsBefore: { 0: 320000, 1: 1060000, 2: 1040000, 3: 760000, 4: 740000, 5: 720000 },
     costNote: "Granite and extra steel were bought outside the estimate without a cost revision.",
+    plan: {
+      preStart: "2026-05-11",
+      generatedAt: "2026-05-11T12:30",
+      generatedBy: "shalini",
+      codeNumber: CODE_NUMBERS.bhat,
+      progress: { doneThrough: "m4", tasks: { "m5-ff-slab": { percent: 50, startedOn: "2026-11-02" } } },
+    },
   },
   {
     id: "fernandes",
-    code: "PD-CV-2025-004",
+    code: projectCode("city-villa", CODE_NUMBERS.fernandes, "Neil Fernandes"),
     name: "Fernandes Villa",
     category: "city-villa",
     place: "Whitefield",
@@ -864,13 +905,13 @@ export const projects: ProjectSeed[] = [
     lng: 77.75,
     clients: ["Neil Fernandes"],
     clientEmail: "neil.fernandes@example.com",
-    clientSignedInOn: "2025-03-03",
-    invitedAt: "2025-03-02T12:00",
+    clientSignedInOn: "2025-07-15",
+    invitedAt: "2025-07-14T12:00",
     builtUpArea: 3050,
     ratePerSqFt: 2600,
     plotPerimeter: 232,
-    signedOn: "2025-03-02",
-    onboardedOn: "2025-03-02",
+    signedOn: "2025-07-14",
+    onboardedOn: "2025-07-14",
     onboardedBy: "rohan",
     originalValue: 7930000,
     revisions: [],
@@ -878,17 +919,19 @@ export const projects: ProjectSeed[] = [
     handoff: "Loaded at launch.",
     phase: "handed-over",
     milestones: schedule("city-villa", 7930000, {
-      0: { state: "paid", paidOn: "2025-03-04" },
-      1: { state: "paid", doneOn: "2025-05-08", doneBy: "suresh", paidOn: "2025-05-20" },
-      2: { state: "paid", doneOn: "2025-07-15", doneBy: "suresh", paidOn: "2025-07-28" },
-      3: { state: "paid", doneOn: "2025-09-18", doneBy: "suresh", paidOn: "2025-09-30" },
-      4: { state: "paid", doneOn: "2025-11-05", doneBy: "suresh", paidOn: "2025-11-18" },
-      5: { state: "paid", doneOn: "2025-12-29", doneBy: "suresh", paidOn: "2026-01-12" },
-      6: { state: "paid", doneOn: "2026-02-12", doneBy: "suresh", paidOn: "2026-02-25" },
-      7: { state: "paid", doneOn: "2026-03-26", doneBy: "suresh", paidOn: "2026-04-08" },
-      8: { state: "paid", doneOn: "2026-05-07", doneBy: "suresh", paidOn: "2026-05-20" },
-      9: { state: "paid", doneOn: "2026-06-19", doneBy: "suresh", paidOn: "2026-07-02" },
-      10: { state: "paid", doneOn: "2026-08-14", doneBy: "suresh", paidOn: "2026-08-14" },
+      0: { state: "paid", paidOn: "2025-07-16" },
+      ...paidRows({
+        1: ["2025-09-01", "2025-09-05"],
+        2: ["2025-10-20", "2025-10-24"],
+        3: ["2025-11-17", "2025-11-21"],
+        4: ["2025-12-01", "2025-12-05"],
+        5: ["2025-12-29", "2026-01-02"],
+        6: ["2026-01-12", "2026-01-16"],
+        7: ["2026-02-16", "2026-02-20"],
+        8: ["2026-03-02", "2026-03-06"],
+        9: ["2026-05-04", "2026-05-08"],
+        10: ["2026-06-08", "2026-06-12"],
+      }),
     }),
     billsBefore: {
       0: 320000,
@@ -904,10 +947,17 @@ export const projects: ProjectSeed[] = [
       10: 115400,
     },
     handedOverOn: "2026-08-14",
+    plan: {
+      preStart: "2025-07-14",
+      generatedAt: "2025-07-14T12:30",
+      generatedBy: "shalini",
+      codeNumber: CODE_NUMBERS.fernandes,
+      progress: { doneThrough: "handover", tasks: { "ho-noc": { percent: 100, doneOn: "2026-08-14" } } },
+    },
   },
   {
     id: "sharma",
-    code: "PD-CB-2026-023",
+    code: projectCode("cement-blocks", CODE_NUMBERS.sharma, "Rakesh Sharma"),
     name: "Sharma Villa",
     category: "cement-blocks",
     place: "Electronic City",
@@ -929,20 +979,15 @@ export const projects: ProjectSeed[] = [
     team: { poc: "kavya", head: "lakshmi", architects: ["karan"], engineers: [], procurement: ["prakash"] },
     handoff: "Rakesh wants the design fast; he has a plan approval appointment in December.",
     phase: "invited",
-    milestones: schedule("cement-blocks", 5720000, {
-      0: { state: "paid", paidOn: "2026-11-06" },
-      1: { state: "to-come", expected: "May 2027" },
-      2: { state: "to-come", expected: "July 2027" },
-      3: { state: "to-come", expected: "September 2027" },
-      4: { state: "to-come", expected: "October 2027" },
-      5: { state: "to-come", expected: "December 2027" },
-      6: { state: "to-come", expected: "February 2028" },
-      7: { state: "to-come", expected: "March 2028" },
-      8: { state: "to-come", expected: "May 2028" },
-      9: { state: "to-come", expected: "June 2028" },
-      10: { state: "to-come", expected: "August 2028" },
-    }),
+    milestones: schedule("cement-blocks", 5720000, { 0: { state: "paid", paidOn: "2026-11-06" } }),
     billsBefore: {},
+    plan: {
+      preStart: "2026-11-02",
+      generatedAt: "2026-11-07T11:30",
+      generatedBy: "shalini",
+      codeNumber: CODE_NUMBERS.sharma,
+      progress: { doneThrough: "sign-up", tasks: { "pd-soil-test": { percent: 30, startedOn: "2026-11-09" } } },
+    },
   },
   {
     id: "kulkarni",
@@ -970,8 +1015,8 @@ export const projects: ProjectSeed[] = [
   },
 ];
 
-/** The code given to Kulkarni Eco Home when its workspace is opened. Sample format. */
-export const KULKARNI_CODE = "PD-EH-2026-024";
+/** The code given to Kulkarni Eco Home when its workspace is opened. Format to be confirmed. */
+export const KULKARNI_CODE = projectCode("eco", CODE_NUMBERS.kulkarni, "Aditi Kulkarni");
 
 // ---- Money ----
 
@@ -989,12 +1034,12 @@ export type Receipt = {
 
 /** Receipts written down item by item. Every other paid milestone gets one "Earlier payment". */
 export const seedReceipts: Receipt[] = [
-  { id: "r-iyer-0", projectId: "iyer", n: 0, amount: 490880, source: "client", reference: "UTR ...2214", on: "2026-01-14", by: "divya" },
-  { id: "r-iyer-1a", projectId: "iyer", n: 1, amount: 1300000, source: "bank", reference: "UTR ...8812", on: "2026-06-02", by: "divya" },
-  { id: "r-iyer-1b", projectId: "iyer", n: 1, amount: 264680, source: "client", reference: "UTR ...8830", on: "2026-06-02", by: "divya" },
-  { id: "r-iyer-2a", projectId: "iyer", n: 2, amount: 1300000, source: "bank", reference: "UTR ...0417", on: "2026-08-29", by: "divya" },
-  { id: "r-iyer-2b", projectId: "iyer", n: 2, amount: 241670, source: "client", reference: "UTR ...0433", on: "2026-08-29", by: "divya" },
-  { id: "r-bhat-5a", projectId: "bhat", n: 5, amount: 590000, source: "bank", reference: "UTR ...6120", on: "2026-10-20", by: "divya" },
+  { id: "r-iyer-0", projectId: "iyer", n: 0, amount: 490880, source: "client", reference: "UTR ...2214", on: "2026-05-27", by: "divya" },
+  { id: "r-iyer-1a", projectId: "iyer", n: 1, amount: 1300000, source: "bank", reference: "UTR ...8812", on: "2026-07-16", by: "divya" },
+  { id: "r-iyer-1b", projectId: "iyer", n: 1, amount: 264680, source: "client", reference: "UTR ...8830", on: "2026-07-16", by: "divya" },
+  { id: "r-iyer-2a", projectId: "iyer", n: 2, amount: 1300000, source: "bank", reference: "UTR ...0417", on: "2026-09-07", by: "divya" },
+  { id: "r-iyer-2b", projectId: "iyer", n: 2, amount: 241670, source: "client", reference: "UTR ...0433", on: "2026-09-07", by: "divya" },
+  { id: "r-bhat-6a", projectId: "bhat", n: 6, amount: 590000, source: "bank", reference: "UTR ...6120", on: "2026-11-10", by: "divya" },
 ];
 
 /** Bills entered before the demo, one row per milestone. */
@@ -1066,8 +1111,12 @@ export type RequestLine = {
   sub: string;
   qty: number;
   unit: string;
-  outsideEstimate: boolean;
-  /** Why, when it is outside the estimate: "for the pool deck". */
+  /**
+   * @deprecated Only the architect recommends changes now, so a site line is never flagged
+   * as outside the estimate. Kept so older saved requests still read; it has no effect.
+   */
+  outsideEstimate?: boolean;
+  /** A short note on the line: "for the pool deck". */
   note?: string;
 };
 
@@ -1083,6 +1132,8 @@ export type RequestSeed = {
   seenBy?: PersonId;
   deliveredAt?: string;
   deliveredBy?: PersonId;
+  /** The site task the material is for (see portal-data.ts). */
+  taskId?: string;
 };
 
 export type PoLine = { lineId: string; qty: number; rate: number; gstPercent: number };
@@ -1106,13 +1157,13 @@ export const seedRequests: RequestSeed[] = [
   {
     no: "MR-2026-0124",
     projectId: "nair",
-    n: 6,
+    n: 8,
     by: "suresh",
     at: "2026-10-28T08:20",
     neededBy: "2026-11-03",
     lines: [
       { id: "0124-1", material: "aggregate", sub: "20 mm", qty: 1000, unit: "cu ft", outsideEstimate: false },
-      { id: "0124-2", material: "sand", sub: "M-sand for concrete", qty: 800, unit: "cu ft", outsideEstimate: false },
+      { id: "0124-2", material: "sand", sub: "P-sand for plastering", qty: 800, unit: "cu ft", outsideEstimate: false },
     ],
     seenAt: "2026-10-28T11:00",
     seenBy: "prakash",
@@ -1197,10 +1248,10 @@ export const seedRequests: RequestSeed[] = [
   {
     no: "MR-2026-0140",
     projectId: "nair",
-    n: 6,
+    n: 9,
     by: "suresh",
     at: "2026-11-09T09:05",
-    neededBy: "2026-11-20",
+    neededBy: "2026-11-30",
     lines: [
       { id: "0140-1", material: "tiles", sub: "Vitrified 600 × 600 mm", qty: 3800, unit: "sq ft", outsideEstimate: false },
       {
@@ -1209,7 +1260,7 @@ export const seedRequests: RequestSeed[] = [
         sub: "Anti-skid 300 × 300 mm",
         qty: 420,
         unit: "sq ft",
-        outsideEstimate: true,
+        outsideEstimate: false,
         note: "for the pool deck",
       },
     ],
@@ -1219,7 +1270,7 @@ export const seedRequests: RequestSeed[] = [
   {
     no: "MR-2026-0141",
     projectId: "bhat",
-    n: 6,
+    n: 5,
     by: "ravi",
     at: "2026-11-10T16:15",
     neededBy: "2026-11-16",
@@ -1232,7 +1283,7 @@ export const seedPos: PoSeed[] = [
     no: "PO-2026-0402",
     requestNo: "MR-2026-0124",
     projectId: "nair",
-    n: 6,
+    n: 8,
     vendorId: "v04",
     at: "2026-10-29T12:00",
     by: "prakash",
@@ -1338,8 +1389,8 @@ export const seedRevisions: RevisionSeed[] = [
     item: "Study next to the master bedroom",
     amount: 390000,
     days: 9,
-    specSheet: "A-102 v2",
-    raisedAt: "2026-02-20",
+    specSheet: "Draft 3 - Floor plan",
+    raisedAt: "2026-06-10T16:00",
     raisedBy: "vikram",
     changeId: "study-room",
     lands: [],
@@ -1355,7 +1406,7 @@ export const seedRevisions: RevisionSeed[] = [
     raisedBy: "vikram",
     changeId: "living-glazing",
     heldUntil: "2026-11-18",
-    lands: [{ n: 8, amount: 84000 }],
+    lands: [{ n: 10, amount: 84000 }],
   },
   {
     id: "CR-2026-007",
@@ -1369,13 +1420,16 @@ export const seedRevisions: RevisionSeed[] = [
     changeId: "terrace-jacuzzi",
     heldUntil: "2026-11-22",
     lands: [
-      { n: 4, amount: 45000 },
-      { n: 6, amount: 195000 },
+      { n: 6, amount: 45000 },
+      { n: 7, amount: 195000 },
     ],
   },
 ];
 
-/** A revision that a flagged request line asks for, prefilled for the Project Head. Sample price. */
+/**
+ * @deprecated Site lines are no longer flagged as outside the estimate, so nothing asks for
+ * this prefill any more. Kept only so older screens compile.
+ */
 export const revisionToRaise = {
   projectId: "nair" as ProjectId,
   requestNo: "MR-2026-0140",
@@ -1404,8 +1458,8 @@ export const registerNotes: RegisterNote[] = [
     for: "vikram",
     by: "kavya",
     on: "2026-11-09",
-    n: 5,
-    text: "Kavya noted on 9 Nov that Meera's bank releases milestone 5 in two parts.",
+    n: 6,
+    text: "Kavya noted on 9 Nov that Meera's bank releases instalment 6 in two parts.",
   },
 ];
 
@@ -1433,9 +1487,9 @@ export const cottageEstimate = {
     total: 1522200,
   },
   grandTotal: 6903000,
-  /** On ₹45,60,000, farmhouse split. The sign-up was paid on the old amount; the gap sits in milestone 1. */
-  schedule: [216000, 559200, 592800, 684000, 456000, 456000, 456000, 364800, 364800, 273600, 136800],
-  gapNote: "The sign-up was paid on the old amount. The ₹12,000 gap (5% of ₹2,40,000) goes into milestone 1.",
+  /** On ₹45,60,000, the agreed split. The sign-up was paid on the old amount; the gap sits in instalment 1. */
+  schedule: [216000, 696000, 684000, 456000, 456000, 456000, 364800, 364800, 364800, 364800, 136800],
+  gapNote: "The sign-up was paid on the old amount. The ₹12,000 gap (5% of ₹2,40,000) goes into instalment 1.",
   addendum: "Addendum 1 to your agreement for Iyer Farm Cottage, dated 11 Nov 2026",
   emailed: ["lakshmi", "prakash", "shalini"] as PersonId[],
 };
@@ -1814,7 +1868,10 @@ export type Post = {
   text: string;
   photos: PhotoKind[];
   storey: StoreyGroup | null;
+  /** "decision" is a system note: an approval, a payment step or a letter. */
   kind: "post" | "decision" | "version" | "revision";
+  /** Names of files attached to a post, e.g. a client's own photo "kitchen-tiles.jpg". */
+  files?: string[];
 };
 
 export const seedPosts: Post[] = [
@@ -1822,7 +1879,7 @@ export const seedPosts: Post[] = [
     id: "p1",
     projectId: "iyer",
     by: "meera",
-    at: "2026-03-28T20:05",
+    at: "2026-06-12T20:05",
     text: "Meera Iyer approved the study next to the master bedroom. Recorded as Addendum 1.",
     photos: [],
     storey: "first",
@@ -1852,10 +1909,10 @@ export const seedPosts: Post[] = [
     id: "p4",
     projectId: "iyer",
     by: "suresh",
-    at: "2026-11-06T17:30",
-    text: "First floor slab cast today. Curing starts tomorrow for 21 days.",
+    at: "2026-10-22T17:30",
+    text: "Ground floor roof slab cast today. Curing starts tomorrow for 21 days.",
     photos: ["slab-pour", "shuttering", "curing"],
-    storey: "first",
+    storey: "ground",
     kind: "post",
   },
   {
@@ -1871,9 +1928,9 @@ export const seedPosts: Post[] = [
   {
     id: "p6",
     projectId: "iyer",
-    by: "meera",
-    at: "2026-11-07T19:42",
-    text: "Meera Iyer accepted the first floor structure as finished.",
+    by: "vikram",
+    at: "2026-11-09T10:15",
+    text: "Vikram Desai raised the demand letter for Instalment 5, letter PD/DL/2026-27/0034.",
     photos: [],
     storey: "first",
     kind: "decision",
@@ -1882,10 +1939,10 @@ export const seedPosts: Post[] = [
     id: "p7",
     projectId: "iyer",
     by: "ananya",
-    at: "2026-11-09T15:20",
-    text: "Terrace plan version 2 is up. The terrace door is now 3.0 m wide and the stair headroom is on the north side.",
+    at: "2026-11-06T16:00",
+    text: "Door frames are up for your choice: teak for the main door, sal wood inside.",
     photos: [],
-    storey: "second",
+    storey: "first",
     kind: "version",
   },
   {
@@ -1893,9 +1950,9 @@ export const seedPosts: Post[] = [
     projectId: "iyer",
     by: "suresh",
     at: "2026-11-10T08:05",
-    text: "Second floor column steel started on the north side.",
-    photos: ["columns", "steel"],
-    storey: "second",
+    text: "First floor walls at lintel height on the north side.",
+    photos: ["blocks", "steel"],
+    storey: "first",
     kind: "post",
   },
   {
@@ -1913,8 +1970,8 @@ export const seedPosts: Post[] = [
     projectId: "nair",
     by: "suresh",
     at: "2026-11-10T17:10",
-    text: "Verandah tiling finished. Pool deck still to do.",
-    photos: ["tiles"],
+    text: "External plaster done on the east and north faces. West face next.",
+    photos: ["sand"],
     storey: null,
     kind: "post",
   },
@@ -1934,35 +1991,25 @@ export type LogEntry = {
 };
 
 export const seedLog: LogEntry[] = [
-  { id: "l1", at: "2026-01-12T11:30", by: "rohan", projectId: "iyer", kind: "staff", action: "Signed agreement uploaded for Iyer Residence, ₹83,20,000." },
-  { id: "l2", at: "2026-01-14T18:20", by: "meera", projectId: "iyer", kind: "client", action: "Approved the payment schedule, sign-up and 10 milestones." },
-  { id: "l3", at: "2026-02-14T21:10", by: "meera", projectId: "iyer", kind: "client", action: "Approved the ground floor plan, version 3." },
-  { id: "l4", at: "2026-03-02T20:45", by: "meera", projectId: "iyer", kind: "client", action: "Approved the first floor plan, version 2." },
-  {
-    id: "l5",
-    at: "2026-03-20T19:05",
-    by: "meera",
-    projectId: "iyer",
-    kind: "client",
-    action: "Approved the front elevation, version 4.",
-    detail: "We love the overhang.",
-  },
-  { id: "l6", at: "2026-03-28T20:05", by: "meera", projectId: "iyer", kind: "client", action: "Approved the study, Addendum 1, +₹3,90,000 and 9 days." },
-  { id: "l7", at: "2026-05-24T19:15", by: "meera", projectId: "iyer", kind: "client", action: "Accepted the foundation and plinth as finished." },
-  { id: "l8", at: "2026-05-25T18:40", by: "meera", projectId: "iyer", kind: "client", action: "Approved payment for milestone 1, ₹15,64,680." },
-  { id: "l9", at: "2026-08-19T20:30", by: "meera", projectId: "iyer", kind: "client", action: "Accepted the ground floor structure as finished." },
-  { id: "l10", at: "2026-08-20T21:02", by: "meera", projectId: "iyer", kind: "client", action: "Approved payment for milestone 2, ₹15,41,670." },
+  { id: "l1", at: "2026-05-25T11:30", by: "rohan", projectId: "iyer", kind: "staff", action: "Signed agreement uploaded for Iyer Residence, ₹83,20,000." },
+  { id: "l2", at: "2026-05-26T18:20", by: "meera", projectId: "iyer", kind: "client", action: "Approved the payment schedule, sign-up and 10 instalments." },
+  { id: "l6", at: "2026-06-12T20:05", by: "meera", projectId: "iyer", kind: "client", action: "Approved the study, Addendum 1, +₹3,90,000 and 9 days." },
+  { id: "l3", at: "2026-06-24T20:45", by: "meera", projectId: "iyer", kind: "client", action: "Approved the final draft floor plan, version 1." },
+  { id: "l4", at: "2026-07-01T21:00", by: "meera", projectId: "iyer", kind: "client", action: "Approved the 3D final elevation, version 1." },
+  { id: "l7", at: "2026-07-02T20:10", by: "meera", projectId: "iyer", kind: "client", action: "Approved the design and cost, pre structure." },
+  { id: "l9", at: "2026-07-10T21:00", by: "meera", projectId: "iyer", kind: "client", action: "Approved the final estimation." },
+  { id: "l8", at: "2026-07-13T18:40", by: "meera", projectId: "iyer", kind: "client", action: "Approved payment for Instalment 1, ₹15,64,680." },
+  { id: "l10", at: "2026-09-01T21:02", by: "meera", projectId: "iyer", kind: "client", action: "Approved payment for Instalment 2, ₹15,41,670." },
   {
     id: "l11",
-    at: "2026-10-30T22:12",
+    at: "2026-09-16T21:20",
     by: "meera",
     projectId: "iyer",
     kind: "client",
-    action: "Asked for changes to the terrace plan, version 1.",
-    detail:
-      "Please make the family room open onto the terrace with a wider door, and keep the staircase headroom away from the seating side.",
+    action: "Asked for changes to the window & skylight grill, version 1.",
+    detail: "Simpler bars on the skylight, no scrollwork.",
   },
-  { id: "l12", at: "2026-11-07T19:42", by: "meera", projectId: "iyer", kind: "client", action: "Accepted the first floor structure as finished." },
+  { id: "l12", at: "2026-09-18T20:30", by: "meera", projectId: "iyer", kind: "client", action: "Approved the window & skylight grill, version 2." },
   {
     id: "l13",
     at: "2026-11-03T15:00",
@@ -1970,15 +2017,6 @@ export const seedLog: LogEntry[] = [
     kind: "staff",
     action: "Gave Divya Shenoy finance access on all projects.",
     reason: "She records bills and payments.",
-  },
-  {
-    id: "l14",
-    at: "2026-10-22T12:30",
-    by: "vikram",
-    projectId: "nair",
-    kind: "staff",
-    action: "Moved milestone 7 from February 2027 to March 2027.",
-    reason: "Monsoon delay to the roof; doors follow the roof.",
   },
   { id: "l15", at: "2026-11-02T08:10", by: "suresh", projectId: "iyer", kind: "staff", action: "Raised MR-2026-0136." },
   { id: "l16", at: "2026-11-02T09:12", by: "prakash", projectId: "iyer", kind: "staff", action: "Marked MR-2026-0136 seen." },
@@ -1990,14 +2028,14 @@ export const seedLog: LogEntry[] = [
     kind: "staff",
     action: "Uploaded PO-2026-0418 for MR-2026-0136, 500 of 850 kg.",
   },
-  { id: "l18", at: "2026-11-06T17:30", by: "suresh", projectId: "iyer", kind: "staff", action: "Marked Iyer Residence milestone 3 done, with 3 photos." },
+  { id: "l18", at: "2026-10-25T17:30", by: "suresh", projectId: "iyer", kind: "staff", action: "Marked Iyer Residence milestone 3 done, with 3 photos." },
   {
     id: "l19",
-    at: "2026-11-07T10:15",
+    at: "2026-11-09T10:15",
     by: "vikram",
     projectId: "iyer",
     kind: "staff",
-    action: "Raised the payment for Iyer Residence milestone 3, letter PD/DL/2026-27/0034.",
+    action: "Raised the demand letter for Iyer Residence Instalment 5, letter PD/DL/2026-27/0034.",
   },
   {
     id: "l20",
@@ -2018,11 +2056,11 @@ export const seedLog: LogEntry[] = [
   },
   {
     id: "l22",
-    at: "2026-10-20T14:10",
+    at: "2026-11-10T14:10",
     by: "divya",
     projectId: "bhat",
     kind: "staff",
-    action: "Recorded ₹5,90,000 from the bank for Bhat Residence letter 0031.",
+    action: "Recorded ₹5,90,000 from the bank for Bhat Residence letter 0033.",
   },
   { id: "l23", at: "2026-11-10T11:00", by: "imran", projectId: "nair", kind: "staff", action: "Marked MR-2026-0140 seen." },
   {
@@ -2058,8 +2096,8 @@ export type DesignSummary = {
 export const designSummaries: DesignSummary[] = [
   {
     projectId: "dsouza",
-    designId: "dsouza-ground-floor-plan",
-    title: "Ground floor plan",
+    designId: "m2-grill",
+    title: "Window & skylight grill",
     version: 2,
     sentAt: "2026-11-02T16:00",
     by: "ananya",
@@ -2093,7 +2131,15 @@ export type DraftStep2 = {
   partB: { id: string; name: string; amount: number }[];
 };
 
-export type DraftStep3 = { agreementFile?: string; signedOn?: string; scheduleApproved?: boolean };
+export type DraftStep3 = {
+  agreementFile?: string;
+  signedOn?: string;
+  scheduleApproved?: boolean;
+  /** Part A before GST, as step 2 worked it out. */
+  contractValue?: number;
+  /** The sign-up money received, with GST: counted as received once the workspace opens. */
+  signUp?: { amount: number; on: string; reference: string };
+};
 
 export type DraftStep4 = {
   poc?: PersonId;
@@ -2183,7 +2229,17 @@ export type DeletedTarget =
   | { kind: "bill"; billId: string };
 
 export type EventBody =
-  | { kind: "request.raised"; no: string; projectId: ProjectId; n: number; neededBy: string; lines: RequestLine[]; queued?: boolean }
+  | {
+      kind: "request.raised";
+      no: string;
+      projectId: ProjectId;
+      n: number;
+      neededBy: string;
+      lines: RequestLine[];
+      queued?: boolean;
+      /** The site task the material is for. */
+      taskId?: string;
+    }
   | { kind: "request.sent"; no: string }
   | { kind: "request.seen"; no: string }
   | { kind: "po.linked"; po: PoSeed }
@@ -2247,7 +2303,39 @@ export type EventBody =
   | { kind: "catalogue.changed"; change: string; reason?: string; edit?: CatalogueEdit }
   /** `template` is the whole template after the change, Part B included. */
   | { kind: "template.changed"; templateId: CategoryId; change: string; template?: Template }
-  | { kind: "record.deleted"; what: string; reason: string; target?: DeletedTarget };
+  | { kind: "record.deleted"; what: string; reason: string; target?: DeletedTarget }
+  // ---- Payment gating: locked -> demand letter raised (payment.raised) -> payment made
+  // (payment.client-paid) -> payment received (receipt.recorded). ----
+  /** The client says the money has gone; `ref` is an optional UTR or cheque number. */
+  | ({ kind: "payment.client-paid"; ref?: string } & At)
+  /** The client asks Poetry for the demand letter of a stage whose work is done. */
+  | ({ kind: "letter.requested" } & At)
+  // ---- Design stage items ----
+  /** The client opened a design item; marks that version viewed. */
+  | { kind: "design.viewed"; projectId: ProjectId; designId: string; version: number }
+  // ---- Chat ----
+  /** Someone opened the project thread; posts from the other side before it count as read. */
+  | { kind: "thread.read"; projectId: ProjectId }
+  // ---- Site tasks ----
+  | { kind: "site-task.progress"; projectId: ProjectId; taskId: string; percent: number; stepsDone?: number; note?: string }
+  | {
+      kind: "work-order.requested";
+      projectId: ProjectId;
+      taskId: string;
+      /** "Tiling crew". */
+      trade: string;
+      days: number;
+      startOn: string;
+      note?: string;
+    }
+  | { kind: "work-order.booked"; projectId: ProjectId; workOrderId: string; crew?: string }
+  /** The architect sends a drawing a site task is waiting for. */
+  | { kind: "drawing.sent"; projectId: ProjectId; drawingId: string; file?: string }
+  // ---- Project plans (workflow-plan.ts) ----
+  /** The admin generated (or re-generated) a project's plan from the workflow template. */
+  | { kind: "plan.generated"; projectId: ProjectId; preStart: string; constructionStart?: string }
+  /** The admin gave a plan task to someone else. `taskId` is the template task id ("m4-ff-blocks"). */
+  | { kind: "plan.task-assigned"; projectId: ProjectId; taskId: string; to: PersonId; from?: PersonId; reason?: string };
 
 /** One entry in the record. `id` is "e1", "e2", ... in order; `at` comes from stampNow(). */
 export type FirmEvent = EventBody & { id: string; at: string; by: PersonId };

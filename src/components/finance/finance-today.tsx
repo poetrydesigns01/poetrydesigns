@@ -1,225 +1,256 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { MaterialStack } from "@/components/instruments/material-stack";
-import { Chip } from "@/components/register/chips";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { Count, GlassTable, Icon, inrShort, Panel, StatCard, StatRow, WaitChip } from "@/components/admin/glass-kit";
 import { useScope } from "@/components/register/project-switch";
-import { Register, RegisterRow } from "@/components/register/register";
 import { StaffBoard } from "@/components/register/staff-board";
+import { StatusChip } from "@/components/register/status-chip";
 import { useFirm, useViewer } from "@/lib/demo-store";
-import { ageWords, type LetterView, type RequestView, type TurnItem } from "@/lib/firm";
-import { countWord, inr, listWords } from "@/lib/format";
-import { ReceivableBlock, receivableWords } from "./receivable-block";
-import {
-  BillTurnRow,
-  LetterRow,
-  lettersOpenOrPaidThisMonth,
-  RequestTurnRow,
-  RevisionRegister,
-  stampedToday,
-  usePanel,
-} from "./rows";
-import { approvedOpen, firstOf, hasFinance, inScope, procuresAny, toCome } from "./shared";
+import type { PoView, RequestView } from "@/lib/firm";
+import { formatShortDate, inr } from "@/lib/format";
+import type { PaymentStageView } from "@/lib/portal";
+import { instShort, weekLanes, weekShort } from "./instalment-weeks";
+import { MarkSeen } from "./mark-seen";
+import { requestTask, taskWords } from "./request-task";
+import { requestChip } from "./request-words";
+import { hasFinance, inScope, procuresAny, procuresFor } from "./shared";
 
-// Procurement and finance, Today. Prakash's day is requests: which are new, which are
-// ageing without a PO. Divya's is money: which letters wait for the bank, which bills need
-// entering. Both see the cost revisions that move a contract value. Each sees the other's
-// queue as "With Prakash" or "With Divya", so nothing is lost between them.
-
-type Side = "requests" | "money";
-
-function headlineFor(n: number, first: string): string {
-  if (n === 0) return `Nothing needs you today, ${first}.`;
-  return `${countWord(n, true)} ${n === 1 ? "thing needs" : "things need"} you today, ${first}.`;
-}
-
-/** The words under the three stacks: "0136: 500 of 850 kg ordered. 0139 and 0140: none ordered yet." */
-function stackCaption(requests: RequestView[], firm: ReturnType<typeof useFirm>): string {
-  const none: string[] = [];
-  const parts: string[] = [];
-  for (const r of requests) {
-    const line = r.lines[0];
-    const item = firm.catalogue.find((c) => c.id === line.material);
-    const ordered = r.ordered[line.id] ?? 0;
-    const short = r.no.slice(-4);
-    if (ordered <= 0) none.push(short);
-    else parts.push(`${short}: ${ordered.toLocaleString("en-IN")} of ${line.qty.toLocaleString("en-IN")} ${item?.unit ?? line.unit} ordered.`);
-  }
-  if (none.length > 0) parts.push(`${listWords(none)}: none ordered yet.`);
-  return parts.join(" ");
-}
+// Procurement and finance, Today: the queues at a glance. Prakash's day is requests,
+// which are new and which are ageing without a PO, and crews to book. Divya's is money:
+// the instalments whose week is this one (the Accounts & Finance weeks of each project's
+// tracker), payments the clients say they have made, letters to raise, and bills to enter.
 
 export function FinanceToday() {
   const firm = useFirm();
   const me = useViewer("finance");
   const scope = useScope("finance");
-  const panel = usePanel();
   const finance = hasFinance(me);
   const buyer = procuresAny(me.id, firm);
-  const [chosen, setChosen] = useState<Side | null>(null);
-  const side: Side = chosen ?? (finance && !buyer ? "money" : "requests");
 
   const turns = firm.turns(me.id, scope);
-  const requestTurns = turns.filter((t) => t.id.startsWith("mr:"));
-  const letterTurns = turns.filter((t) => t.id.startsWith("pay:"));
-  const billTurns = turns.filter((t) => t.id.startsWith("bill:"));
-  // A home shows only today's stamps; the history is on each row's own page.
-  const today = (item: TurnItem): TurnItem => ({ ...item, stamps: stampedToday(item.stamps) });
-  const requestOf = (item: TurnItem) => firm.requests.find((r) => `mr:${r.no}` === item.id);
-
-  // ---- The board ----
-  const newest = requestTurns
-    .map(requestOf)
-    .filter((r): r is RequestView => !!r && r.status === "New")
-    .sort((a, b) => b.days - a.days);
-  const letters = inScope(firm.letters, scope);
-  const owed = approvedOpen(letters).reduce((total, l) => total + toCome(l), 0);
-
-  let state: string;
-  let primary: { label: string; href: string } | undefined;
-  let picture: ReactNode = null;
-  let pictureWords: string | undefined;
-  if (buyer) {
-    const oldest = newest[0];
-    state = oldest
-      ? `The oldest request has waited ${ageWords(oldest.days).toLowerCase()}.`
-      : requestTurns.length > 0
-        ? "Every request has been seen."
-        : "Every request has its PO.";
-    const opening = oldest ?? (requestTurns[0] ? requestOf(requestTurns[0]) : undefined);
-    if (opening) primary = { label: `Open ${opening.no}`, href: `/staff/finance/requests/${opening.no}` };
-    const stacked = requestTurns
-      .map(requestOf)
-      .filter((r): r is RequestView => !!r)
-      .slice(0, 3);
-    if (stacked.length > 0) {
-      picture = (
-        <div className="flex flex-wrap items-end gap-4">
-          {stacked.map((r) => {
-            const line = r.lines[0];
-            const item = firm.catalogue.find((c) => c.id === line.material);
-            if (!item) return null;
-            const pos = r.pos.map((po) => po.lines.filter((l) => l.lineId === line.id).reduce((t, l) => t + l.qty, 0));
-            return (
-              <MaterialStack
-                key={r.no}
-                item={item}
-                requested={line.qty}
-                ordered={pos}
-                delivered={r.status === "Delivered"}
-                width={136}
-                tone="dark"
-                words="none"
-              />
-            );
-          })}
-        </div>
-      );
-      pictureWords = stackCaption(stacked, firm);
-    }
-  } else {
-    state = owed > 0 ? `${inr(owed)} with GST is approved and not yet received.` : "Every approved letter is paid.";
-    const blocks = lettersOpenOrPaidThisMonth(letters).filter((l) => l.state !== "paid" || l.receipts.length > 0);
-    if (blocks.length > 0) {
-      picture = <ReceivableBlock letters={blocks} />;
-      pictureWords = receivableWords(blocks);
-    }
-  }
-
-  // ---- The two columns ----
-  const openRequests = inScope(
+  const open = inScope(
     firm.requests.filter((r) => !r.queued && (r.status === "New" || r.status === "Seen" || r.status === "PO in part")),
     scope,
+  ).sort((a, b) => b.days - a.days);
+  const fresh = open.filter((r) => r.status === "New");
+  const late = open.filter((r) => r.late);
+  const crews = inScope(firm.workOrders, scope).filter((w) => w.status === "requested");
+  const stages = inScope(firm.paymentStages, scope);
+  // The client says it is paid: finance confirms once it shows in the bank.
+  const toConfirm = stages.filter((s) => s.state === "client-paid");
+  const toRaise = stages.filter((s) => s.state === "work-done");
+  // The instalments whose week is this one (or already gone): the Accounts & Finance week.
+  const { overdue, lanes } = weekLanes(stages);
+  const thisWeek = lanes[0];
+  const weekRows = [...overdue.items, ...thisWeek.items, ...toConfirm, ...toRaise].filter(
+    (s, i, list) => list.findIndex((x) => x.projectId === s.projectId && x.n === s.n) === i,
   );
-  const group = (status: string) => requestTurns.filter((t) => t.status?.[0] === status);
+  const bills = firm.pos.filter((po) => turns.some((t) => t.id === `bill:${po.no}`));
+  const accountant = firm.people.find((p) => p.role === "finance" && hasFinance(p));
+  const billsWaiting = finance
+    ? bills
+    : accountant
+      ? firm.pos.filter((po) => firm.turns(accountant.id, scope).some((t) => t.id === `bill:${po.no}`))
+      : [];
 
-  const requestsColumn = buyer ? (
-    <>
-      <Register title="New requests" empty="No new requests.">
-        {group("New").map((item) => (
-          <RequestTurnRow key={item.id} item={today(item)} person={me.id} />
-        ))}
-      </Register>
-      <Register title="Seen, waiting on a PO">
-        {group("Seen, waiting on a PO").map((item) => (
-          <RequestTurnRow key={item.id} item={today(item)} person={me.id} />
-        ))}
-      </Register>
-      <Register title="PO in part">
-        {group("PO in part").map((item) => (
-          <RequestTurnRow key={item.id} item={today(item)} person={me.id} />
-        ))}
-      </Register>
-    </>
+  const n = turns.length;
+  const headline = n === 0 ? `All clear, ${me.first}` : `${n} ${n === 1 ? "thing needs" : "need"} you, ${me.first}`;
+  const oldest = fresh[0] ?? open[0];
+
+  const requestsPanel = (
+    <Panel
+      title="Requests"
+      aside={
+        <Link href="/staff/finance/requests" className="link inline-flex min-h-11 items-center gap-1 text-15">
+          All <Icon name="arrow" />
+        </Link>
+      }
+      strong
+    >
+      <GlassTable<RequestView>
+        caption="Open requests"
+        rows={open.slice(0, 6)}
+        rowKey={(r) => r.no}
+        wide="md"
+        empty="Every request has its PO."
+        chip={(r) => requestChip(r)}
+        columns={[
+          {
+            label: "Request",
+            cell: (r) => (
+              <span className="grid min-w-0">
+                <Link href={`/staff/finance/requests/${r.no}`} className="link -my-3 inline-flex min-h-11 items-center whitespace-nowrap">
+                  {r.no}
+                </Link>
+                <span className="max-w-72 truncate text-13 font-normal text-ink-soft" title={r.lineWords[0]}>
+                  {r.projectName} · {taskWords(requestTask(r, firm))}
+                </span>
+              </span>
+            ),
+          },
+          { label: "Waiting", width: "w-28", cell: (r) => <WaitChip days={r.days} /> },
+          { label: "Status", width: "w-40", phone: false, cell: (r) => requestChip(r) },
+          {
+            label: "Action",
+            align: "right",
+            width: "w-36",
+            phone: false,
+            cell: (r) =>
+              r.status === "New" && procuresFor(me.id, firm.project(r.projectId)) ? (
+                <MarkSeen no={r.no} person={me.id} className="min-h-11 whitespace-nowrap px-4 text-15" />
+              ) : (
+                <Link href={`/staff/finance/requests/${r.no}`} className="btn btn-glass min-h-11 whitespace-nowrap px-4 text-15">
+                  Open
+                </Link>
+              ),
+          },
+        ]}
+      />
+    </Panel>
+  );
+
+  const moneyPanel = (
+    <Panel
+      title="This week"
+      aside={
+        <Link href="/staff/finance/money" className="link inline-flex min-h-11 items-center gap-1 text-15">
+          Money in <Icon name="arrow" />
+        </Link>
+      }
+      strong
+    >
+      <GlassTable<PaymentStageView>
+        caption="Instalments this week"
+        rows={weekRows.slice(0, 6)}
+        rowKey={(s) => `${s.projectId}:${s.n}`}
+        wide="md"
+        empty="Nothing due this week."
+        chip={(s) => <StatusChip tone={s.tone}>{s.status}</StatusChip>}
+        columns={[
+          {
+            label: "Instalment",
+            cell: (s) => (
+              <span className="grid min-w-0">
+                <span>{firm.project(s.projectId)?.name}</span>
+                <span className="text-13 font-normal text-ink-soft">
+                  {instShort(s)} · {weekShort(s)}
+                  {s.clientPaidAt ? ` · paid ${formatShortDate(s.clientPaidAt)}` : s.dueDate ? ` · due ${formatShortDate(s.dueDate)}` : ""}
+                </span>
+              </span>
+            ),
+          },
+          {
+            // The status sits under the amount in the table, so the stage keeps its room in a
+            // half-width panel; on a phone card it is the chip at the top right.
+            label: "Amount",
+            align: "right",
+            // As narrow as its figure and chip, so the stage takes the rest.
+            width: "w-1",
+            cell: (s) => (
+              <span className="grid justify-items-end gap-1">
+                <span className="figure whitespace-nowrap">{inr(s.outstanding)}</span>
+                <span className="hidden whitespace-nowrap md:inline-flex">
+                  <StatusChip tone={s.tone}>{s.status}</StatusChip>
+                </span>
+              </span>
+            ),
+          },
+        ]}
+      />
+    </Panel>
+  );
+
+  const billsPanel = (
+    <Panel
+      title="Bills to enter"
+      aside={
+        <Link href="/staff/finance/costs" className="link inline-flex min-h-11 items-center gap-1 text-15">
+          Money out <Icon name="arrow" />
+        </Link>
+      }
+    >
+      <GlassTable<PoView>
+        caption="Bills to enter"
+        rows={billsWaiting.slice(0, 5)}
+        rowKey={(po) => po.no}
+        empty="Every bill is entered."
+        chip={(po) => <span className="figure text-15">{inr(po.amount)}</span>}
+        columns={[
+          {
+            label: "PO",
+            cell: (po) => (
+              <span className="grid min-w-0">
+                <span>
+                  {po.no} · {po.vendor}
+                </span>
+                <span className="text-13 font-normal text-ink-soft">{firm.project(po.projectId)?.name}</span>
+              </span>
+            ),
+          },
+          { label: "Before GST", align: "right", width: "w-32", phone: false, cell: (po) => <span className="figure">{inr(po.amount)}</span> },
+        ]}
+      />
+    </Panel>
+  );
+
+  const stats: ReactNode = buyer ? (
+    <StatRow cols={4} label="Today at a glance">
+      <StatCard label="New requests" value={fresh.length} icon="box" href="/staff/finance/requests" tone={fresh.length > 0 ? "late" : undefined} />
+      <StatCard label="Waiting on PO" value={open.length} icon="clock" href="/staff/finance/requests" />
+      <StatCard label="Late for site" value={late.length} icon="alert" tone={late.length > 0 ? "late" : undefined} />
+      <StatCard label="Crews to book" value={crews.length} icon="hammer" href="/staff/finance/requests" />
+    </StatRow>
   ) : (
-    <Register title="Requests with procurement" empty="No requests are waiting on procurement." limit={3}>
-      {openRequests.map((r) => (
-        <RegisterRow
-          key={r.no}
-          id={`mr:${r.no}`}
-          margin={`With ${firstOf(firm.person(r.procurement[0])?.name ?? "procurement")}`}
-          marginSub={ageWords(r.days)}
-          title={`${r.no}, ${r.lineWords[0]}${r.lines.length > 1 ? ` and ${r.lines.length - 1} more` : ""}`}
-          sentence={`${r.projectName}. ${r.status === "New" ? "Not seen yet" : r.status === "Seen" ? "Seen, waiting on a PO" : "PO in part"}.`}
-          href={`/staff/finance/requests/${r.no}`}
-          stamps={stampedToday(firm.stampsFor(`mr:${r.no}`))}
-        />
-      ))}
-    </Register>
+    <StatRow cols={4} label="Today at a glance">
+      <StatCard label="To confirm" value={toConfirm.length} icon="check" href="/staff/finance/money" tone={toConfirm.length > 0 ? "late" : undefined} />
+      <StatCard label="Letters to raise" value={toRaise.length} icon="file" href="/staff/finance/money" tone={toRaise.length > 0 ? "late" : undefined} />
+      <StatCard label="Due this week" value={inrShort(thisWeek.total)} sub={`${thisWeek.items.length} ${thisWeek.items.length === 1 ? "instalment" : "instalments"}`} icon="rupee" href="/staff/finance/money" />
+      <StatCard label="Bills to enter" value={billsWaiting.length} icon="file" href="/staff/finance/costs" />
+    </StatRow>
   );
-
-  const waitingLetters = letterTurns
-    .map((t) => firm.letters.find((l) => `pay:${l.projectId}:${l.n}` === t.id))
-    .filter((l): l is LetterView => !!l);
-
-  const moneyColumn = (
-    <>
-      {finance && (
-        <Register title="Money in" empty="No letters are waiting for money.">
-          {waitingLetters.map((l) => (
-            <LetterRow key={l.letterNo} letter={l} person={me.id} canRecord panel={panel} todayOnly />
-          ))}
-        </Register>
-      )}
-      {finance && (
-        <Register title="Bills to enter" empty="No bills are waiting to be entered.">
-          {billTurns.map((item) => {
-            const po = firm.pos.find((x) => `bill:${x.no}` === item.id);
-            return po ? <BillTurnRow key={item.id} item={today(item)} po={po} person={me.id} canEnter panel={panel} /> : null;
-          })}
-        </Register>
-      )}
-      <RevisionRegister scope={scope} todayOnly />
-    </>
-  );
-
-  const first = buyer ? requestsColumn : moneyColumn;
-  const second = buyer ? moneyColumn : requestsColumn;
-  const firstSide: Side = buyer ? "requests" : "money";
 
   return (
     <>
       <StaffBoard
         place="Today"
-        headline={headlineFor(turns.length, me.first)}
-        state={state}
-        primary={primary}
-        picture={picture}
-        pictureWords={pictureWords}
+        headline={headline}
+        state={overdue.items.length > 0 ? `${overdue.items.length} overdue` : undefined}
+        primary={
+          buyer && oldest
+            ? { label: `Open ${oldest.no}`, href: `/staff/finance/requests/${oldest.no}` }
+            : !buyer && toConfirm.length > 0
+              ? { label: "Confirm payments", href: "/staff/finance/money" }
+              : !buyer && toRaise.length > 0
+                ? { label: "Raise letters", href: "/staff/finance/money" }
+                : undefined
+        }
       />
-      <div className="mt-6 min-[1360px]:hidden" role="group" aria-label="Show">
-        <div className="grid grid-cols-2 gap-2 sm:max-w-[28rem]">
-          <Chip pressed={side === "requests"} onClick={() => setChosen("requests")}>
-            Requests
-          </Chip>
-          <Chip pressed={side === "money"} onClick={() => setChosen("money")}>
-            Money
-          </Chip>
-        </div>
-      </div>
-      <div className="staff-columns mt-6 min-[1360px]:mt-10">
-        <div className={`gap-10 ${side === firstSide ? "grid" : "hidden min-[1360px]:grid"}`}>{first}</div>
-        <div className={`content-start gap-10 ${side !== firstSide ? "grid" : "hidden min-[1360px]:grid"}`}>{second}</div>
+      <div className="mt-6 grid gap-5">
+        {stats}
+        {buyer ? (
+          <>
+            {requestsPanel}
+            <div className="grid gap-5 xl:grid-cols-2">
+              {moneyPanel}
+              {billsPanel}
+            </div>
+          </>
+        ) : (
+          <>
+            {moneyPanel}
+            <div className="grid gap-5 xl:grid-cols-2">
+              {billsPanel}
+              <Panel title="Requests" aside={<Count n={open.length} />}>
+                <p className="px-1 text-15 text-ink-soft">
+                  <Link href="/staff/finance/requests" className="link inline-flex min-h-11 items-center">
+                    {open.length} waiting on a PO
+                  </Link>
+                </p>
+              </Panel>
+            </div>
+          </>
+        )}
       </div>
     </>
   );

@@ -1,0 +1,47 @@
+/* Payments: the contract bar fills as money comes in. Only transform moves. */
+.pay-fill {
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* A stage number in a small glass disc; a locked stage's disc is dashed. */
+.pay-disc {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid rgb(42 26 18 / 0.16);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+.pay-disc[data-tone="done"] {
+  border-color: transparent;
+  background: var(--color-kota);
+  color: #fff;
+}
+
+.pay-disc[data-tone="locked"] {
+  border-style: dashed;
+  background: transparent;
+}
+
+/* The open form under a row slides in. */
+.pay-panel {
+  animation: pay-panel-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes pay-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pay-fill,
+  .pay-panel {
+    transition: none;
+    animation: none;
+  }
+}

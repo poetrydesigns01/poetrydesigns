@@ -3,20 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
-import { ProgrammeStrip } from "@/components/instruments/programme-strip";
+import { stageChip } from "@/components/admin/admin-data";
+import { Icon, Meter } from "@/components/admin/glass-kit";
 import { ProjectMark } from "@/components/instruments/project-mark";
 import { PersonMenu } from "@/components/register/person-menu";
-import { SampleTag } from "@/components/register/sample-tag";
 import { PLACES, useStaffRole } from "@/components/register/staff-shell";
-import { TODAY } from "@/lib/demo-data";
+import { StatusChip } from "@/components/register/status-chip";
 import { useFirm } from "@/lib/demo-store";
 import { templateOf, type ProjectId, type StaffRole } from "@/lib/firm-data";
-import { weekdayDate } from "@/lib/format";
 
-// The project record's frame: one rosewood board for every tab, holding the project's name,
-// its code, category and address, and as the picture the house drawn at its stage over its
-// programme strip; then the row of tabs. A tab a role may not open is not drawn. Kulkarni
-// Eco Home, still a draft, shows how far its setting up has gone instead of tabs.
+// The project record's frame: a glass header with the project's name, code, category, its
+// stage and how far the payment stages have come, then the row of tabs as glass pills. A
+// tab a role may not open is not drawn. A draft shows how far its setting up has gone.
 
 type Tab = { label: string; path: string; roles?: StaffRole[] };
 
@@ -65,98 +63,68 @@ export function ProjectFrame({ projectId, children }: { projectId: ProjectId; ch
   const draft = p.phase === "draft";
   const draftView = firm.drafts.find((d) => d.id === "kulkarni");
   const category = templateOf(p.category).name;
+  const stages = draft ? [] : firm.payments(p.id);
+  const paid = stages.filter((s) => s.state === "paid").length;
 
   return (
     <>
-      <header className="board on-dark">
-        {/* A phone has no rail: the wordmark and the person menu head the board. */}
-        <div className="-mt-2 flex min-h-12 items-center justify-between gap-2 lg:hidden">
-          <p className="display shrink-0 text-22 leading-none">Poetry Designs</p>
+      <header className="glass mt-3 grid gap-3 p-4 sm:p-5 lg:mt-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-end lg:gap-6">
+        {/* A phone has no rail: the wordmark and the person menu head the page. */}
+        <div className="-mt-1 flex min-h-12 items-center justify-between gap-2 border-b border-ink/10 pb-2 lg:col-span-2 lg:hidden">
+          <p className="display shrink-0 text-22 leading-none text-ink">Poetry Designs</p>
           <PersonMenu role={role} variant="button" />
         </div>
 
-        <div className="board-text">
-          <Link href={home.href} className="link inline-flex min-h-11 items-center self-start text-15 text-lime/80">
-            Back to {home.label}
+        <div className="grid min-w-0 gap-2">
+          <Link href={home.href} className="link inline-flex min-h-11 items-center gap-1.5 self-start text-15 text-ink-soft">
+            <Icon name="arrow" className="size-4 rotate-180" />
+            {home.label}
           </Link>
-          <p className="lettering text-lime/75">
-            {draft ? "Project record" : active.label}, {weekdayDate(TODAY)}
-          </p>
-          <div className="flex items-end gap-4">
-            {/* From 1024 px the house is drawn large at the right instead. */}
-            <ProjectMark projectId={p.id} tone="dark" className="w-[56px] shrink-0 lg:hidden" />
-            <h1 className="display text-balance text-22 lg:text-32">{p.name}</h1>
+          <div className="flex items-center gap-3">
+            <ProjectMark projectId={p.id} tone="light" className="w-12 shrink-0 sm:w-14" />
+            <h1 className="display min-w-0 text-balance text-22 text-ink lg:text-32">{p.name}</h1>
           </div>
-          <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-15 text-lime/80">
-            {p.code ? (
-              <>
-                <span>{p.code}</span>
-                <span className="text-lime">
-                  <SampleTag>Sample code</SampleTag>
-                </span>
-              </>
-            ) : (
-              <span>No project code until it is opened.</span>
-            )}
-            <span>{category}.</span>
-            {/* The address is on the Overview too; on a phone the board keeps to the essentials. */}
-            <span className="hidden sm:inline">{p.address}.</span>
-          </p>
-          <p className="flex flex-wrap gap-x-4 text-15">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {p.code && <span className="glass-chip">{p.code}</span>}
+            <span className="glass-chip">{category}</span>
+            <StatusChip tone={draft ? "locked" : p.phase === "handed-over" ? "done" : "progress"}>
+              {draft ? "Draft" : stageChip(p)}
+            </StatusChip>
             <a
               href={p.maps}
               target="_blank"
               rel="noreferrer"
-              className="link inline-flex min-h-11 items-center text-lime"
+              className="link inline-flex min-h-11 items-center gap-1 px-1 text-13 text-ink-soft"
             >
-              Open in Google Maps
+              <Icon name="pin" className="size-3.5" />
+              Map
             </a>
-            <span className="hidden min-h-11 items-center text-lime/80 sm:inline-flex">
-              Coordinates {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
-            </span>
-          </p>
-          {/* .board-picture sets its own display, so the wrapper is what hides it from 1024 px. */}
-          {!draft && (
-            <div className="mt-2 lg:hidden">
-              <figure className="board-picture">
-                <ProgrammeStrip cells={p.strip} size={264} tone="dark" label={p.stageWords} />
-                <figcaption className="lettering board-words">{p.stageWords}</figcaption>
-              </figure>
-            </div>
-          )}
+          </div>
         </div>
 
-        {!draft && (
-          // Set at the foot of the board, level with the name and the address, not the back link.
-          <div className="hidden lg:block lg:self-end">
-            <div className="board-side">
-              <figure className="board-picture justify-items-start">
-                <div className="grid gap-3" style={{ maxHeight: "none" }}>
-                  <ProjectMark
-                    projectId={p.id}
-                    tone="dark"
-                    className="w-[160px] shrink-0"
-                    title={`${p.name}, drawn at its stage`}
-                  />
-                  <ProgrammeStrip cells={p.strip} size={264} tone="dark" label={p.stageWords} />
-                </div>
-                <figcaption className="lettering board-words">{p.stageWords}</figcaption>
-              </figure>
-            </div>
+        {!draft && stages.length > 0 && (
+          <div className="glass-inner hidden gap-2 p-3 sm:grid">
+            <p className="flex items-baseline justify-between gap-3">
+              <span className="lettering text-ink-soft">Instalments paid</span>
+              <span className="figure text-17">
+                {paid} / {stages.length}
+              </span>
+            </p>
+            <Meter value={paid / stages.length} tone="done" label="Instalments received" />
           </div>
         )}
       </header>
 
       {draft ? (
         <>
-          <section className="mt-8 grid max-w-[60ch] gap-3">
-            <p className="text-17">
-              This project is still being set up by {firm.person(p.onboardedBy)?.name ?? "business development"}.{" "}
-              {draftView ? `${draftView.stepsDone} of 4 steps are done.` : ""}
-            </p>
-            {draftView && <p className="text-15 text-ink-soft">{draftView.missing}</p>}
+          <section aria-label="Set up" className="glass mt-5 grid gap-3 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-17 font-semibold">Being set up</h2>
+              {draftView && <StatusChip tone="waiting">{`${draftView.stepsDone} of 4 steps`}</StatusChip>}
+            </div>
+            {draftView && <Meter value={draftView.stepsDone / 4} tone="progress" label="Set-up steps done" />}
             <p>
-              <Link href="/staff/bd/onboard/kulkarni" className="link inline-flex min-h-11 items-center text-17">
+              <Link href="/staff/bd/onboard/kulkarni" className="btn btn-glass min-h-11 px-4 text-15">
                 Open the draft
               </Link>
             </p>
@@ -166,21 +134,20 @@ export function ProjectFrame({ projectId, children }: { projectId: ProjectId; ch
         </>
       ) : (
         <>
-          {/* A phone scrolls the row sideways, its scrollbar hidden and the open tab brought into
-              view; from 768 px the tabs wrap, so none is ever out of reach. */}
+          {/* A phone scrolls the row sideways inside itself; from 768 px the pills wrap. */}
           <nav
             ref={navRef}
             aria-label="Project record"
-            className="-mx-4 mt-4 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden"
+            className="glass mt-4 overflow-x-auto rounded-3xl p-1 [scrollbar-width:none] md:overflow-visible [&::-webkit-scrollbar]:hidden"
           >
-            <ul className="flex min-w-max gap-2 border-b border-sand pb-3 md:min-w-0 md:flex-wrap md:gap-1.5 lg:gap-1">
+            <ul className="flex min-w-max gap-1 md:min-w-0 md:flex-wrap">
               {tabs.map((t) => (
                 <li key={t.label}>
                   <Link
                     ref={t === active ? activeRef : undefined}
                     href={`${base}${t.path}`}
                     aria-current={t === active ? "page" : undefined}
-                    className="inline-flex min-h-11 items-center whitespace-nowrap bg-sand-2 px-4 text-15 md:px-3 aria-[current=page]:bg-rosewood aria-[current=page]:text-lime lg:bg-transparent lg:px-3 lg:aria-[current=page]:bg-transparent lg:aria-[current=page]:font-semibold lg:aria-[current=page]:text-ink lg:aria-[current=page]:shadow-[inset_0_-3px_0_var(--color-rosewood)] lg:hover:bg-sand-2"
+                    className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full px-4 text-15 text-ink transition-colors duration-150 hover:bg-white/60 aria-[current=page]:bg-rosewood aria-[current=page]:font-semibold aria-[current=page]:text-lime"
                   >
                     {t.label}
                   </Link>
@@ -188,7 +155,7 @@ export function ProjectFrame({ projectId, children }: { projectId: ProjectId; ch
               ))}
             </ul>
           </nav>
-          <div className="mt-8">{children}</div>
+          <div className="mt-5">{children}</div>
         </>
       )}
     </>
@@ -197,5 +164,10 @@ export function ProjectFrame({ projectId, children }: { projectId: ProjectId; ch
 
 /** What a role that may not see the money reads on the Money tab. */
 export function NotForRole({ children }: { children: string }) {
-  return <p className="py-4 text-17 text-ink-soft">{children}</p>;
+  return (
+    <p className="glass flex items-center gap-2 p-4 text-15 text-ink-soft">
+      <Icon name="lock" />
+      {children}
+    </p>
+  );
 }

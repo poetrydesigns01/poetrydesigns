@@ -4,19 +4,19 @@ import { useRef, useState } from "react";
 import { Chip, ChipGroup, field } from "@/components/register/chips";
 import { Field } from "@/components/register/field";
 import { usePause } from "@/components/register/recording-pause";
-import { Register, RegisterRow } from "@/components/register/register";
+import { Count, Icon, Initials, Panel } from "@/components/admin/glass-kit";
 import { StaffBoard } from "@/components/register/staff-board";
+import { StatusChip } from "@/components/register/status-chip";
 import { useDemo, useFirm, useViewer } from "@/lib/demo-store";
-import type { ProjectView, StampView } from "@/lib/firm";
+import type { ProjectView } from "@/lib/firm";
 import type { PersonId, ProjectId } from "@/lib/firm-data";
 import { listWords } from "@/lib/format";
 import { focusReturn } from "./focus-return";
 import { usePanel } from "./rows";
 import { hasFinance } from "./shared";
 
-// The procurement lead's team: who is in it, which sites each one buys for, and two
-// actions, each through the pause: add a member, and give a member more sites. Adding to
-// a team is how work is handed on here; there are no other permissions to set.
+// The procurement lead's team: who is in it and which sites each one buys for, with two
+// actions through the pause: add a member, and give a member more sites.
 
 const TEAM = "Procurement" as const;
 
@@ -109,7 +109,7 @@ function AssignSites({
 
   return (
     <form
-      className="grid gap-4 border-t border-sand pt-4"
+      className="glass-inner grid gap-4 p-4"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
@@ -134,7 +134,7 @@ function AssignSites({
         have={have}
         chosen={sites}
         onChange={setSites}
-        label={adding ? "Sites they buy for (you can add these later)" : "More sites"}
+        label={adding ? "Sites" : "More sites"}
       />
       {error && (
         <p className="text-15 font-semibold text-brick" role="alert">
@@ -152,7 +152,6 @@ function AssignSites({
 
 export function FinanceTeam() {
   const firm = useFirm();
-  const demo = useDemo();
   const me = useViewer("finance");
   const pause = usePause();
   const panel = usePanel();
@@ -163,8 +162,7 @@ export function FinanceTeam() {
     return (
       <StaffBoard
         place="Team"
-        headline="This page is for the procurement lead."
-        state="Your requests and money are on Today."
+        headline="For the procurement lead"
         chip={false}
         back={{ label: "Back to Today", href: "/staff/finance" }}
       />
@@ -178,92 +176,48 @@ export function FinanceTeam() {
     .sort((a, b) => Number(b.role === "finance") - Number(a.role === "finance"))
     .map((p) => ({ id: p.id, name: p.name, title: p.title }));
   const uncovered = projects.filter((p) => p.team.procurement.length === 0);
-  // The team's own record: each addition and each site given, newest first.
-  const stampsOf = (person: PersonId): StampView[] =>
-    demo.events
-      .flatMap((e) => (e.kind === "member.added" && e.team === TEAM && e.personId === person ? [e] : []))
-      .map((e) => ({
-        words: e.sites.length === 0 ? "Added to procurement" : `Given ${listWords(e.sites.map((id) => firm.project(id)?.name ?? id))}`,
-        at: e.at,
-        by: e.by,
-      }))
-      .reverse();
 
   return (
     <>
-      <StaffBoard
-        place="Team"
-        headline={members.length > 0 ? `Your team: ${listWords(members.map((m) => m.name))}.` : "Your team has no one else yet."}
-        state={
-          uncovered.length === 0
-            ? "Every open site has someone in procurement."
-            : `${listWords(uncovered.map((p) => p.name))} ${uncovered.length === 1 ? "has" : "have"} no one in procurement.`
-        }
-        chip={false}
-      />
+      <StaffBoard place="Team" headline="Procurement team" chip={false} />
 
-      <div className="mt-10 grid gap-10">
-        <Register title="Your team" empty="No one else is in the team yet.">
-          {members.map((m) => {
-            const id = `member:${m.id}`;
-            const sites = projects.filter((p) => p.team.procurement.includes(m.id));
-            const open = panel.isOpen(id);
-            return (
-              <RegisterRow
-                key={m.id}
-                id={id}
-                margin={hasFinance(m) ? "Accounts" : `${sites.length} ${sites.length === 1 ? "site" : "sites"}`}
-                title={m.name}
-                sentence={
-                  <>
-                    {m.title}. {hasFinance(m) ? "Records money in and bills for every project. " : ""}
-                    {sites.length > 0 ? `Buys for ${listWords(sites.map((p) => p.name))}.` : "Buys for no site yet."}{" "}
-                    <a href={`tel:${m.phone.replace(/\s/g, "")}`} className="link whitespace-nowrap py-3.5">
-                      {m.phone}
-                    </a>
-                  </>
-                }
-                action={
-                  <button
-                    type="button"
-                    className="btn btn-quiet"
-                    aria-expanded={open}
-                    onClick={(event) => panel.toggle(id, event.currentTarget)}
-                  >
-                    {open ? "Close" : "Assign sites"}
-                  </button>
-                }
-                stamps={stampsOf(m.id)}
+      <div className="mt-6 grid gap-5">
+        {uncovered.length > 0 && (
+          <section aria-label="Sites with no buyer" className="glass flex flex-wrap items-center gap-2 px-4 py-3">
+            <Icon name="alert" className="size-4 text-brick" />
+            <span className="text-15 font-semibold">No buyer</span>
+            {uncovered.map((p) => (
+              <StatusChip key={p.id} tone="late">
+                {p.name}
+              </StatusChip>
+            ))}
+          </section>
+        )}
+
+        <Panel
+          title="Members"
+          aside={
+            <span className="flex items-center gap-2">
+              <Count n={members.length} />
+              <button
+                ref={addRef}
+                type="button"
+                className="btn btn-glass min-h-11 gap-2 px-4 text-15"
+                aria-expanded={adding}
+                onClick={() => {
+                  if (adding && pause.pending !== null && pause.pending.rowId === null) pause.cancel();
+                  setAdding((a) => !a);
+                }}
               >
-                {open && (
-                  <AssignSites
-                    person={m.id}
-                    by={me.id}
-                    have={sites.map((p) => p.id)}
-                    projects={projects}
-                    onDone={panel.close}
-                  />
-                )}
-              </RegisterRow>
-            );
-          })}
-        </Register>
-
-        <div className="grid justify-items-start gap-3">
-          <button
-            ref={addRef}
-            type="button"
-            className="btn btn-quiet"
-            aria-expanded={adding}
-            onClick={() => {
-              if (adding && pause.pending !== null && pause.pending.rowId === null) pause.cancel();
-              setAdding((a) => !a);
-            }}
-          >
-            {adding ? "Close" : "Add a member"}
-          </button>
+                {!adding && <Icon name="plus" />}
+                {adding ? "Close" : "Add member"}
+              </button>
+            </span>
+          }
+          strong
+        >
           {adding && (
-            <div className="w-full">
+            <div className="mb-3">
               <AssignSites
                 by={me.id}
                 have={[]}
@@ -276,8 +230,62 @@ export function FinanceTeam() {
               />
             </div>
           )}
-          <p className="text-15 text-ink-soft">New people are set up by Shalini Murthy on the admin People page.</p>
-        </div>
+          {members.length === 0 ? (
+            <p className="px-1 py-3 text-15 text-ink-soft">No one else yet.</p>
+          ) : (
+            <ul className="grid gap-1">
+              {members.map((m) => {
+                const id = `member:${m.id}`;
+                const sites = projects.filter((p) => p.team.procurement.includes(m.id));
+                const open = panel.isOpen(id);
+                return (
+                  <li key={m.id} className="glass-row grid gap-3 px-3 py-3" data-row-id={id}>
+                    <div className="grid items-center gap-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Initials name={m.name} />
+                        <span className="grid min-w-0">
+                          <span className="truncate text-15 font-semibold">{m.name}</span>
+                          <a href={`tel:${m.phone.replace(/\s/g, "")}`} className="link -my-3 inline-flex min-h-11 items-center text-13 text-ink-soft">
+                            {m.phone}
+                          </a>
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {hasFinance(m) && <StatusChip tone="done">Accounts</StatusChip>}
+                        {sites.length === 0 ? (
+                          <StatusChip tone="locked">No site</StatusChip>
+                        ) : (
+                          sites.map((p) => (
+                            <span key={p.id} className="glass-chip">
+                              {p.name}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-glass min-h-11 justify-self-start px-4 text-15 sm:justify-self-end"
+                        aria-expanded={open}
+                        onClick={(event) => panel.toggle(id, event.currentTarget)}
+                      >
+                        {open ? "Close" : "Assign sites"}
+                      </button>
+                    </div>
+                    {open && (
+                      <AssignSites
+                        person={m.id}
+                        by={me.id}
+                        have={sites.map((p) => p.id)}
+                        projects={projects}
+                        onDone={panel.close}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Panel>
       </div>
     </>
   );

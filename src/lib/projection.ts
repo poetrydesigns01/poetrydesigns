@@ -33,6 +33,8 @@ import {
   type ProjectId,
   type Receipt,
 } from "./firm-data";
+import { seedDesignItems, seedDrawings, siteTaskTitle as planSiteTaskTitle } from "./portal-data";
+import { fallsInMilestone, instalmentOf, workflowTask } from "./workflow-template";
 import {
   addDays,
   datePart,
@@ -218,7 +220,11 @@ export type DeriveInput = {
 
 // Which floor of the house each mark belongs to. The positions are in house-model.ts.
 const GROUPS: Record<string, StoreyGroup> = {
-  "pay:3": "first",
+  "pay:4": "first",
+  "pay:5": "first",
+  "pay:6": "second",
+  "design:m4-door-frames": "first",
+  "design:m6-handrails": "second",
   "design:terrace-plan": "second",
   "design:kitchen-spec": "ground",
   "design:first-floor-plan": "first",
@@ -237,9 +243,9 @@ export function groupOf(anchor: string): StoreyGroup {
 
 /** The floor a milestone's work belongs to on a city villa, or null when it is not one floor. */
 function storeyOfMilestone(n: number): StoreyGroup | null {
-  if (n === 1 || n === 2) return "ground";
-  if (n === 3) return "first";
-  if (n === 4) return "second";
+  if (n >= 1 && n <= 3) return "ground";
+  if (n === 4 || n === 5) return "first";
+  if (n === 6) return "second";
   return null;
 }
 
@@ -251,6 +257,8 @@ const MONEY: Record<Milestone["status"], MoneyState> = {
 };
 
 function lowerFirst(text: string): string {
+  // "FF roof slab", "BOM" and "UG sump" keep their capitals.
+  if (/^[A-Z]{2}/.test(text)) return text;
   return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
@@ -263,7 +271,7 @@ function landing(list: Change[], milestoneId: number): number {
   return sum(list.flatMap((change) => change.lands.filter((l) => l.milestoneId === milestoneId).map((l) => l.amount)));
 }
 
-/** The milestone that was waiting for her approval when the demo starts: 3. */
+/** The instalment that was waiting for her when the demo starts: 5. */
 const SEED_DUE = milestones.find((m) => m.status === "awaiting-approval")?.id ?? -1;
 
 const CLIENTS = new Set<PersonId>(["meera", "arjun"]);
@@ -300,7 +308,12 @@ function taskTitle(taskId: string, events: FirmEvent[]): { title: string; person
 }
 
 function designTitle(projectId: ProjectId, designId: string): string {
-  if (projectId === "iyer") return designs.find((d) => d.id === designId)?.title ?? designId;
+  if (projectId === "iyer")
+    return (
+      designs.find((d) => d.id === designId)?.title ??
+      seedDesignItems.find((d) => d.projectId === "iyer" && d.id === designId)?.title ??
+      designId
+    );
   return designSummaries.find((d) => d.designId === designId)?.title ?? designId;
 }
 
@@ -314,7 +327,8 @@ export function logEntryOf(event: FirmEvent, events: FirmEvent[]): LogEntry | nu
     kind: (CLIENTS.has(event.by) ? "client" : "staff") as LogEntry["kind"],
   };
   const total = (projectId: ProjectId, n: number) => withGst(milestoneOf(projectId, n)?.amount ?? 0).total;
-  const stageName = (projectId: ProjectId, n: number) => lowerFirst(milestoneOf(projectId, n)?.name ?? `milestone ${n}`);
+  // Money rows are instalments ("Instalment 5", "Sign-up"); stage.done is construction milestone n.
+  const instalmentWords = (n: number) => instalmentOf(n)?.label ?? (n === 0 ? "Sign-up" : `Instalment ${n}`);
   switch (event.kind) {
     case "request.raised":
       return {
@@ -338,7 +352,7 @@ export function logEntryOf(event: FirmEvent, events: FirmEvent[]): LogEntry | nu
       return {
         ...base,
         projectId: event.projectId,
-        action: `Marked ${projectName(event.projectId)} milestone ${event.n} done, with ${
+        action: `Marked ${projectName(event.projectId)} Milestone ${event.n} done, with ${
           event.photos.length === 1 ? "1 photo" : `${event.photos.length} photos`
         }.`,
         detail: event.note || undefined,
@@ -347,15 +361,15 @@ export function logEntryOf(event: FirmEvent, events: FirmEvent[]): LogEntry | nu
       return {
         ...base,
         projectId: event.projectId,
-        action: `Raised the payment for ${projectName(event.projectId)} milestone ${event.n}, letter ${event.letterNo}.`,
+        action: `Raised the demand letter for ${projectName(event.projectId)} ${instalmentWords(event.n)}, letter ${event.letterNo}.`,
       };
     case "stage.accepted":
-      return { ...base, projectId: event.projectId, action: `Accepted the ${stageName(event.projectId, event.n)} as finished.` };
+      return { ...base, projectId: event.projectId, action: `Confirmed the work for ${instalmentWords(event.n)} as finished.` };
     case "payment.approved":
       return {
         ...base,
         projectId: event.projectId,
-        action: `Approved payment for milestone ${event.n}, ${inr(total(event.projectId, event.n))}.`,
+        action: `Approved payment for ${instalmentWords(event.n)}, ${inr(total(event.projectId, event.n))}.`,
         detail: event.note || undefined,
       };
     case "receipt.recorded": {
@@ -366,7 +380,7 @@ export function logEntryOf(event: FirmEvent, events: FirmEvent[]): LogEntry | nu
         projectId: receipt.projectId,
         action: `Recorded ${inr(receipt.amount)} from the ${receipt.source === "bank" ? "bank" : "client"} for ${projectName(
           receipt.projectId,
-        )} ${letter ? `letter ${letterShort(letter)}` : `milestone ${receipt.n}`}.`,
+        )} ${instalmentWords(receipt.n)}${letter ? `, letter ${letterShort(letter)}` : ""}.`,
       };
     }
     case "bill.entered":
@@ -387,7 +401,7 @@ export function logEntryOf(event: FirmEvent, events: FirmEvent[]): LogEntry | nu
       return {
         ...base,
         projectId: event.projectId,
-        action: `Proposed paying milestone ${event.n} in two parts.`,
+        action: `Proposed paying ${instalmentWords(event.n)} in two parts.`,
         reason: event.reason,
       };
     case "schedule.decided":
@@ -396,15 +410,15 @@ export function logEntryOf(event: FirmEvent, events: FirmEvent[]): LogEntry | nu
         projectId: event.projectId,
         action:
           event.status === "approved"
-            ? `Approved paying milestone ${event.n} in two parts.`
-            : `Asked for changes to the split of milestone ${event.n}.`,
+            ? `Approved paying ${instalmentWords(event.n)} in two parts.`
+            : `Asked for changes to the split of ${instalmentWords(event.n)}.`,
         detail: event.comment || undefined,
       };
     case "milestone.revised":
       return {
         ...base,
         projectId: event.projectId,
-        action: `Moved milestone ${event.n} from ${event.from} to ${event.to}.`,
+        action: `Moved ${instalmentWords(event.n)} from ${event.from} to ${event.to}.`,
         reason: event.reason,
       };
     case "estimate.approved":
@@ -545,7 +559,64 @@ export function logEntryOf(event: FirmEvent, events: FirmEvent[]): LogEntry | nu
       return { ...base, action: event.change };
     case "record.deleted":
       return { ...base, kind: "deleted", action: `Deleted ${event.what}.`, reason: event.reason };
+    case "payment.client-paid":
+      return {
+        ...base,
+        projectId: event.projectId,
+        action: `Marked ${instalmentWords(event.n)} paid, ${inr(total(event.projectId, event.n))}.`,
+        detail: event.ref ? `Reference ${event.ref}` : undefined,
+      };
+    case "letter.requested":
+      return { ...base, projectId: event.projectId, action: `Asked for the demand letter for ${instalmentWords(event.n)}.` };
+    case "design.viewed":
+    case "thread.read":
+      return null;
+    case "site-task.progress":
+      return {
+        ...base,
+        projectId: event.projectId,
+        action: `Updated ${lowerFirst(siteTaskTitle(event.taskId))} to ${event.percent}%.`,
+        detail: event.note || undefined,
+      };
+    case "work-order.requested":
+      return {
+        ...base,
+        projectId: event.projectId,
+        action: `Requested a work order on ${projectName(event.projectId)}: ${lowerFirst(event.trade)}, ${dayCount(event.days)} from ${formatShortDate(event.startOn)}.`,
+        detail: event.note || undefined,
+      };
+    case "work-order.booked":
+      return {
+        ...base,
+        projectId: event.projectId,
+        action: `Booked work order ${event.workOrderId}${event.crew ? ` with ${event.crew}` : ""}.`,
+      };
+    case "drawing.sent": {
+      const drawing = seedDrawings.find((d) => d.id === event.drawingId);
+      return {
+        ...base,
+        projectId: event.projectId,
+        action: `Sent drawing ${drawing ? `${drawing.sheet}, ${lowerFirst(drawing.title)}` : event.drawingId} to site.`,
+      };
+    }
+    case "plan.generated":
+      return {
+        ...base,
+        projectId: event.projectId,
+        action: `Generated the plan for ${projectName(event.projectId)} from ${formatShortDate(event.preStart)}.`,
+      };
+    case "plan.task-assigned":
+      return {
+        ...base,
+        projectId: event.projectId,
+        action: `Gave ${name(event.to)} ${projectName(event.projectId)}: ${workflowTask(event.taskId)?.name ?? event.taskId}.`,
+        reason: event.reason || undefined,
+      };
   }
+}
+
+function siteTaskTitle(taskId: string): string {
+  return planSiteTaskTitle(taskId);
 }
 
 /** The audit trail: the seed and every event that is recorded there, newest first. */
@@ -613,6 +684,10 @@ export function threadPosts(events: FirmEvent[]): Post[] {
         break;
       case "design.decided":
       case "change.decided":
+      case "payment.client-paid":
+      case "letter.requested":
+      case "payment.raised":
+      case "receipt.recorded":
       case "payment.approved":
       case "stage.accepted":
       case "schedule.decided":
@@ -626,7 +701,12 @@ export function threadPosts(events: FirmEvent[]): Post[] {
             : event.kind === "change.decided"
               ? `change:${event.changeId}`
               : null;
-        const projectId: ProjectId = event.kind === "cottage-schedule.approved" ? "iyer-cottage" : event.projectId;
+        const projectId: ProjectId =
+          event.kind === "cottage-schedule.approved"
+            ? "iyer-cottage"
+            : event.kind === "receipt.recorded"
+              ? event.receipt.projectId
+              : event.projectId;
         live.push({
           id,
           projectId,
@@ -710,10 +790,16 @@ export function scheduleChangeOf(
   };
 }
 
-/** The newest version of an Iyer design, counting versions uploaded in this tab. */
+/** The newest version of an Iyer design or design item, counting versions uploaded in this tab. */
 export function latestVersionOf(designId: string, events: FirmEvent[] = []): number {
   const design = designs.find((d) => d.id === designId);
-  const seedLast = design ? design.versions[design.versions.length - 1].version : 0;
+  const item = seedDesignItems.find((d) => d.projectId === "iyer" && d.id === designId);
+  // A stage item's own seed wins: its versions are what the client's Designs page shows.
+  const seedLast = item
+    ? (item.versions[item.versions.length - 1]?.version ?? 0)
+    : design
+      ? design.versions[design.versions.length - 1].version
+      : 0;
   return events.reduce(
     (latest, e) =>
       e.kind === "design.uploaded" && e.projectId === "iyer" && e.designId === designId ? Math.max(latest, e.version) : latest,
@@ -723,13 +809,15 @@ export function latestVersionOf(designId: string, events: FirmEvent[] = []): num
 
 /** Her approvals before the demo, by anchor. */
 const SEED_APPROVED: Record<string, string> = {
-  agreement: "2026-01-14T18:20",
-  "design:ground-floor-plan": "2026-02-14T21:10",
-  "design:first-floor-plan": "2026-03-02T20:45",
-  "design:front-elevation": "2026-03-20T19:05",
-  "change:study-room": "2026-03-28T20:05",
-  "pay:1": "2026-05-25T18:40",
-  "pay:2": "2026-08-20T21:02",
+  agreement: "2026-05-26T18:20",
+  "design:ground-floor-plan": "2026-06-24T20:45",
+  "design:first-floor-plan": "2026-06-24T20:45",
+  "design:front-elevation": "2026-07-01T21:00",
+  "change:study-room": "2026-06-12T20:05",
+  "pay:1": "2026-07-13T18:40",
+  "pay:2": "2026-09-01T21:02",
+  "pay:3": "2026-09-28T20:15",
+  "pay:4": "2026-10-13T19:40",
 };
 
 export function derive(state: DeriveInput): Projection {
@@ -786,7 +874,9 @@ export function derive(state: DeriveInput): Projection {
     // write sets; both are needed before it counts.
     const approvedEvent =
       milestone.id === SEED_DUE && !state.paymentApproved ? undefined : find("payment.approved", milestone.id);
-    const doneEvent = find("stage.done", milestone.id);
+    // Instalment n falls due inside milestone n-1; that milestone's stage.done is the work behind it.
+    const fallsIn = fallsInMilestone(milestone.id);
+    const doneEvent = fallsIn > 0 ? find("stage.done", fallsIn) : undefined;
     const acceptedEvent = find("stage.accepted", milestone.id);
     const raised = milestone.status === "paid" || milestone.status === "awaiting-approval" || !!raisedEvent;
     const approved =
@@ -871,7 +961,8 @@ export function derive(state: DeriveInput): Projection {
   const open = projectedMilestones.filter((m) => m.money === "due" || m.money === "approved");
   const raisedNow = open[open.length - 1];
   const seedStage = raisedNow ? milestoneOf("iyer", raisedNow.id) : undefined;
-  const doneHere = raisedNow ? find("stage.done", raisedNow.id) : undefined;
+  const raisedFallsIn = raisedNow ? fallsInMilestone(raisedNow.id) : 0;
+  const doneHere = raisedFallsIn > 0 ? find("stage.done", raisedFallsIn) : undefined;
   const stage = raisedNow
     ? {
         n: raisedNow.id,

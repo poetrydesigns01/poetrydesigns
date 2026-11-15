@@ -1,77 +1,85 @@
 "use client";
 
-import { ProgrammeStrip } from "@/components/instruments/programme-strip";
-import { Register, RegisterRow } from "@/components/register/register";
+import Link from "next/link";
+import { dated, Empty, IconArrow, Panel, Stat, Stats } from "@/components/architect/glass-ui";
 import { StaffBoard } from "@/components/register/staff-board";
-import { TODAY } from "@/lib/demo-data";
+import { StatusChip } from "@/components/register/status-chip";
 import { useFirm } from "@/lib/demo-store";
-import { ageWords } from "@/lib/firm";
-import { formatDate } from "@/lib/format";
-import { monthName, phaseMargin, pipeline, signInWords, THIS_MONTH } from "./bd-words";
+import { phaseChip, pipeline, THIS_MONTH } from "./bd-words";
 
-// The pipeline Rohan built: every project he onboarded, where it stands, and whether the
-// client has signed in. Each opened workspace is one onboarded client, the billing event,
-// so the foot counts them by month.
+// Every project Rohan onboarded, newest first: its code, when, whether the client has
+// signed in, the plan's week and where it stands. Each row opens its project record.
+
+const COLS = "md:grid md:grid-cols-[minmax(0,1fr)_7rem_8.5rem_4rem_9rem_1.25rem]";
 
 export function BdProjects() {
   const firm = useFirm();
   const projects = pipeline(firm.projects);
   const thisMonth = projects.filter((p) => (p.onboardedOn ?? "").startsWith(THIS_MONTH)).length;
-
-  // This year's onboardings by month, newest first: "November 2026: 1. October: 1."
-  const year = TODAY.slice(0, 4);
-  const months = new Map<string, number>();
-  for (const p of projects) {
-    const month = (p.onboardedOn ?? "").slice(0, 7);
-    if (month.startsWith(year)) months.set(month, (months.get(month) ?? 0) + 1);
-  }
-  const monthLine = [...months.entries()]
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([month, n], i) => `${monthName(`${month}-01`)}${i === 0 ? ` ${year}` : ""}: ${n}.`)
-    .join(" ");
+  const signedIn = projects.filter((p) => p.clientSignedInOn).length;
+  const building = projects.filter((p) => p.phase === "building").length;
 
   return (
     <>
       <StaffBoard
         place="Projects"
-        headline={`${projects.length} projects, ${thisMonth} onboarded in ${monthName(TODAY)}.`}
-        state="Every workspace you opened, newest first. Each one opens on its project record."
+        headline={`${projects.length} ${projects.length === 1 ? "project" : "projects"}`}
         chip={false}
       />
-      <div className="mt-8 grid max-w-[60rem] gap-10">
-        <Register title="Your projects" limit={12} empty="No projects onboarded yet.">
-          {projects.map((p) => {
-            const { margin, sub } = phaseMargin(p);
-            // "Invited" over how long ago; the sentence says it is not signed in yet.
-            const invited = p.phase === "invited" && !p.clientSignedInOn;
-            return (
-              <RegisterRow
-                key={p.id}
-                id={`project:${p.id}`}
-                margin={margin}
-                marginSub={invited ? ageWords(p.daysAtStage) : sub}
-                title={p.name}
-                sentence={`Onboarded ${p.onboardedOn ? formatDate(p.onboardedOn) : "before the portal"}. ${signInWords(p)}`}
-                href={`/staff/projects/${p.id}`}
-                instrument={<ProgrammeStrip cells={p.strip} size={120} />}
-              />
-            );
-          })}
-        </Register>
-        {monthLine && (
-          <section aria-labelledby="bd-months">
-            <h2 id="bd-months" className="text-17 font-semibold">
-              Onboarded this year
-            </h2>
-            <p className="mt-1 text-17">{monthLine}</p>
-            <details className="mt-2 text-15">
-              <summary className="link inline-flex min-h-11 cursor-pointer items-center">How clients are counted</summary>
-              <p className="max-w-[60ch] text-ink-soft">
-                Each new workspace counts as one onboarded client, in the month it was opened.
-              </p>
-            </details>
-          </section>
-        )}
+      <div className="mt-6 grid gap-4 lg:mt-8">
+        <Stats label="Pipeline" cols={3}>
+          <Stat label="This month" value={thisMonth} />
+          <Stat label="Signed in" value={`${signedIn}/${projects.length}`} />
+          <Stat label="Building" value={building} />
+        </Stats>
+
+        <Panel title="Onboarded">
+          <div aria-hidden="true" className={`lettering hidden gap-x-3 px-3 pb-1 text-ink-soft ${COLS}`}>
+            <span>Project</span>
+            <span>Onboarded</span>
+            <span>Client</span>
+            <span>Week</span>
+            <span>Stage</span>
+            <span />
+          </div>
+          {projects.length === 0 ? (
+            <Empty>None yet</Empty>
+          ) : (
+            <ul className="grid grid-cols-1 gap-1">
+              {projects.map((p) => {
+                const chip = phaseChip(p);
+                return (
+                  <li key={p.id}>
+                    <Link
+                      href={`/staff/projects/${p.id}`}
+                      className={`glass-row flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 ${COLS} md:items-center`}
+                    >
+                      <span className="min-w-0 basis-full md:basis-auto">
+                        <span className="block truncate text-15 font-semibold text-ink">{p.name}</span>
+                        <span className="block truncate text-13 text-ink-soft">
+                          <span className="figure text-ink">{p.code || "—"}</span> · {p.clients.join(", ")}
+                        </span>
+                      </span>
+                      <span className="text-13 text-ink">{p.onboardedOn ? dated(p.onboardedOn) : "—"}</span>
+                      <span>
+                        <StatusChip tone={p.clientSignedInOn ? "done" : "late"}>
+                          {p.clientSignedInOn ? "Signed in" : "Not signed in"}
+                        </StatusChip>
+                      </span>
+                      <span className="figure text-13 text-ink">
+                        {!p.plan || p.phase === "handed-over" ? "—" : p.plan.todayWeek >= 1 ? `W${p.plan.todayWeek}` : `P${p.plan.todayPreWeek}`}
+                      </span>
+                      <span>
+                        <StatusChip tone={chip.tone}>{chip.words}</StatusChip>
+                      </span>
+                      <IconArrow className="ml-auto text-ink-soft md:ml-0" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Panel>
       </div>
     </>
   );

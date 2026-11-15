@@ -1,0 +1,352 @@
+/* Client home and timeline. Only transform and opacity move. */
+
+/* ---- The thermometer beside the elevation: fills as the house rises. ---- */
+.thermo {
+  --thermo-w: 14px;
+  --thermo-bulb: 30px;
+  display: grid;
+  justify-items: center;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 150px;
+}
+
+.thermo-tube {
+  position: relative;
+  width: var(--thermo-w);
+  height: 100%;
+  margin-bottom: -6px;
+  border-radius: 999px 999px 0 0;
+  background: rgb(42 26 18 / 0.08);
+  box-shadow: inset 0 1px 3px rgb(42 26 18 / 0.18);
+  overflow: hidden;
+}
+
+.thermo-fill {
+  position: absolute;
+  inset: auto 0 0;
+  border-radius: 999px 999px 0 0;
+  background: linear-gradient(to top, var(--color-laterite), var(--color-brass-light));
+  transform-origin: bottom;
+  animation: thermo-rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A tick where each milestone ends, placed from the plan's weeks. */
+.thermo-tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  margin-bottom: -0.75px;
+  background: rgb(255 252 247 / 0.75);
+  pointer-events: none;
+}
+
+.thermo-bulb {
+  position: relative;
+  width: var(--thermo-bulb);
+  height: var(--thermo-bulb);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--color-brass-light), var(--color-laterite) 70%);
+  box-shadow:
+    inset 0 -2px 4px rgb(42 26 18 / 0.3),
+    0 4px 10px -4px rgb(74 44 26 / 0.5);
+}
+
+@keyframes thermo-rise {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* ---- The stage rail on the home's right side. ---- */
+.stage-dot {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid rgb(42 26 18 / 0.28);
+  color: var(--color-lime);
+  font-size: var(--text-13);
+}
+
+.stage-dot[data-state="done"] {
+  border-color: transparent;
+  background: var(--color-kota);
+}
+
+.stage-dot[data-state="current"] {
+  border: 2px solid var(--color-laterite);
+  background: rgb(255 255 255 / 0.7);
+  box-shadow: 0 0 0 4px rgb(123 74 48 / 0.16);
+}
+
+.stage-rail {
+  position: relative;
+}
+
+/* The thread that joins the dots. */
+.stage-rail::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 22px;
+  width: 1.5px;
+  background: rgb(42 26 18 / 0.12);
+}
+
+/* ---- The timeline's weekly plan, as on Poetry's schedule sheet. ----
+   Rows share three columns: the stage, the week track and (from 1024 px) the expected
+   finish. The overlay sits exactly over the track column, under every row, and carries the
+   week grid and the line for today. */
+.wk {
+  --wk-label: 12.5rem;
+  --wk-dates: 0px;
+  --wk-gap: 12px;
+  --wk-pad: 12px;
+  position: relative;
+}
+
+@media (min-width: 1024px) {
+  .wk {
+    --wk-label: 14rem;
+    --wk-dates: 6.5rem;
+  }
+}
+
+.wk-row {
+  display: grid;
+  grid-template-columns: var(--wk-label) minmax(0, 1fr) var(--wk-dates);
+  column-gap: var(--wk-gap);
+  align-items: center;
+  padding-inline: var(--wk-pad);
+}
+
+@media (max-width: 1023px) {
+  .wk-row {
+    column-gap: 0;
+    grid-template-columns: var(--wk-label) minmax(0, 1fr) 0;
+  }
+  .wk-row > :first-child {
+    padding-right: var(--wk-gap);
+  }
+  .wk-dates {
+    display: none;
+  }
+}
+
+.wk-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--wk-pad) + var(--wk-label) + var(--wk-gap));
+  right: calc(var(--wk-pad) + var(--wk-dates) + var(--wk-gap));
+  background-image: linear-gradient(to right, rgb(42 26 18 / 0.06) 1px, transparent 1px);
+  pointer-events: none;
+}
+
+@media (max-width: 1023px) {
+  .wk-overlay {
+    left: calc(var(--wk-pad) + var(--wk-label));
+    right: var(--wk-pad);
+  }
+}
+
+.wk-lane {
+  position: relative;
+  height: 24px;
+}
+
+.wk-bar {
+  position: absolute;
+  height: 8px;
+  min-width: 4px;
+  border-radius: 999px;
+}
+
+.wk-bar[data-kind="planned"] {
+  top: 2px;
+  border: 1.5px dashed rgb(42 26 18 / 0.4);
+}
+
+.wk-bar[data-kind="expected"] {
+  bottom: 2px;
+  overflow: hidden;
+  background: rgb(176 138 74 / 0.35);
+}
+
+.wk-bar[data-kind="expected"][data-state="done"] {
+  background: var(--color-kota);
+}
+
+.wk-bar[data-kind="expected"][data-state="current"] {
+  background: rgb(123 74 48 / 0.25);
+}
+
+.wk-bar[data-kind="expected"][data-state="held"] {
+  background: repeating-linear-gradient(-45deg, rgb(176 138 74 / 0.5) 0 3px, transparent 3px 6px);
+}
+
+.wk-bar[data-kind="expected"][data-locked="true"][data-state="upcoming"] {
+  background: rgb(42 26 18 / 0.12);
+}
+
+/* The part of the current stage done, filling from the left. */
+.wk-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--color-laterite);
+  transform-origin: left;
+}
+
+/* Days her changes added, in brick, at the end of the expected bar. */
+.wk-bar[data-kind="added"] {
+  bottom: 2px;
+  background: var(--color-brick);
+}
+
+.wk-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--color-brick);
+  opacity: 0.75;
+}
+
+.wk-start {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1.5px dashed rgb(42 26 18 / 0.22);
+}
+
+.wk-phase {
+  position: absolute;
+  top: 0;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding-inline: 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.wk-phase[data-phase="pre-construction"] {
+  background: rgb(176 138 74 / 0.18);
+}
+
+.wk-phase[data-phase="construction"] {
+  background: rgb(123 74 48 / 0.14);
+}
+
+.wk-phase[data-phase="close-out"] {
+  background: rgb(76 100 82 / 0.2);
+}
+
+/* An instalment: a small diamond, coloured by where the money stands. */
+.wk-diamond {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  border: 1.5px solid rgb(42 26 18 / 0.35);
+  background: rgb(255 255 255 / 0.7);
+}
+
+.wk-diamond[data-tone="done"] {
+  border-color: transparent;
+  background: var(--color-kota);
+}
+
+.wk-diamond[data-tone="waiting"],
+.wk-diamond[data-tone="progress"] {
+  border-color: var(--color-brass-deep);
+  background: var(--color-brass-light);
+}
+
+.wk-diamond[data-tone="late"] {
+  border-color: transparent;
+  background: var(--color-brick);
+}
+
+.wk-pin {
+  position: absolute;
+  top: 2px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  transform: translateX(-50%);
+}
+
+.wk-key {
+  display: inline-block;
+  width: 18px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.wk-key[data-kind="planned"] {
+  border: 1.5px dashed rgb(42 26 18 / 0.45);
+}
+
+.wk-key[data-kind="expected"] {
+  background: var(--color-laterite);
+}
+
+.wk-key[data-kind="added"] {
+  background: var(--color-brick);
+}
+
+/* A phone's stacked plan: a thin bar of the part done under the current stage. */
+.wk-mini {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(42 26 18 / 0.1);
+}
+
+.wk-mini > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-laterite);
+  transform-origin: left;
+}
+
+/* A summary row that opens: the chevron turns. */
+.wk-chevron {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+details[open] > summary .wk-chevron {
+  transform: rotate(180deg);
+}
+
+summary.wk-summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+summary.wk-summary::-webkit-details-marker {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thermo-fill {
+    animation: none;
+  }
+  .wk-chevron {
+    transition: none;
+  }
+}

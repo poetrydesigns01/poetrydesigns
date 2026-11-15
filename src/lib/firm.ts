@@ -65,6 +65,18 @@ import {
   listWords,
   percent,
 } from "./format";
+import { seedThreadReads } from "./portal-data";
+import {
+  derivePortal,
+  seededDesignState,
+  type ChatPost,
+  type DesignStageView,
+  type PaymentStageView,
+  type SiteStageView,
+  type TaskDrawingView,
+  type TimelineView,
+  type WorkOrderView,
+} from "./portal";
 import {
   allReceipts,
   derive,
@@ -76,6 +88,15 @@ import {
   type Projection,
   type ScheduleChange,
 } from "./projection";
+import {
+  generatePlan,
+  instalmentDate,
+  planProgress,
+  type PlanTeam,
+  type PlanView,
+  type ProjectPlan,
+} from "./workflow-plan";
+import { fallsInMilestone, instalmentOf, milestoneStage, WORKFLOW_TEMPLATE, type WorkflowTemplate } from "./workflow-template";
 
 // The staff side's one pure derivation. Everything a register, a board or a ledger shows
 // is worked out here from the seed in firm-data.ts and the events recorded in this tab.
@@ -119,15 +140,31 @@ export type MilestoneView = Omit<MilestoneSeed, "state"> & {
   /** Set once a split is approved. */
   parts?: { label: string; amount: number; total: number }[];
   pendingSplit?: boolean;
+  // Row n is instalment n and opens construction milestone n (workflow-template.ts).
+  /** Construction milestone n's work. held: due to start, its instalment not received. Row 0: everything before construction. */
+  work: "not-started" | "in-progress" | "done" | "held";
+  workPercent: number;
+  /** Planned start and end of milestone n (row 0: of pre-construction). */
+  workStart: string;
+  workEnd: string;
+  workDoneOn?: string;
+  /** The week instalment n falls due in (construction week; pre-construction week for the sign-up). */
+  dueWeek: number;
+  /** Monday of that week, as planned. */
+  dueOn: string;
+  /** The construction milestone the instalment falls inside; 0 before construction. */
+  fallsIn: number;
+  /** When that milestone (`fallsIn`) was finished, on the plan; the work an instalment's letter can point to. */
+  fallsInDoneOn?: string;
 };
 
-export type ProjectView = Omit<ProjectSeed, "milestones"> & {
+export type ProjectView = Omit<ProjectSeed, "milestones" | "plan"> & {
   milestones: MilestoneView[];
   contractValue: number;
   valueHistory: { label: string; amount: number; at: string }[];
   /** 11 cells, or 12 after a split. */
   strip: StripCell[];
-  /** "Building, milestone 4". */
+  /** "Building, stage 4". */
   stageWords: string;
   /** Before GST. */
   workDone: number;
@@ -149,6 +186,10 @@ export type ProjectView = Omit<ProjectSeed, "milestones"> & {
   daysAtStage: number;
   /** The client as a turn word: "Meera" or "client". */
   clientWord: string;
+  /** The plan generated from the workflow template, as it stands; null for a draft. */
+  plan: PlanView | null;
+  /** The construction milestone in hand (1 to 10), or null before and after construction. */
+  currentMilestone: number | null;
 };
 
 export type StampView = {
@@ -210,6 +251,7 @@ export type RequestView = RequestSeed & {
   sentAt: string;
   status: RequestStatus;
   late: boolean;
+  /** @deprecated Site lines are never outside the estimate now; always false. */
   outside: boolean;
   /** Ordered so far, by line id. */
   ordered: Record<string, number>;
@@ -405,6 +447,35 @@ export type Firm = {
   hoursThisWeek: (person: PersonId) => number;
   person: (id: PersonId) => Person | undefined;
   project: (id: ProjectId) => ProjectView | undefined;
+
+  // ---- The redesigned portal (derived in portal.ts) ----
+  /** The payment stages of a project, sign-up first: locked, due, payment made, received. */
+  payments: (id: ProjectId) => PaymentStageView[];
+  /** Every project's payment stages, for finance's Money in. */
+  paymentStages: PaymentStageView[];
+  /** Planned and expected dates per milestone, with the days client changes added. */
+  timeline: (id: ProjectId) => TimelineView | null;
+  /** Stage-wise design items: floor plan, 3D elevation, final cost estimate. */
+  designStages: (id: ProjectId) => DesignStageView[];
+  /** The project thread oldest first, with sides and ticks. */
+  chat: (id: ProjectId) => ChatPost[];
+  /** Posts from the other side since `side` last opened the thread. */
+  unread: (id: ProjectId, side: "client" | "team") => number;
+  /** The site engineer's tasks for the stage under way, or null. */
+  siteStage: (id: ProjectId) => SiteStageView | null;
+  /** Labour and services for site tasks, every project. */
+  workOrders: WorkOrderView[];
+  /** Architect drawings site tasks need, every project. */
+  siteDrawings: TaskDrawingView[];
+  nextWorkOrderNo: string;
+
+  // ---- Poetry's workflow (workflow-template.ts, workflow-plan.ts) ----
+  /** The stages, tasks, owners, weeks and instalments every plan is generated from. */
+  workflow: WorkflowTemplate;
+  /** A project's plan: every task dated, owned and with its state. Null for a draft with no plan. */
+  plan: (id: ProjectId) => PlanView | null;
+  /** Every plan task given to a person, open ones first, across projects. */
+  planTasksFor: (person: PersonId) => PlanView["tasks"];
 };
 
 // ---- Small helpers ----
@@ -414,7 +485,19 @@ function sum(values: number[]): number {
 }
 
 function lowerFirst(text: string): string {
+  // "FF roof slab", "BOM" and "UG sump" keep their capitals.
+  if (/^[A-Z]{2}/.test(text)) return text;
   return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/**
+ * The work an instalment row stands on: the milestone it falls inside ("First floor block
+ * work" for instalment 5), not the milestone it opens. Before construction, the row's name.
+ */
+function fallsInWords(m: { fallsIn: number; name: string }): string {
+  const short = m.fallsIn > 0 ? milestoneStage(m.fallsIn)?.short : undefined;
+  const words = short ?? m.name;
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /** Whole days from a date or timestamp to the demo's day. */
@@ -774,6 +857,7 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       lines: e.lines,
       queued: !!e.queued,
       sentAt: e.queued ? "" : e.at,
+      taskId: e.taskId,
     })),
   ];
   for (const e of events) {
@@ -917,7 +1001,8 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       projectName: projectName(r.projectId),
       status,
       late: !r.deliveredAt && daysBetween(r.neededBy, TODAY_ISO) > 0,
-      outside: r.lines.some((line) => line.outsideEstimate),
+      // Only the architect recommends changes; a site line never asks for a cost revision.
+      outside: false,
       ordered,
       stillToOrder:
         mine.length > 0 && short.length > 0
@@ -930,19 +1015,75 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
     };
   });
 
-  // Money in.
-  const receipts = allReceipts(events);
+  // Money in. The sign-up money BD enters in onboarding step 3 counts as received once the
+  // workspace is opened, so payments, the plan's sign-up task and cash agree.
+  const onboardingReceipts: Receipt[] = [];
+  for (const d of drafts) {
+    const opened = of("workspace.opened").find((e) => e.draftId === d.id);
+    const signUp = d.step3?.signUp;
+    if (!opened || !signUp || !(signUp.amount > 0) || !signUp.on) continue;
+    onboardingReceipts.push({
+      id: `r-${opened.projectId}-0-onboarding`,
+      projectId: opened.projectId,
+      n: 0,
+      amount: signUp.amount,
+      source: "client",
+      reference: signUp.reference || "Sign-up",
+      on: signUp.on,
+      by: opened.by,
+    });
+  }
+  const receipts = [...allReceipts(events), ...onboardingReceipts];
   const additions: CreditAddition[] = [...seedAdditions, ...of("credits.added").map((e) => e.addition)];
 
   // Milestones, live: amounts, receipts and the state each one has reached.
   // Iyer's waiting milestone follows the client projection, which reads `paymentApproved`.
   const iyerWaiting = (projectId: ProjectId, n: number) =>
     projectId === "iyer" && projection.milestones.find((m) => m.id === n)?.status === "awaiting-approval";
+  // "Payment made" by the client counts as the older approval: the letter then waits for the
+  // money to be confirmed in.
+  const clientPaid = (projectId: ProjectId, n: number) =>
+    of("payment.client-paid").find((e) => e.projectId === projectId && e.n === n);
   const approvedHere = (projectId: ProjectId, n: number) =>
-    iyerWaiting(projectId, n)
+    (iyerWaiting(projectId, n)
       ? state.paymentApproved
-      : of("payment.approved").some((e) => e.projectId === projectId && e.n === n);
+      : of("payment.approved").some((e) => e.projectId === projectId && e.n === n)) || !!clientPaid(projectId, n);
   const scheduleChanges: ProjectSchedule[] = [];
+
+  // Plans: generated from the workflow template for each project, again when the admin
+  // generates one (plan.generated), with tasks given to someone else (plan.task-assigned).
+  const teamFor = (p: ProjectSeed): PlanTeam => ({
+    client: p.id === "iyer" || p.id === "iyer-cottage" ? "meera" : null,
+    business: p.onboardedBy,
+    finance: "divya",
+    architect: p.team.head,
+    designer: p.team.architects[0] ?? p.team.head,
+    site: p.team.engineers[0] ?? p.team.head,
+  });
+  const planOf = (p: ProjectSeed): ProjectPlan | null => {
+    let lastGenerated = -1;
+    events.forEach((e, i) => {
+      if (e.kind === "plan.generated" && e.projectId === p.id) lastGenerated = i;
+    });
+    const generated = lastGenerated >= 0 ? (events[lastGenerated] as Ev<"plan.generated">) : undefined;
+    if (!p.plan && !generated) return null;
+    // Re-generating starts the allocations again from the team.
+    const assigned: Record<string, PersonId> = generated ? {} : { ...(p.plan?.assigned ?? {}) };
+    events.forEach((e, i) => {
+      if (e.kind === "plan.task-assigned" && e.projectId === p.id && i > lastGenerated) assigned[e.taskId] = e.to;
+    });
+    return generatePlan({
+      projectId: p.id,
+      code: p.code,
+      preStart: generated?.preStart ?? p.plan?.preStart ?? p.signedOn ?? TODAY_ISO,
+      constructionStart: generated ? generated.constructionStart : p.plan?.constructionStart,
+      team: teamFor(p),
+      generatedAt: generated?.at ?? p.plan?.generatedAt ?? TODAY_ISO,
+      generatedBy: generated?.by ?? p.plan?.generatedBy ?? "shalini",
+      assigned,
+    });
+  };
+  const planViews = new Map<ProjectId, PlanView>();
 
   const projectViews: ProjectView[] = seeds.map((p) => {
     const amountOf = (n: number) =>
@@ -952,6 +1093,34 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
     const split = p.milestones.length > 0 ? scheduleChangeOf(p.id, events, amountOf) : null;
     if (split) scheduleChanges.push({ ...split, projectId: p.id });
 
+    // The plan as it stands: instalments received, stages the site marked done, task updates and the client's design decisions.
+    const rawPlan = planOf(p);
+    const paidOn = (n: number): string | null => {
+      const seed = p.milestones.find((m) => m.n === n);
+      if (!seed) return null;
+      const total = withGst(amountOf(n)).total;
+      const mine = receipts.filter((r) => r.projectId === p.id && r.n === n);
+      if (total <= 0 || sum(mine.map((r) => r.amount)) < total) return null;
+      return datePart(mine[mine.length - 1]?.on || seed.paidOn || TODAY_ISO);
+    };
+    const plan = rawPlan
+      ? planProgress(rawPlan, p.plan?.progress, {
+          today: TODAY_ISO,
+          paidOn,
+          stageDoneOn: (n) => {
+            const done = of("stage.done").find((e) => e.projectId === p.id && e.n === n);
+            return done ? datePart(done.at) : null;
+          },
+          taskUpdate: (taskId) => {
+            const update = [...of("site-task.progress")].reverse().find((e) => e.taskId === taskId);
+            return update ? { percent: update.percent, at: update.at } : null;
+          },
+          designOf: (templateId) => seededDesignState(p.id, templateId, events),
+        })
+      : null;
+    if (plan) planViews.set(p.id, plan);
+    const stageOf = (n: number) => plan?.stages.find((s) => (n === 0 ? s.id === "initiation" : s.milestone === n));
+
     const milestones: MilestoneView[] = [];
     for (const seed of p.milestones) {
       const amount = amountOf(seed.n);
@@ -959,22 +1128,49 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       const mine = receipts.filter((r) => r.projectId === p.id && r.n === seed.n);
       const received = sum(mine.map((r) => r.amount));
       const bank = sum(mine.filter((r) => r.source === "bank").map((r) => r.amount));
-      const done = of("stage.done").find((e) => e.projectId === p.id && e.n === seed.n);
+      // Instalment n falls due inside milestone n-1: that milestone's "done" is the one that
+      // bears on it (milestone n itself cannot be done before instalment n is paid).
+      const fallsIn = fallsInMilestone(seed.n);
+      const done = fallsIn > 0 ? of("stage.done").find((e) => e.projectId === p.id && e.n === fallsIn) : undefined;
       const raised = of("payment.raised").find((e) => e.projectId === p.id && e.n === seed.n);
       const accepted = of("stage.accepted").find((e) => e.projectId === p.id && e.n === seed.n);
       const approved = of("payment.approved").find((e) => e.projectId === p.id && e.n === seed.n);
       const wasRaised = ["raised", "approved", "part-paid", "paid"].includes(seed.state) || !!raised;
       const wasApproved = ["approved", "part-paid", "paid"].includes(seed.state) || approvedHere(p.id, seed.n);
-      const wasDone = !["under-way", "to-come"].includes(seed.state) || !!done;
-      const previous = milestones[milestones.length - 1];
+      // Instalment n falls due in its week inside milestone n-1, or as soon as that milestone is done.
+      const inst = instalmentOf(seed.n);
+      const dueOn = plan ? instalmentDate(plan, seed.n) : (seed.doneOn ?? p.signedOn ?? TODAY_ISO);
+      const fallsInStage = fallsIn > 0 ? plan?.stages.find((s) => s.milestone === fallsIn) : undefined;
+      const dueReached =
+        !!plan && seed.n > 0 && (daysBetween(dueOn, TODAY_ISO) >= 0 || fallsInStage?.state === "done" || !!done);
+      const wasDone = (seed.state !== "under-way" && seed.state !== "to-come") || dueReached;
       let state: MilestoneState = seed.state;
       if (wasRaised) state = received >= total ? "paid" : received > 0 ? "part-paid" : wasApproved ? "approved" : "raised";
+      else if (received >= total && total > 0) state = "paid";
+      else if (seed.n === 0 && received > 0) state = "part-paid";
       else if (wasDone) state = "done";
-      else if (seed.state === "to-come" && previous && p.phase === "building" && of("stage.done").some((e) => e.projectId === p.id && e.n === previous.n))
-        state = "under-way";
-      const startedOn =
-        seed.startedOn ??
-        (state === "under-way" && previous ? of("stage.done").find((e) => e.projectId === p.id && e.n === previous.n)?.at : undefined);
+      else if (fallsInStage?.state === "current") state = "under-way";
+      else state = "to-come";
+      // Row n's own work: construction milestone n (row 0: everything before construction).
+      const workStage = seed.n === 0 ? undefined : stageOf(seed.n);
+      const preStages = plan?.stages.filter((s) => s.phase === "pre-construction") ?? [];
+      const work: MilestoneView["work"] =
+        seed.n === 0
+          ? preStages.length > 0 && preStages.every((s) => s.state === "done")
+            ? "done"
+            : preStages.some((s) => s.state !== "upcoming")
+              ? "in-progress"
+              : "not-started"
+          : workStage?.state === "done"
+            ? "done"
+            : workStage?.state === "current"
+              ? "in-progress"
+              : workStage?.state === "held"
+                ? "held"
+                : "not-started";
+      const workStart = seed.n === 0 ? (preStages[0]?.plannedStart ?? dueOn) : (workStage?.plannedStart ?? dueOn);
+      const workEnd = seed.n === 0 ? (preStages[preStages.length - 1]?.plannedEnd ?? dueOn) : (workStage?.plannedEnd ?? dueOn);
+      const startedOn = seed.startedOn ?? (seed.n === 0 ? preStages[0]?.startedOn : workStage?.startedOn);
       const view: MilestoneView = {
         ...seed,
         amount,
@@ -991,11 +1187,21 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
         raisedBy: seed.raisedBy ?? raised?.by,
         approvedAt:
           seed.approvedAt ??
-          (p.id === "iyer" ? projection.milestones.find((m) => m.id === seed.n)?.approvedAt : approved?.at),
+          (p.id === "iyer" ? projection.milestones.find((m) => m.id === seed.n)?.approvedAt : approved?.at) ??
+          clientPaid(p.id, seed.n)?.at,
         letterNo: seed.letterNo ?? raised?.letterNo,
         paidOn: seed.paidOn ?? (state === "paid" && mine.length > 0 ? mine[mine.length - 1].on : undefined),
         startedOn,
         photos: seed.photos ?? done?.photos,
+        work,
+        workPercent: seed.n === 0 ? (work === "done" ? 100 : 0) : (workStage?.percent ?? 0),
+        workStart,
+        workEnd,
+        workDoneOn: seed.n === 0 ? undefined : workStage?.doneOn,
+        dueWeek: inst?.week ?? 1,
+        dueOn,
+        fallsIn,
+        fallsInDoneOn: fallsInStage?.state === "done" ? fallsInStage.doneOn : undefined,
       };
       if (split && split.n === seed.n) {
         if (split.status === "approved") {
@@ -1048,7 +1254,8 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
 
     const strip: StripCell[] = [];
     for (const m of milestones) {
-      const cellState: StripCell["state"] = m.state === "done" ? "built" : m.state;
+      const cellState: StripCell["state"] =
+        m.state === "paid" && m.work === "in-progress" ? "under-way" : m.state === "done" ? "built" : m.state;
       const words = (label: string) =>
         `${label}, ${
           {
@@ -1068,7 +1275,7 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
             label: part.label,
             state: cellState,
             split: i === 0 ? "a" : "b",
-            words: words(`Milestone ${part.label}`),
+            words: words(`Instalment ${part.label}`),
           }),
         );
       } else {
@@ -1077,12 +1284,14 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
           label: m.n === 0 ? "Sign-up" : String(m.n),
           state: cellState,
           pendingSplit: m.pendingSplit || undefined,
-          words: words(m.n === 0 ? "Sign-up" : `Milestone ${m.n}`),
+          words: words(m.n === 0 ? "Sign-up" : `Instalment ${m.n}`),
         });
       }
     }
 
-    const underWay = milestones.find((m) => m.state === "under-way");
+    const currentMilestone = plan?.currentMilestone ?? null;
+    const underWay = currentMilestone !== null ? milestones.find((m) => m.n === currentMilestone) : undefined;
+    const currentStage = plan?.stages.find((s) => s.id === plan.currentStage);
     const stageWords =
       p.phase === "draft"
         ? "Draft"
@@ -1091,12 +1300,14 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
             ? "In design"
             : "Invited, not signed in yet"
           : p.phase === "in-design"
-            ? "In design"
+            ? currentStage
+              ? `In design, ${lowerFirst(currentStage.short)}`
+              : "In design"
             : p.phase === "handed-over"
               ? "Handed over"
-              : `Building, milestone ${underWay?.n ?? milestones.filter((m) => builtStates.includes(m.state)).length}`;
+              : `Building, milestone ${currentMilestone ?? milestones.filter((m) => builtStates.includes(m.state)).length}`;
     const daysAtStage = daysSince(
-      p.phase === "building" ? underWay?.startedOn ?? p.signedOn ?? TODAY_ISO : p.invitedAt ?? p.onboardedOn ?? TODAY_ISO,
+      p.phase === "building" ? (underWay?.startedOn ?? underWay?.workStart ?? p.signedOn ?? TODAY_ISO) : (p.invitedAt ?? p.onboardedOn ?? TODAY_ISO),
     );
 
     const openMoney = milestones.find((m) => m.state === "raised" || m.state === "approved" || m.state === "part-paid");
@@ -1111,11 +1322,17 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
             : overdue > 0
               ? `with the bank, overdue ${dayCount(overdue)}`
               : "with the bank";
-      next = { n: openMoney.n, words: `Milestone ${openMoney.n}, ${inr(openMoney.total)}, ${tail}`, amount: openMoney.total };
+      next = {
+        n: openMoney.n,
+        words: `${openMoney.n === 0 ? "Sign-up" : `Instalment ${openMoney.n}`}, ${inr(openMoney.total)}, ${tail}`,
+        amount: openMoney.total,
+      };
     } else if (underWay) {
       next = {
         n: underWay.n,
-        words: `Milestone ${underWay.n}, under way${underWay.expected ? `, expected ${underWay.expected}` : ""}`,
+        words: `Milestone ${underWay.n}, ${lowerFirst(milestoneStage(underWay.n)?.short ?? underWay.name)}, ${
+          underWay.work === "held" ? "waiting for its instalment" : "under way"
+        }`,
       };
     }
 
@@ -1138,6 +1355,8 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       next,
       daysAtStage,
       clientWord: clientWord(p.id),
+      plan,
+      currentMilestone,
     };
   });
   const projectOf = (id: ProjectId) => projectViews.find((p) => p.id === id);
@@ -1765,7 +1984,7 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
         // The senior engineer on a site marks its stages done.
         if (p.team.engineers[0] !== person) continue;
         for (const m of p.milestones) {
-          if (m.state !== "under-way" || !m.siteNote || of("stage.done").some((e) => e.projectId === p.id && e.n === m.n)) continue;
+          if (m.work !== "in-progress" || !m.siteNote || of("stage.done").some((e) => e.projectId === p.id && e.n === m.n)) continue;
           items.push(
             withStamps({
               id: `stage:${p.id}:${m.n}`,
@@ -1787,28 +2006,6 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
     if (me.role === "architect") {
       for (const p of projectViews) {
         if (p.team.head !== person) continue;
-        // Lines flagged as outside the estimate wait for a cost revision.
-        for (const r of requests) {
-          if (r.projectId !== p.id || r.queued || !r.outside) continue;
-          if (of("revision.raised").some((e) => e.fromRequest === r.no)) continue;
-          const line = r.lines.find((l) => l.outsideEstimate);
-          if (!line) continue;
-          const days = daysSince(r.at);
-          items.push(
-            withStamps({
-              id: `flag:${r.no}`,
-              projectId: p.id,
-              title: `Raise a cost revision for the ${lowerFirst(line.sub)} ${catalogueName(line.material, catalogueAll).toLowerCase()} on ${p.name}${
-                line.note ? `, ${line.note}` : ""
-              }`,
-              sentence: `${firstOf(r.by)} flagged them on ${formatShortDate(datePart(r.at))} in ${r.no}. They are not in the agreed estimate.`,
-              margin: ageWords(days),
-              days,
-              href: `/staff/projects/${p.id}/programme#revision`,
-              action: { label: "Raise cost revision", href: `/staff/projects/${p.id}/programme#revision` },
-            }),
-          );
-        }
         // Stages marked done wait for their payment to be raised.
         for (const m of p.milestones) {
           if (m.state !== "done") continue;
@@ -1817,11 +2014,11 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
             withStamps({
               id: `pay:${p.id}:${m.n}`,
               projectId: p.id,
-              title: `Raise the payment for ${p.name} milestone ${m.n}`,
+              title: `Raise the demand letter for ${p.name} instalment ${m.n}`,
               sentence: stamped(`pay:${p.id}:${m.n}`, "Stage done")
-                ? `${m.name.charAt(0).toUpperCase()}${m.name.slice(1)}.`
-                : `${m.doneBy ? firstOf(m.doneBy) : "The site"} marked the ${lowerFirst(m.name)} done on ${formatShortDate(
-                    datePart(m.doneOn ?? TODAY_ISO),
+                ? `${fallsInWords(m)}, done.`
+                : `Instalment ${m.n}, due week ${m.dueWeek}${m.fallsIn > 0 ? ` of milestone ${m.fallsIn}` : ""}, from ${formatShortDate(
+                    datePart(m.doneOn ?? m.dueOn),
                   )}.`,
               margin: ageWords(days),
               days,
@@ -2062,7 +2259,7 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
             withStamps({
               id: `pay:${p.id}:${m.n}`,
               projectId: p.id,
-              title: `${p.name}, ${lowerFirst(m.name)}`,
+              title: `${p.name}, ${lowerFirst(fallsInWords(m))}`,
               sentence: "Marked done. The Project Head raises the payment next.",
               margin: `With ${firstOf(p.team.head)}`,
               marginSub: ageWords(days),
@@ -2338,6 +2535,26 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
 
   const allNumbers = (prefix: string, list: string[]) => list.filter((no) => no.startsWith(prefix));
 
+  // ---- The redesigned portal: payments, timeline, design stages, chat and site tasks ----
+  const portal = derivePortal({
+    events,
+    projects: projectViews,
+    requests,
+    receipts,
+    people,
+    catalogue: catalogueAll,
+    posts,
+    changes: projection.changes,
+    plans: planViews,
+  });
+  const lastRead = (id: ProjectId, side: "client" | "team") =>
+    [
+      ...seedThreadReadsFor(id),
+      ...events.filter((e) => e.kind === "thread.read" && e.projectId === id).map((e) => ({ by: e.by, at: e.at })),
+    ]
+      .filter((r) => (side === "client") === (r.by === "meera" || r.by === "arjun"))
+      .reduce((latest, r) => (r.at > latest ? r.at : latest), "");
+
   return {
     people,
     projects: projectViews,
@@ -2389,7 +2606,32 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       sum(time.filter((t) => t.person === person && t.date >= WEEK.from && t.date <= WEEK.to).map((t) => t.hours)),
     person: personOf,
     project: projectOf,
+    payments: (id) => portal.payments.get(id) ?? [],
+    paymentStages: [...portal.payments.values()].flat(),
+    timeline: (id) => portal.timelines.get(id) ?? null,
+    designStages: (id) => portal.designStages.get(id) ?? [],
+    chat: (id) => portal.chats.get(id) ?? [],
+    unread: (id, side) => {
+      const since = lastRead(id, side);
+      return (portal.chats.get(id) ?? []).filter((p) => p.side !== "system" && p.side !== side && p.at > since).length;
+    },
+    siteStage: (id) => portal.sites.get(id) ?? null,
+    workOrders: portal.workOrders,
+    siteDrawings: portal.drawings,
+    nextWorkOrderNo: portal.nextWorkOrderNo,
+    workflow: WORKFLOW_TEMPLATE,
+    plan: (id) => planViews.get(id) ?? null,
+    planTasksFor: (person) => {
+      const order = { "in-progress": 0, "not-started": 1, locked: 2, done: 3 } as const;
+      return [...planViews.values()]
+        .flatMap((plan) => plan.tasks.filter((t) => t.assignee === person))
+        .sort((a, b) => order[a.state] - order[b.state] || a.plannedStart.localeCompare(b.plannedStart));
+    },
   };
+}
+
+function seedThreadReadsFor(id: ProjectId): { by: PersonId; at: string }[] {
+  return seedThreadReads.filter((r) => r.projectId === id).map((r) => ({ by: r.by, at: r.at }));
 }
 
 /** The draft ids BD can open, for static params. */

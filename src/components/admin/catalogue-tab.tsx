@@ -5,13 +5,15 @@ import { Chip, ChipGroup, field } from "@/components/register/chips";
 import { usePause } from "@/components/register/recording-pause";
 import { useDemo, useFirm } from "@/lib/demo-store";
 import type { CatalogueEdit, CatalogueUnit, PersonId } from "@/lib/firm-data";
-import { formatStampShort, listWords } from "@/lib/format";
+import { formatStampShort } from "@/lib/format";
+import { StatusChip } from "@/components/register/status-chip";
+import { Count, Panel } from "./glass-kit";
 import { catalogueRowsOf, catalogueWords, cleanValue, UNITS, type CatalogueRow } from "./admin-data";
 import { StruckNote, TwoStepDelete } from "./two-step-delete";
 
-// The material catalogue the site engineers pick from: each material with its unit and its
-// subcategories. The admin adds and renames through the pause, and deletes in two steps
-// with a reason. A deleted line stays in the list, struck, with who deleted it and why.
+// The material catalogue the site engineers pick from: each material with its unit and
+// sizes. The admin adds and renames through the pause and deletes in two steps with a
+// reason; a deleted line stays, struck, with who deleted it and why.
 
 export function CatalogueTab() {
   const firm = useFirm();
@@ -20,12 +22,14 @@ export function CatalogueTab() {
   const names = rows.filter((r) => !r.struck).map((r) => r.name);
 
   return (
-    <div className="grid gap-8">
-      <ul className="sheet-rows ruled">
-        {rows.map((row) => (
-          <CatalogueItemRow key={row.id} row={row} names={names} />
-        ))}
-      </ul>
+    <div className="grid gap-5">
+      <Panel title="Materials" aside={<Count n={names.length} />} strong>
+        <ul className="grid gap-1">
+          {rows.map((row) => (
+            <CatalogueItemRow key={row.id} row={row} names={names} />
+          ))}
+        </ul>
+      </Panel>
       <AddMaterial names={names} />
     </div>
   );
@@ -39,11 +43,12 @@ function CatalogueItemRow({ row, names }: { row: CatalogueRow; names: string[] }
 
   if (row.struck) {
     return (
-      <li className="grid gap-1 py-1">
-        <p className="text-17 text-ink-soft">
+      <li className="glass-row grid gap-1 px-3 py-3 opacity-70">
+        <p className="flex flex-wrap items-center gap-2 text-15 text-ink-soft">
           <s>
             {row.name}, in {row.unit}
           </s>
+          <StatusChip tone="locked">Deleted</StatusChip>
         </p>
         <StruckNote by={byName(row.struck.by)} at={formatStampShort(row.struck.at)} reason={row.struck.reason} />
       </li>
@@ -51,31 +56,38 @@ function CatalogueItemRow({ row, names }: { row: CatalogueRow; names: string[] }
   }
 
   return (
-    <li className="grid gap-3 py-1">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-17 font-semibold">
-            {row.name} <span className="font-normal text-ink-soft">in {row.unit}</span>
-          </p>
-          <p className="text-15 text-ink-soft">
-            {live.length > 0 ? listWords(live.map((s) => s.name)) : "No subcategories yet."}
-            {row.subs
-              .filter((sub) => sub.struck)
-              .map((sub, i) => (
-                <span key={`${sub.name}-${i}`}>
-                  {" "}
-                  <s>{sub.name}</s>
-                  <span className="sr-only"> (deleted)</span>
-                </span>
-              ))}
-          </p>
+    <li className="glass-row grid gap-3 px-3 py-3">
+      <div className="grid items-center gap-3 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]">
+        <p className="flex flex-wrap items-baseline gap-x-2 text-15 font-semibold">
+          {row.name} <span className="lettering font-normal text-ink-soft">{row.unit}</span>
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {live.length === 0 && <span className="text-13 text-ink-soft">No sizes</span>}
+          {live.map((s) => (
+            <span key={s.name} className="glass-chip">
+              {s.name}
+            </span>
+          ))}
+          {row.subs
+            .filter((sub) => sub.struck)
+            .map((sub, i) => (
+              <span key={`${sub.name}-${i}`} className="glass-chip chip-locked">
+                <s>{sub.name}</s>
+                <span className="sr-only"> (deleted)</span>
+              </span>
+            ))}
         </div>
-        <button type="button" className="btn btn-quiet min-h-11" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <button
+          type="button"
+          className="btn btn-glass min-h-11 justify-self-start px-4 text-15 md:justify-self-end"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
           {open ? "Close" : "Change"}
         </button>
       </div>
       {open && (
-        <div className="grid gap-5 border-l-2 border-sand py-2 pl-4">
+        <div className="glass-inner grid gap-5 p-4">
           <AddSub row={row} />
           <RenameLine
             label={`Rename ${row.name}`}
@@ -88,7 +100,7 @@ function CatalogueItemRow({ row, names }: { row: CatalogueRow; names: string[] }
             {row.subs.map((sub, i) =>
               sub.struck ? (
                 <li key={`${sub.name}-${i}`} className="grid gap-1">
-                  <p className="text-17 text-ink-soft">
+                  <p className="text-15 text-ink-soft">
                     <s>{sub.name}</s>
                   </p>
                   <StruckNote
@@ -100,9 +112,9 @@ function CatalogueItemRow({ row, names }: { row: CatalogueRow; names: string[] }
               ) : (
                 <li
                   key={`${sub.name}-${i}`}
-                  className="flex flex-wrap items-start justify-between gap-3 border-t border-sand pt-3"
+                  className="flex flex-wrap items-start justify-between gap-3 border-t border-ink/10 pt-3"
                 >
-                  <p className="inline-flex min-h-11 items-center text-17">{sub.name}</p>
+                  <p className="inline-flex min-h-11 items-center text-15">{sub.name}</p>
                   <div className="flex flex-wrap items-start gap-3">
                     <RenameLine
                       label={`Rename ${sub.name}`}
@@ -122,7 +134,7 @@ function CatalogueItemRow({ row, names }: { row: CatalogueRow; names: string[] }
               ),
             )}
           </ul>
-          <div className="border-t border-sand pt-3">
+          <div className="border-t border-ink/10 pt-3">
             <TwoStepDelete
               label={`Delete ${row.name}`}
               question={`Delete ${row.name} and its subcategories from the catalogue?`}
@@ -148,7 +160,7 @@ function AddSub({ row }: { row: CatalogueRow }) {
     event.preventDefault();
     if (pause.pending !== null) return;
     const sub = cleanValue(name);
-    if (!sub) return setError("Write the subcategory, such as 10 inch.");
+    if (!sub) return setError("Write the size, such as 10 inch.");
     if (row.subs.some((s) => !s.struck && s.name.toLowerCase() === sub.toLowerCase()))
       return setError(`${row.name} already has ${sub}.`);
     setError("");
@@ -169,7 +181,7 @@ function AddSub({ row }: { row: CatalogueRow }) {
   return (
     <form onSubmit={submit} className="grid gap-2">
       <label htmlFor={`${ids}-sub`} className="text-15 font-semibold">
-        Add a subcategory to {row.name}
+        New size
       </label>
       <div className="flex flex-wrap gap-3">
         <input
@@ -178,7 +190,7 @@ function AddSub({ row }: { row: CatalogueRow }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <button type="submit" className="btn btn-quiet min-h-12" aria-disabled={pause.pending ? true : undefined}>
+        <button type="submit" className="btn btn-glass min-h-12" aria-disabled={pause.pending ? true : undefined}>
           Add
         </button>
       </div>
@@ -217,7 +229,7 @@ function RenameLine({
 
   if (!open)
     return (
-      <button type="button" className="btn btn-quiet min-h-11" onClick={() => setOpen(true)}>
+      <button type="button" className="btn btn-glass min-h-11 px-4 text-15" onClick={() => setOpen(true)}>
         Rename
       </button>
     );
@@ -248,7 +260,7 @@ function RenameLine({
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <button type="submit" className="btn btn-quiet min-h-12" aria-disabled={pause.pending ? true : undefined}>
+        <button type="submit" className="btn btn-glass min-h-12" aria-disabled={pause.pending ? true : undefined}>
           Rename
         </button>
       </div>
@@ -294,8 +306,8 @@ function AddMaterial({ names }: { names: string[] }) {
   };
 
   return (
-    <form onSubmit={submit} className="grid max-w-[40rem] gap-4" aria-label="Add a material">
-      <h3 className="text-17 font-semibold">Add a material</h3>
+    <form onSubmit={submit} className="glass grid gap-4 p-4 sm:p-5" aria-label="Add a material">
+      <h2 className="text-17 font-semibold">New material</h2>
       <div>
         <label htmlFor={`${ids}-material`} className="block text-15 font-semibold">
           Material
@@ -320,7 +332,7 @@ function AddMaterial({ names }: { names: string[] }) {
         </p>
       )}
       <div>
-        <button type="submit" className="btn btn-quiet min-h-12" aria-disabled={pause.pending ? true : undefined}>
+        <button type="submit" className="btn btn-glass min-h-12" aria-disabled={pause.pending ? true : undefined}>
           Add the material
         </button>
       </div>

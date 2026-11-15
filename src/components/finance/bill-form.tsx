@@ -101,7 +101,7 @@ export function BillForm({
   const readBack =
     project && vendor && draft.n !== "" && Number.isFinite(amount) && amount > 0
       ? `${draft.billNo.trim() || "A bill"} from ${vendor.name} for ${project.name}, ${
-          draft.n === "0" ? "sign-up" : `milestone ${draft.n}`
+          draft.n === "0" ? "sign-up" : `stage ${draft.n}`
         }: ${inr(amount)} before GST${Number.isFinite(gst) ? `, GST ${inr(gst)}` : ""}${draft.poNo ? `, against ${draft.poNo}` : ""}.`
       : "";
 
@@ -109,7 +109,7 @@ export function BillForm({
     if (pause.pending !== null) return;
     const next: typeof errors = {};
     if (!project) next.projectId = "Choose the project.";
-    if (draft.n === "") next.n = "Choose the milestone the bill belongs to.";
+    if (draft.n === "") next.n = "Choose the stage the bill belongs to.";
     if (!vendor) next.vendorId = "Choose the vendor.";
     if (!draft.billNo.trim()) next.billNo = "Write the bill number from the vendor's bill.";
     if (!Number.isFinite(amount) || amount <= 0) next.amount = "Write the amount before GST, in rupees.";
@@ -176,7 +176,7 @@ export function BillForm({
             ))}
           </select>
         </Field>
-        <Field label="Milestone" error={errors.n}>
+        <Field label="Stage" error={errors.n}>
           <select
             className={field}
             value={draft.n}
@@ -186,7 +186,7 @@ export function BillForm({
             <option value="">Choose</option>
             {project?.milestones.map((m) => (
               <option key={m.n} value={String(m.n)}>
-                {m.n === 0 ? "Sign-up" : `Milestone ${m.n}`}
+                {m.n === 0 ? "Sign-up" : `Stage ${m.n}`}
               </option>
             ))}
           </select>

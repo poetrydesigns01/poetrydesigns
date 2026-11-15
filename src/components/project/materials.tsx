@@ -1,82 +1,176 @@
 "use client";
 
+import Link from "next/link";
 import { dayWords } from "@/components/admin/admin-data";
-import { RequestLadder } from "@/components/instruments/request-ladder";
-import { Register, RegisterRow } from "@/components/register/register";
-import { SampleTag } from "@/components/register/sample-tag";
+import { Count, GlassTable, inrShort, Panel, StatCard, StatRow, WaitChip } from "@/components/admin/glass-kit";
+import { requestChip } from "@/components/finance/request-words";
+import { useStaffRole } from "@/components/register/staff-shell";
+import { StatusChip } from "@/components/register/status-chip";
 import { useFirm } from "@/lib/demo-store";
-import { ageWords, type RequestView } from "@/lib/firm";
+import type { PoView, RequestView } from "@/lib/firm";
 import type { ProjectId } from "@/lib/firm-data";
-import { formatStampShort, inr } from "@/lib/format";
+import { inr } from "@/lib/format";
+import type { WorkOrderView } from "@/lib/portal";
+import { milestoneTag } from "./record-kit";
 
-// Every material request on the project, newest first, with where it has got to (the
-// ladder says the status, so the sentence does not) and the
-// purchase orders linked to it: vendor, quantities, rates, GST and the uploaded file.
-// Estimates, requests and orders are kept together here, per project.
-
-function turnOf(r: RequestView): string {
-  if (r.status === "Delivered") return "Delivered";
-  if (r.status === "PO uploaded") return "With site";
-  return "With procurement";
-}
+// What the site has asked for on this project and how procurement answered: the material
+// requests with their status and how long each has waited, the POs sent to vendors, and the
+// work orders for labour and services.
 
 export function ProjectMaterials({ projectId }: { projectId: ProjectId }) {
   const firm = useFirm();
+  const role = useStaffRole();
   const p = firm.project(projectId);
   if (!p || p.phase === "draft") return null;
   const requests = firm.requests.filter((r) => r.projectId === projectId).sort((a, b) => b.at.localeCompare(a.at));
-  // The sample tag goes beside the first file on the screen only.
-  const taggedNo = requests.find((r) => r.pos.length > 0)?.no;
+  const open = requests.filter((r) => !r.queued && (r.status === "New" || r.status === "Seen" || r.status === "PO in part"));
+  const pos = firm.pos.filter((po) => po.projectId === projectId).sort((a, b) => b.at.localeCompare(a.at));
+  const orders = firm.workOrders.filter((w) => w.projectId === projectId);
+  const delivered = requests.filter((r) => r.status === "Delivered").length;
+  const linkable = role === "finance";
+
+  const requestName = (r: RequestView) => {
+    const more = r.lines.length > 1 ? ` +${r.lines.length - 1}` : "";
+    return (
+      <span className="grid min-w-0">
+        {linkable && !r.queued ? (
+          <Link href={`/staff/finance/requests/${r.no}`} className="link -my-3 inline-flex min-h-11 items-center whitespace-nowrap">
+            {r.no}
+          </Link>
+        ) : (
+          <span className="whitespace-nowrap">{r.no}</span>
+        )}
+        <span className="max-w-64 truncate text-13 font-normal text-ink-soft">
+          {r.lineWords[0]}
+          {more}
+        </span>
+      </span>
+    );
+  };
 
   return (
-    <Register
-      title="Material requests and orders"
-      empty="No material has been requested on this project yet."
-      limit={8}
-    >
-      {requests.map((r) => {
-        const raiser = firm.person(r.by)?.name ?? r.by;
-        const firstFile = r.no === taggedNo;
-        return (
-          <RegisterRow
-            key={r.no}
-            id={`mr:${r.no}`}
-            margin={turnOf(r)}
-            marginSub={r.status === "Delivered" ? undefined : ageWords(r.days)}
-            title={`${r.no}, milestone ${r.n}`}
-            sentence={
-              <>
-                {r.queued ? "Saved with no signal and not sent yet. " : ""}
-                {r.lineWords.join("; ")}.{r.outside ? " One line is not in the agreed estimate." : ""} Needed by{" "}
-                {dayWords(r.neededBy)}. Raised by {raiser}, {formatStampShort(r.at)}.
-                {r.stillToOrder ? ` ${r.stillToOrder}.` : ""}
-              </>
-            }
-            instrument={<RequestLadder status={r.status} stamps={firm.stampsFor(`mr:${r.no}`)} late={r.late} />}
-          >
-            {r.pos.length > 0 && (
-              <ul className="grid gap-3 border-t border-sand pt-3">
-                {r.pos.map((po) => (
-                  <li key={po.no} className="grid gap-0.5">
-                    <p className="text-17 font-semibold">
-                      {po.no}, {po.vendor}
-                    </p>
-                    <p className="max-w-[56ch] text-15 text-ink-soft">
-                      {po.lineWords.join("; ")}. {inr(po.amount)} before GST, GST {inr(po.gst)}, {inr(po.total)} with
-                      GST. Uploaded by {firm.person(po.by)?.name ?? po.by} on {dayWords(po.at)}.{" "}
-                      {po.billed ? "Billed." : "Not billed yet."}
-                    </p>
-                    <p className="flex flex-wrap items-baseline gap-x-2 text-15">
-                      <span>{po.file.replace(/ \(sample\)$/, "")}</span>
-                      {firstFile && po === r.pos[0] && <SampleTag>Sample file</SampleTag>}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </RegisterRow>
-        );
-      })}
-    </Register>
+    <div className="grid gap-5">
+      <StatRow cols={4} label="Materials at a glance">
+        <StatCard label="Requests" value={requests.length} icon="box" />
+        <StatCard
+          label="With procurement"
+          value={open.length}
+          sub={open.some((r) => r.late) ? <span className="late-text">{open.filter((r) => r.late).length} late</span> : undefined}
+          icon="clock"
+        />
+        <StatCard label="Ordered" value={inrShort(pos.reduce((t, po) => t + po.amount, 0))} sub="Before GST" icon="truck" />
+        <StatCard label="Delivered" value={delivered} icon="check" />
+      </StatRow>
+
+      <Panel title="Requests" aside={<Count n={open.length} tone={open.length > 0 ? "waiting" : undefined} />} strong>
+        <GlassTable<RequestView>
+          caption="Material requests"
+          rows={requests}
+          rowKey={(r) => r.no}
+          wide="lg"
+          empty="No requests yet."
+          chip={(r) => (r.queued ? <StatusChip tone="locked">Not sent</StatusChip> : requestChip(r))}
+          columns={[
+            { label: "Request", cell: requestName },
+            { label: "Milestone", width: "w-24", cell: (r) => <span className="figure font-normal">{milestoneTag(r.n)}</span> },
+            { label: "Needed by", width: "w-28", cell: (r) => <span className="font-normal">{dayWords(r.neededBy)}</span> },
+            {
+              label: "Waiting",
+              width: "w-28",
+              cell: (r) =>
+                r.status === "Delivered" || r.status === "PO uploaded" || r.queued ? (
+                  <span className="font-normal text-ink-soft">–</span>
+                ) : (
+                  <WaitChip days={r.days} />
+                ),
+            },
+            {
+              label: "PO",
+              cell: (r) =>
+                r.pos.length === 0 ? (
+                  <span className="font-normal text-ink-soft">–</span>
+                ) : (
+                  <span className="grid text-13 font-normal">
+                    {r.pos.map((po) => (
+                      <span key={po.no} className="whitespace-nowrap">
+                        {po.no}
+                      </span>
+                    ))}
+                  </span>
+                ),
+            },
+            {
+              label: "Status",
+              width: "w-40",
+              phone: false,
+              cell: (r) => (r.queued ? <StatusChip tone="locked">Not sent</StatusChip> : requestChip(r)),
+            },
+          ]}
+        />
+      </Panel>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Panel title="Purchase orders" aside={<Count n={pos.length} />}>
+          <GlassTable<PoView>
+            caption="Purchase orders"
+            rows={pos}
+            rowKey={(po) => po.no}
+            wide="md"
+            empty="No POs yet."
+            chip={(po) => (po.billed ? <StatusChip tone="done">Billed</StatusChip> : <StatusChip tone="waiting">Not billed</StatusChip>)}
+            columns={[
+              {
+                label: "PO",
+                cell: (po) => (
+                  <span className="grid min-w-0">
+                    <span className="whitespace-nowrap">{po.no}</span>
+                    <span className="truncate text-13 font-normal text-ink-soft">{po.vendor}</span>
+                  </span>
+                ),
+              },
+              { label: "Date", width: "w-24", cell: (po) => <span className="font-normal">{dayWords(po.at)}</span> },
+              { label: "With GST", align: "right", cell: (po) => <span className="figure">{inr(po.total)}</span> },
+              {
+                label: "Bill",
+                phone: false,
+                width: "w-28",
+                cell: (po) =>
+                  po.billed ? <StatusChip tone="done">Billed</StatusChip> : <StatusChip tone="waiting">Not billed</StatusChip>,
+              },
+            ]}
+          />
+        </Panel>
+
+        <Panel title="Work orders" aside={<Count n={orders.length} />}>
+          <GlassTable<WorkOrderView>
+            caption="Work orders"
+            rows={orders}
+            rowKey={(w) => w.id}
+            wide="md"
+            empty="No labour asked for."
+            chip={(w) => <StatusChip tone={w.tone}>{w.statusWords}</StatusChip>}
+            columns={[
+              {
+                label: "Labour",
+                cell: (w) => (
+                  <span className="grid min-w-0">
+                    <span>{w.trade}</span>
+                    <span className="truncate text-13 font-normal text-ink-soft">{w.crew ?? w.taskTitle}</span>
+                  </span>
+                ),
+              },
+              { label: "Start", width: "w-24", cell: (w) => <span className="font-normal">{dayWords(w.startOn)}</span> },
+              { label: "Days", width: "w-16", align: "right", cell: (w) => <span className="figure font-normal">{w.days}</span> },
+              {
+                label: "Status",
+                phone: false,
+                width: "w-32",
+                cell: (w) => <StatusChip tone={w.tone}>{w.statusWords}</StatusChip>,
+              },
+            ]}
+          />
+        </Panel>
+      </div>
+    </div>
   );
 }

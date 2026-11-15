@@ -1,18 +1,16 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
+import { dated, IconCheck, IconSend, Panel } from "@/components/architect/glass-ui";
 import { EmailPreview } from "@/components/register/email-preview";
 import { usePause } from "@/components/register/recording-pause";
-import { Register, RegisterRow } from "@/components/register/register";
 import { StaffBoard } from "@/components/register/staff-board";
-import { TODAY } from "@/lib/demo-data";
+import { StatusChip } from "@/components/register/status-chip";
 import { useDemo, useFirm } from "@/lib/demo-store";
 import type { DraftView } from "@/lib/firm";
-import { ageWords, daysSince } from "@/lib/firm";
 import type { DraftId } from "@/lib/firm-data";
-import { formatDate, formatShortDate, formatStampShort, formatTime } from "@/lib/format";
-import { BoardPlot } from "./board-plot";
-import { draftName, firstNames, onboardedWords, THIS_MONTH } from "./bd-words";
+import { draftName, firstNames } from "./bd-words";
+import { PlanPanel } from "./plan-panel";
 import {
   STEP_NAMES,
   StepAgreement,
@@ -24,9 +22,9 @@ import {
   type StepProps,
 } from "./draft-steps";
 
-// One client's workspace being set up, in four steps. The plot on the board gets a stake
-// for each step saved; with all four the outline closes and the workspace can be opened,
-// which invites the client and counts as one onboarded client.
+// One client's workspace being set up, in four steps shown as a stepper. With all four
+// saved the workspace can be opened, which invites the client and gives the project its
+// code; onboarding ends with the plan generated from the workflow template.
 
 const STEPS: StepNo[] = [1, 2, 3, 4];
 
@@ -37,39 +35,47 @@ const FORMS: Record<StepNo, (props: StepProps) => ReactNode> = {
   4: StepTeam,
 };
 
-/** A surveyor's stake: driven (a square with a cross) once the step is saved, a chalk ring before. */
-function Stake({ driven }: { driven: boolean }) {
+function Stepper({
+  open,
+  done,
+  onChoose,
+}: {
+  open: StepNo;
+  done: Record<StepNo, boolean>;
+  onChoose: (n: StepNo) => void;
+}) {
   return (
-    <svg viewBox="0 0 16 16" width={16} height={16} className="shrink-0" aria-hidden="true" focusable="false">
-      {driven ? (
-        <>
-          <rect x="5" y="5" width="6" height="6" style={{ fill: "currentColor" }} />
-          <path d="M1 8h14M8 1v14" style={{ stroke: "currentColor", strokeWidth: 1.2 }} />
-        </>
-      ) : (
-        <circle cx="8" cy="8" r="3.5" style={{ fill: "none", stroke: "currentColor", strokeWidth: 1.2, strokeDasharray: "2 1.5" }} />
-      )}
-    </svg>
-  );
-}
-
-/** The invite the client would get, shown as a preview. */
-function invitePreview(draft: DraftView, poc: string | undefined) {
-  const name = draftName(draft);
-  const clients = draft.step1?.clients ?? [];
-  return (
-    <EmailPreview
-      label="See the invite"
-      to={`${clients.join(" and ") || "The client"} <${draft.step1?.email ?? "no email yet"}>`}
-      subject={`Your Poetry Designs workspace for ${name}`}
-      body={[
-        `Dear ${firstNames(clients)},`,
-        `${name} is ready for you on the Poetry Designs portal. Your designs, payments, changes and advisory hours are all kept there.`,
-        "Use the link in this email to set your password and sign in. It works for 7 days; if it runs out, ask us for a new one.",
-        ...(poc ? [`${poc} is your point of contact.`] : []),
-        "Rohan Menon, Poetry Designs",
-      ]}
-    />
+    <nav aria-label="Steps" className="glass p-2">
+      <ol className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        {STEPS.map((n) => {
+          const current = open === n;
+          return (
+            <li key={n} className="min-w-0">
+              <button
+                type="button"
+                aria-current={current ? "step" : undefined}
+                onClick={() => onChoose(n)}
+                className={`flex min-h-12 w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left ${
+                  current ? "bg-rosewood text-lime" : "text-ink hover:bg-white/55"
+                }`}
+              >
+                <span
+                  className={`grid size-7 shrink-0 place-items-center rounded-full text-13 font-semibold ${
+                    done[n] ? (current ? "bg-lime text-rosewood" : "bg-kota text-lime") : current ? "border border-lime/60" : "border border-ink/30"
+                  }`}
+                >
+                  {done[n] ? <IconCheck /> : n}
+                </span>
+                <span className="min-w-0 text-15 leading-tight">
+                  {STEP_NAMES[n]}
+                  <span className="sr-only">{done[n] ? ", done" : ", to do"}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 
@@ -77,56 +83,62 @@ function OpenWorkspace({ draft, ready }: { draft: DraftView; ready: boolean }) {
   const demo = useDemo();
   const firm = useFirm();
   const pause = usePause();
-  const rowId = `draft:${draft.id}`;
   const name = draftName(draft);
   const clients = draft.step1?.clients ?? [];
   const poc = draft.step4?.poc ? firm.person(draft.step4.poc)?.name : undefined;
-  // Only Kulkarni Eco Home has a project waiting for it in this demo.
+  // Only Kulkarni Eco Home has a project waiting for it.
   const openable = draft.id === "kulkarni";
   const waiting = pause.pending !== null;
-  const days = daysSince(draft.openedAt || draft.startedAt || TODAY);
-
-  const sentence = draft.opened
-    ? `Opened. ${name} is in your projects and on the admin's board.`
-    : !openable
-      ? "This demo opens Kulkarni Eco Home only. This draft stays saved in this tab."
-      : ready
-        ? `All four steps are done. The invite goes to ${draft.step1?.email ?? "the client"}.`
-        : `${draft.missing} All four steps must be done before it can be opened.`;
 
   return (
-    <Register title="Open the workspace">
-      <RegisterRow
-        id={rowId}
-        margin={draft.opened ? ageWords(days) : ready ? "Ready" : "Not yet"}
-        title={name}
-        // The opening's carbon copies Shalini, so its own line offers to see it as her.
-        sentence={sentence}
-        stamps={firm.stampsFor(rowId)}
-        action={
-          !draft.opened && openable ? (
+    <Panel
+      title="Workspace"
+      aside={
+        draft.opened ? (
+          <>
+            {draft.projectId && <span className="figure text-15 text-ink">{firm.project(draft.projectId)?.code}</span>}
+            <StatusChip tone="done">{draft.openedAt ? `Opened ${dated(draft.openedAt)}` : "Opened"}</StatusChip>
+          </>
+        ) : (
+          <StatusChip tone={ready ? "done" : "locked"}>{ready ? "Ready" : `${draft.stepsDone}/4 steps`}</StatusChip>
+        )
+      }
+    >
+      {!draft.opened && openable && (
+        <div className="grid gap-2 px-1 pb-1">
+          <div>
             <button
               type="button"
-              className={`btn ${ready ? "btn-primary" : "btn-quiet"}`}
+              className={`btn ${ready ? "btn-primary" : "btn-glass"} min-h-12 gap-2`}
               aria-disabled={!ready || waiting}
               onClick={(event) => {
                 if (!ready || waiting) return;
                 const { record } = demo;
                 pause.start({
-                  what: `The workspace for ${name}, and the invite to ${firstNames(clients)}`,
+                  what: `Workspace for ${name}, invite to ${firstNames(clients)}`,
                   origin: event.currentTarget,
                   commit: () => record({ kind: "workspace.opened", draftId: draft.id, projectId: "kulkarni", by: "rohan" }),
                 });
               }}
             >
-              Open the workspace and invite {firstNames(clients)}
+              <IconSend /> Open and invite {firstNames(clients)}
             </button>
-          ) : undefined
-        }
-      >
-        {!draft.opened && openable && invitePreview(draft, poc)}
-      </RegisterRow>
-    </Register>
+          </div>
+          <EmailPreview
+            label="See the invite"
+            to={`${clients.join(" and ") || "The client"} <${draft.step1?.email ?? "no email yet"}>`}
+            subject={`Your Poetry Designs workspace for ${name}`}
+            body={[
+              `Dear ${firstNames(clients)},`,
+              `${name} is ready for you on the Poetry Designs portal.`,
+              "Use the link in this email to set your password. It works for 7 days.",
+              ...(poc ? [`${poc} is your point of contact.`] : []),
+              "Rohan Menon, Poetry Designs",
+            ]}
+          />
+        </div>
+      )}
+    </Panel>
   );
 }
 
@@ -142,29 +154,15 @@ export function DraftPage({ id }: { id: DraftId }) {
   const done = stepsDone(draft);
   const open: StepNo = chosen ?? ((draft.nextStep as StepNo | null) ?? 4);
   const ready = STEPS.every((n) => done[n]);
-  const pegs = (draft.opened ? 4 : draft.stepsDone) as 0 | 1 | 2 | 3 | 4;
   const name = draftName(draft);
 
-  // The last save of each step keys its form, so a form takes up what was saved when the
-  // tab wakes, and starts again from the record after it is saved.
+  // The last save of each step keys its form, so a form starts again from the record after it is saved.
   const lastSave = (step: StepNo) =>
     demo.events.findLast((e) => e.kind === "draft.saved" && e.draftId === draft.id && e.step === step)?.id ?? "seed";
-  const lastAny = demo.events.findLast((e) => e.kind === "draft.saved" && e.draftId === draft.id);
-  const savedAt = lastAny?.at ?? draft.startedAt;
-  const savedWords = savedAt
-    ? `Saved on ${formatShortDate(savedAt)}${formatTime(savedAt) ? ` at ${formatTime(savedAt)}` : ""}.`
-    : "Nothing saved yet.";
-
-  const state = draft.opened
-    ? `Workspace opened ${draft.openedAt ? formatStampShort(draft.openedAt) : "today"}. ${onboardedWords(firm.onboardedIn(THIS_MONTH).length)}`
-    : `Step ${open} of 4, ${STEP_NAMES[open].toLowerCase()}. ${savedWords}`;
 
   const onSaved = (step: StepNo) => {
-    // The next step still to do, counting this one as done.
     const next = STEPS.find((n) => n !== step && !done[n]);
     setChosen(next ?? step);
-    // The save button goes with its form: bring the next step, or with none left the
-    // opening, into view and give it the focus.
     const target = next ? stepsRef.current : openRef.current;
     target?.scrollIntoView({ block: "start" });
     target?.focus({ preventScroll: true });
@@ -177,49 +175,17 @@ export function DraftPage({ id }: { id: DraftId }) {
       <StaffBoard
         place="Onboard"
         headline={name}
-        state={state}
         chip={false}
-        picture={<BoardPlot pegs={pegs} />}
-        pictureWords={draft.opened ? "All four stakes driven; the plot is closed." : `${draft.stepsDone} of 4 steps done.`}
+        back={{ label: "Onboard", href: "/staff/bd/onboard" }}
       />
-      <div className="mt-8 grid gap-12">
-        <div
-          ref={stepsRef}
-          tabIndex={-1}
-          className="grid scroll-mt-4 gap-8 outline-none lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-12"
-        >
-          <nav aria-label="Steps">
-            <ol className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 lg:grid-cols-1">
-              {STEPS.map((n) => (
-                <li key={n}>
-                  <button
-                    type="button"
-                    className="chip w-full justify-between"
-                    aria-pressed={open === n}
-                    aria-current={open === n ? "step" : undefined}
-                    onClick={() => setChosen(n)}
-                  >
-                    <span className="flex min-w-0 items-center gap-2 py-1.5">
-                      <Stake driven={done[n]} />
-                      <span className="min-w-0">
-                        <span className="block">
-                          {n}. {STEP_NAMES[n]}
-                        </span>
-                        <span className="chip-detail">{done[n] ? "Done" : "To do"}</span>
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-            {draft.startedAt && (
-              <p className="lettering mt-3 text-ink-soft">Started {formatDate(draft.startedAt)} by Rohan Menon.</p>
-            )}
-          </nav>
-          <Form key={`${draft.id}-${open}-${lastSave(open)}`} draft={draft} locked={draft.opened} onSaved={onSaved} />
+      <div className="mt-6 grid gap-4 lg:mt-8">
+        <div ref={stepsRef} tabIndex={-1} className="grid scroll-mt-4 gap-4 outline-none">
+          <Stepper open={open} done={done} onChoose={setChosen} />
+          <Form key={`${draft.id}-${open}-${lastSave(open)}`} draft={draft} locked={draft.opened} onSaved={onSaved} primary={!ready} />
         </div>
-        <div ref={openRef} tabIndex={-1} className="scroll-mt-4 outline-none">
+        <div ref={openRef} tabIndex={-1} className="grid scroll-mt-4 gap-4 outline-none">
           <OpenWorkspace draft={draft} ready={ready} />
+          <PlanPanel draft={draft} />
         </div>
       </div>
     </>

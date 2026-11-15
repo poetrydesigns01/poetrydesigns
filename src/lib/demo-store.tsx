@@ -14,7 +14,8 @@ import {
   type ProjectId,
   type StaffRole,
 } from "./firm-data";
-import { derive, latestVersionOf, type Projection } from "./projection";
+import { seedDesignItems, seedThreadReads } from "./portal-data";
+import { derive, latestVersionOf, threadPosts, type Projection } from "./projection";
 
 // Demo-only state: what the viewer does is kept for the browser tab, so approving
 // something on one screen shows up on the others, and every role reads the same record.
@@ -127,6 +128,22 @@ function applyEvent(state: DemoState, event: NewEvent, at: string): DemoState {
   return next;
 }
 
+const noSubscribe = () => () => {};
+
+/**
+ * False on the server and while the page hydrates (screens then see the seed state, not the
+ * tab's); true once the tab's own state is read. Hold session-dependent screens on it so the
+ * seed never flashes before the tab's events. SessionGate already does this for every
+ * client and staff screen.
+ */
+export function useStoreReady(): boolean {
+  return useSyncExternalStore(
+    noSubscribe,
+    () => true,
+    () => false,
+  );
+}
+
 function useDemoState(): DemoState {
   return useSyncExternalStore(subscribe, read, () => initialState);
 }
@@ -205,6 +222,59 @@ export function useDemo() {
       write({ ...read(), trying: on ? [...rest, id] : rest });
     },
     stopTrying: () => write({ ...read(), trying: [] }),
+
+    // ---- The client's payment, design and thread writers (Iyer Residence) ----
+    /** "Payment made": the client says the money for a stage has gone. `ref` is an optional UTR. */
+    markPaymentMade: (n: number, ref?: string) => {
+      const now = read();
+      const at = stampNow();
+      write(
+        append(
+          now,
+          { kind: "payment.client-paid", projectId: "iyer", n, ref: ref?.trim() || undefined, by: "meera" },
+          at,
+        ),
+      );
+    },
+    /** "Request demand letter" on a stage whose work is done and whose letter is not raised yet. */
+    requestDemandLetter: (n: number) => {
+      const now = read();
+      if (now.events.some((e) => e.kind === "letter.requested" && e.projectId === "iyer" && e.n === n)) return;
+      write(append(now, { kind: "letter.requested", projectId: "iyer", n, by: "meera" }, stampNow()));
+    },
+    /** The client opened a design item: marks its newest version viewed, once. Call from a handler or effect. */
+    viewDesignItem: (id: string) => {
+      const now = read();
+      const version = latestVersionOf(id, now.events);
+      if (version === 0) return;
+      const seeded = seedDesignItems
+        .find((d) => d.projectId === "iyer" && d.id === id)
+        ?.versions.find((v) => v.version === version)?.viewedAt;
+      const viewed =
+        seeded ||
+        now.events.some(
+          (e) => (e.kind === "design.viewed" || e.kind === "design.decided") && e.designId === id && e.version === version,
+        );
+      if (viewed) return;
+      write(append(now, { kind: "design.viewed", projectId: "iyer", designId: id, version, by: "meera" }, stampNow()));
+    },
+    /**
+     * Someone opened a project thread. Recorded only when the other side has posted since
+     * this person last opened it, so it is safe to call each time the thread is shown.
+     */
+    readThread: (projectId: ProjectId, by: PersonId) => {
+      const now = read();
+      const client = by === "meera" || by === "arjun";
+      const last = [
+        ...seedThreadReads.filter((r) => r.projectId === projectId && r.by === by).map((r) => r.at),
+        ...now.events.filter((e) => e.kind === "thread.read" && e.projectId === projectId && e.by === by).map((e) => e.at),
+      ].reduce((latest, at) => (at > latest ? at : latest), "");
+      const fresh = threadPosts(now.events).some(
+        (p) => p.projectId === projectId && p.kind === "post" && (p.by === "meera" || p.by === "arjun") !== client && p.at > last,
+      );
+      if (!fresh) return;
+      write(append(now, { kind: "thread.read", projectId, by }, stampNow()));
+    },
 
     // ---- The staff writer ----
     /** Records one staff event: called from a handler or the pause timer, never from render. */

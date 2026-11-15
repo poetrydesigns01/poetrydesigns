@@ -1,14 +1,15 @@
 "use client";
 
 import { useScope, viewerIdOf } from "@/components/register/project-switch";
+import { TODAY } from "@/lib/demo-data";
 import { useDemo, useFirm } from "@/lib/demo-store";
-import type { Firm, StampView, TaskView } from "@/lib/firm";
-import type { Person, PersonId, Post, ProjectId } from "@/lib/firm-data";
-import { countWord } from "@/lib/format";
+import type { Firm, TaskView } from "@/lib/firm";
+import type { Person, PersonId, ProjectId } from "@/lib/firm-data";
+import { datePart } from "@/lib/format";
+import type { Tone } from "@/lib/portal";
 
-// What every studio screen needs first: who is looking, at which projects, and the words
-// for a count in a headline. Vikram Desai and Ananya Rao share these screens; the person
-// menu switches between them in place.
+// What every studio screen needs first: who is looking and at which projects. Vikram Desai
+// and Ananya Rao share these screens; signing in as either picks the view.
 
 export type ArchitectView = {
   id: PersonId;
@@ -27,12 +28,6 @@ export function useArchitect(): ArchitectView {
   return { id, person, first: person?.first ?? "", senior: Boolean(person?.senior), scope };
 }
 
-/** "Three things need you today, Vikram." with words for 0 to 10. */
-export function needsYou(n: number, first: string): string {
-  if (n === 0) return `Nothing needs you today, ${first}.`;
-  return `${countWord(n, true)} ${n === 1 ? "thing needs" : "things need"} you today, ${first}.`;
-}
-
 /** The juniors who work under a senior architect, in the firm's order. */
 export function juniorsOf(firm: Firm, lead: PersonId): Person[] {
   return firm.people.filter((p) => p.role === "architect" && !p.senior && p.lead === lead && p.active);
@@ -43,36 +38,22 @@ export function isOpen(t: TaskView): boolean {
   return t.status === "planned" || t.status === "in-progress" || t.status === "revision";
 }
 
-/** "Ananya's" from a person id. */
-export function possessive(firm: Firm, id: PersonId): string {
-  const first = firm.person(id)?.first ?? id;
-  return `${first}'s`;
+/** A task's state as one chip. */
+export function taskChip(t: TaskView): { tone: Tone; words: string } {
+  if (t.status === "accepted") return { tone: "done", words: "Accepted" };
+  if (t.status === "submitted") return { tone: "waiting", words: "In review" };
+  if (t.overdue) return { tone: "late", words: "Overdue" };
+  if (t.status === "revision") return { tone: "progress", words: "Sent back" };
+  if (t.dueAt && datePart(t.dueAt) === TODAY) return { tone: "waiting", words: "Due today" };
+  if (t.status === "in-progress") return { tone: "progress", words: "In progress" };
+  return { tone: "locked", words: "To do" };
 }
 
-/** The sort key "newest first" for stamps from several sources. */
-export function newestFirst(stamps: StampView[]): StampView[] {
-  return [...stamps].sort((a, b) => b.at.localeCompare(a.at));
-}
-
-/** The prefix of a reminder post's id, so a row can find the reminders sent from it. */
-export function remindPrefix(rowId: string): string {
-  return `remind-${rowId}-`;
-}
-
-/**
- * The stamps a row's reminders left: one per reminder posted in Updates from it. A post by
- * the team emails the client only; Meera can be seen as, other clients are named.
- */
-export function reminderStamps(firm: Firm, rowId: string, projectId: ProjectId): StampView[] {
-  const iyer = projectId === "iyer" || projectId === "iyer-cottage";
-  return firm.posts
-    .filter((post: Post) => post.id.startsWith(remindPrefix(rowId)))
-    .map((post) => ({
-      words: "Reminder posted in Updates",
-      at: post.at,
-      by: post.by,
-      carbon: iyer
-        ? { to: ["meera" as PersonId], href: "/client/updates", rowId }
-        : { to: [], others: firm.project(projectId)?.clients ?? [], href: `/staff/projects/${projectId}/updates`, rowId },
-    }));
+/** Sort order for a task table: what needs action first. */
+export function taskRank(t: TaskView): number {
+  if (t.status === "submitted") return 0;
+  if (t.overdue) return 1;
+  if (t.status === "revision") return 2;
+  if (isOpen(t)) return 3;
+  return 4;
 }

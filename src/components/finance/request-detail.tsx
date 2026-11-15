@@ -1,38 +1,31 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { MaterialStack, stackWords } from "@/components/instruments/material-stack";
-import { RequestLadder } from "@/components/instruments/request-ladder";
+import Link from "next/link";
+import { useRef, useState, type ReactNode } from "react";
+import { GlassTable, Icon, Meter, Panel, StepTrack, WaitChip } from "@/components/admin/glass-kit";
 import { field } from "@/components/register/chips";
 import { DropZone } from "@/components/register/drop-zone";
 import { Field } from "@/components/register/field";
 import { usePause } from "@/components/register/recording-pause";
 import { StaffBoard } from "@/components/register/staff-board";
-import { CarbonLine, Stamp } from "@/components/register/stamp";
-import { StatusWord } from "@/components/register/status-word";
+import { StatusChip } from "@/components/register/status-chip";
 import { MaterialReport } from "@/components/reports/material-report";
 import { stampNow } from "@/lib/clock";
+import { TODAY } from "@/lib/demo-data";
 import { useDemo, useFirm, useViewer } from "@/lib/demo-store";
-import type { RequestView } from "@/lib/firm";
+import type { PoView, RequestView } from "@/lib/firm";
 import type { PersonId, Vendor } from "@/lib/firm-data";
-import { datePart, formatShortDate, formatStampShort, inr } from "@/lib/format";
+import { datePart, daysBetween, formatShortDate, formatStampShort, inr } from "@/lib/format";
 import { MarkSeen, SeeAsLine } from "./mark-seen";
-import { ProjectLink } from "./rows";
-import { beforeGstWords, numberFrom, perUnit, procuresFor, rateWords, withGstWords } from "./shared";
+import { REQUEST_STEPS, reachedOf, requestChip } from "./request-words";
+import { numberFrom, perUnit, procuresFor, rateWords } from "./shared";
+import { WorkOrders } from "./work-orders";
 
-// One material request, for procurement. The left side is what the site asked for, how
-// much is on a PO so far, and the request's own report. The right side links the PO made
-// in Zoho Books: the file, its number, the vendor (with each vendor's last rate for this
-// material), the quantities, rates and GST per line, and the totals. A PO that covers part
-// of a line leaves the rest to order, and another PO can be linked for it.
-
-const HEADLINE: Record<RequestView["status"], (no: string) => string> = {
-  New: (no) => `${no} has not been seen yet.`,
-  Seen: (no) => `${no} is seen and waiting on a PO.`,
-  "PO in part": (no) => `${no} is ordered in part.`,
-  "PO uploaded": (no) => `${no} is ordered in full.`,
-  Delivered: (no) => `${no} is delivered.`,
-};
+// One material request, for procurement. At the left what the site asked for and how much
+// is ordered; at the right the Zoho PO: the file, its number, the vendor (with the last
+// rate for this material), quantity, rate and GST per line, and the totals. A PO that
+// covers part of a line leaves the rest to order, and another PO can be linked for it.
+// Labour for the same site task is booked from here too.
 
 /** A vendor's last rate for a request line: the same size first, then any size of it. */
 function rateFor(vendor: Vendor | undefined, material: string, sub: string) {
@@ -56,12 +49,13 @@ function LinkPo({ request, person }: { request: RequestView; person: PersonId })
   const open = request.lines.filter((l) => (request.ordered[l.id] ?? 0) < l.qty);
   const first = open[0] ?? request.lines[0];
   // Vendors who have sold this material, the most recent rate first; then the rest.
-  const selling = firm.vendors
+  const live = firm.vendors.filter((v) => !v.deleted);
+  const selling = live
     .filter((v) => request.lines.some((l) => rateFor(v, l.material, l.sub)))
     .sort((a, b) => (rateFor(b, first.material, first.sub)?.on ?? "").localeCompare(rateFor(a, first.material, first.sub)?.on ?? ""));
-  const others = firm.vendors.filter((v) => !selling.includes(v));
+  const others = live.filter((v) => !selling.includes(v));
   const chosenId = vendorId ?? selling[0]?.id ?? "";
-  const vendor = firm.vendors.find((v) => v.id === chosenId);
+  const vendor = live.find((v) => v.id === chosenId);
   const number = poNo ?? firm.nextPoNo;
 
   const valueOf = (lineId: string) => {
@@ -80,10 +74,7 @@ function LinkPo({ request, person }: { request: RequestView; person: PersonId })
 
   const priced = open.map((line) => {
     const v = valueOf(line.id);
-    const qty = numberFrom(v.qtyText);
-    const rate = numberFrom(v.rateText);
-    const gst = numberFrom(v.gstText);
-    return { line, v, qty, rate, gst };
+    return { line, v, qty: numberFrom(v.qtyText), rate: numberFrom(v.rateText), gst: numberFrom(v.gstText) };
   });
   const counted = priced.filter((p) => Number.isFinite(p.qty) && p.qty > 0 && Number.isFinite(p.rate) && Number.isFinite(p.gst));
   const before = Math.round(counted.reduce((t, p) => t + p.qty * p.rate, 0));
@@ -98,18 +89,18 @@ function LinkPo({ request, person }: { request: RequestView; person: PersonId })
   const submit = () => {
     if (pause.pending !== null) return;
     const next: typeof errors = {};
-    if (files.length === 0) next.files = "Choose the PO file from Zoho Books.";
-    if (!/^PO-\d{4}-\d{4}$/.test(number)) next.poNo = "Write the PO number as it is in Zoho Books, like PO-2026-0422.";
-    else if (firm.pos.some((po) => po.no === number)) next.poNo = `${number} is already linked to a request.`;
-    if (!vendor) next.vendor = "Choose the vendor on the PO.";
+    if (files.length === 0) next.files = "Choose the PO file.";
+    if (!/^PO-\d{4}-\d{4}$/.test(number)) next.poNo = "As in Zoho Books, like PO-2026-0422.";
+    else if (firm.pos.some((po) => po.no === number)) next.poNo = `${number} is already linked.`;
+    if (!vendor) next.vendor = "Choose the vendor.";
     const ordering = priced.filter((p) => p.v.qtyText.trim() !== "" && p.v.qtyText.trim() !== "0");
-    if (ordering.length === 0) next.lines = "Write the quantity ordered on at least one line.";
+    if (ordering.length === 0) next.lines = "Write a quantity on at least one line.";
     for (const p of ordering) {
       const unit = p.line.unit;
-      if (!Number.isFinite(p.qty) || p.qty <= 0) next.lines = `Write the quantity of ${p.line.sub} ordered, in ${unit}.`;
-      else if (p.qty > p.v.left) next.lines = `Only ${p.v.left.toLocaleString("en-IN")} ${unit} of ${p.line.sub} is still to order.`;
-      else if (!Number.isFinite(p.rate) || p.rate <= 0) next.lines = `Write the rate before GST for ${p.line.sub}.`;
-      else if (!Number.isFinite(p.gst) || p.gst < 0 || p.gst > 28) next.lines = `Write the GST for ${p.line.sub} as a percentage, like 18.`;
+      if (!Number.isFinite(p.qty) || p.qty <= 0) next.lines = `Quantity of ${p.line.sub}, in ${unit}.`;
+      else if (p.qty > p.v.left) next.lines = `Only ${p.v.left.toLocaleString("en-IN")} ${unit} of ${p.line.sub} is left to order.`;
+      else if (!Number.isFinite(p.rate) || p.rate <= 0) next.lines = `Rate before GST for ${p.line.sub}.`;
+      else if (!Number.isFinite(p.gst) || p.gst < 0 || p.gst > 28) next.lines = `GST for ${p.line.sub}, as a percentage.`;
     }
     setErrors(next);
     if (Object.keys(next).length > 0 || !vendor) return;
@@ -139,16 +130,11 @@ function LinkPo({ request, person }: { request: RequestView; person: PersonId })
     });
   };
 
-  // The select holds only the vendor's name, so a narrow column never cuts it; the chosen
-  // vendor's last rate for the first line is said in the hint above it.
-  const rateHint = (v: Vendor | undefined) => {
-    const r = v && rateFor(v, first.material, first.sub);
-    return r ? `Last rate ${rateWords(r.rate)} ${perUnit(r.unit)}, on ${formatShortDate(r.on)}.` : undefined;
-  };
+  const last = vendor ? rateFor(vendor, first.material, first.sub) : undefined;
 
   return (
     <form
-      className="@container grid gap-5"
+      className="@container grid gap-4"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
@@ -157,7 +143,7 @@ function LinkPo({ request, person }: { request: RequestView; person: PersonId })
     >
       <div>
         <DropZone
-          label="The PO from Zoho Books"
+          label="PO from Zoho Books"
           samples={[`${number}.pdf`]}
           accept="pdf"
           chosen={files}
@@ -182,10 +168,14 @@ function LinkPo({ request, person }: { request: RequestView; person: PersonId })
             onChange={(event) => setPoNo(event.target.value)}
           />
         </Field>
-        <Field label="Vendor" hint={rateHint(vendor)} error={errors.vendor}>
+        <Field
+          label="Vendor"
+          hint={last ? `Last ${rateWords(last.rate)} ${perUnit(last.unit)}, ${formatShortDate(last.on)}` : undefined}
+          error={errors.vendor}
+        >
           <select className={field} value={chosenId} onChange={(event) => chooseVendor(event.target.value)}>
             <option value="">Choose</option>
-            <optgroup label="Have sold this before">
+            <optgroup label="Sold this before">
               {selling.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name}
@@ -205,18 +195,24 @@ function LinkPo({ request, person }: { request: RequestView; person: PersonId })
         </Field>
       </div>
 
-      <div className="grid gap-5">
-        {priced.map(({ line, v, qty }) => {
+      <div className="grid gap-3">
+        {priced.map(({ line, v }) => {
           const item = firm.catalogue.find((c) => c.id === line.material);
-          const before = request.pos.map((po) => po.lines.filter((l) => l.lineId === line.id).reduce((t, l) => t + l.qty, 0));
-          const adding = Number.isFinite(qty) && qty > 0 ? Math.min(qty, v.left) : 0;
           return (
-            <fieldset key={line.id} className="grid gap-3 border-t border-sand pt-4">
-              <legend className="float-left w-full pb-2 text-17 font-semibold">
+            <fieldset key={line.id} className="glass-inner grid gap-3 p-3">
+              <legend className="sr-only">
                 {item?.name ?? line.material}, {line.sub}
               </legend>
-              <div className="grid grid-cols-3 gap-3">
-                <Field label={`Ordered, ${line.unit}`}>
+              <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-15">
+                <span className="font-semibold">
+                  {item?.name ?? line.material}, {line.sub}
+                </span>
+                <span className="text-13 text-ink-soft">
+                  {v.left.toLocaleString("en-IN")} {line.unit} left
+                </span>
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <Field label={`Qty, ${line.unit}`}>
                   <input
                     className={field}
                     inputMode="decimal"
@@ -225,7 +221,7 @@ function LinkPo({ request, person }: { request: RequestView; person: PersonId })
                     onChange={(event) => setLine(line.id, { qty: event.target.value })}
                   />
                 </Field>
-                <Field label="Rate before GST">
+                <Field label="Rate">
                   <input
                     className={field}
                     inputMode="decimal"
@@ -244,19 +240,6 @@ function LinkPo({ request, person }: { request: RequestView; person: PersonId })
                   />
                 </Field>
               </div>
-              {item && (
-                <div className="grid gap-1">
-                  <MaterialStack
-                    item={item}
-                    requested={line.qty}
-                    ordered={[...before, adding]}
-                    delivered={false}
-                    width={160}
-                    words="none"
-                  />
-                  <p className="text-15">{stackWords(item, line.qty, before.reduce((t, q) => t + q, 0) + adding, false)}</p>
-                </div>
-              )}
             </fieldset>
           );
         })}
@@ -267,27 +250,27 @@ function LinkPo({ request, person }: { request: RequestView; person: PersonId })
         )}
       </div>
 
-      <dl className="sheet-rows ruled grid text-17">
-        <div className="flex items-baseline justify-between gap-4 py-2">
-          <dt>Before GST</dt>
-          <dd className="figure">{inr(before)}</dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-4 py-2">
-          <dt>GST</dt>
-          <dd className="figure">{inr(gstTotal)}</dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-4 py-2 font-semibold">
-          <dt>With GST</dt>
-          <dd className="figure">{inr(before + gstTotal)}</dd>
-        </div>
+      <dl className="grid grid-cols-3 gap-2">
+        <Total label="Before GST" value={inr(before)} />
+        <Total label="GST" value={inr(gstTotal)} />
+        <Total label="Total" value={inr(before + gstTotal)} strong />
       </dl>
 
       <div>
-        <button ref={submitRef} type="submit" className="btn btn-primary w-full sm:w-auto" aria-disabled={pause.pending !== null}>
+        <button ref={submitRef} type="submit" className="btn btn-primary min-h-12 w-full sm:w-auto" aria-disabled={pause.pending !== null}>
           Link PO
         </button>
       </div>
     </form>
+  );
+}
+
+function Total({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="glass-inner min-w-0 px-3 py-2">
+      <dt className="lettering text-ink-soft">{label}</dt>
+      <dd className={`figure truncate text-17 ${strong ? "font-semibold" : ""}`}>{value}</dd>
+    </div>
   );
 }
 
@@ -297,7 +280,7 @@ function MarkDelivered({ request, person }: { request: RequestView; person: Pers
   return (
     <button
       type="button"
-      className="btn btn-quiet w-full sm:w-auto"
+      className="btn btn-primary min-h-12 w-full sm:w-auto"
       aria-disabled={pause.pending !== null}
       onClick={(event) => {
         if (pause.pending !== null) return;
@@ -322,15 +305,13 @@ export function RequestDetail({ no }: { no: string }) {
 
   if (!request || request.queued) {
     return (
-      <>
-        <StaffBoard
-          place="Requests"
-          headline="This request has not been raised yet."
-          state={request?.queued ? "It is saved on the site engineer's phone and goes out when the signal is back." : undefined}
-          chip={false}
-          back={back}
-        />
-      </>
+      <StaffBoard
+        place="Requests"
+        headline="Not raised yet"
+        state={request?.queued ? "Saved on the site phone; it goes out with the signal." : undefined}
+        chip={false}
+        back={back}
+      />
     );
   }
 
@@ -340,146 +321,185 @@ export function RequestDetail({ no }: { no: string }) {
   // Who to hand over to: someone in this site's procurement the demo can show, else the first.
   const team = project?.team.procurement ?? ["prakash"];
   const buyer = firm.person(team.find((id) => id === "prakash" || id === "divya") ?? team[0]);
-  const buyerDoes = request.status === "New" ? "marks this seen and links its PO" : "links its PO";
-  const stamps = firm.stampsFor(`mr:${request.no}`);
-  const newest = stamps[0];
+  const left = daysBetween(TODAY, request.neededBy);
+  const open = request.status !== "Delivered";
 
-  const state = `Raised ${formatStampShort(request.sentAt || request.at)}, needed on site by ${formatShortDate(request.neededBy)}.${
-    request.late ? " It is late for site." : ""
-  }`;
+  const heading =
+    request.status === "PO in part"
+      ? "Link another PO"
+      : request.status === "New" || request.status === "Seen"
+        ? "Zoho PO"
+        : request.status === "PO uploaded"
+          ? "Delivery"
+          : "Delivered";
 
   return (
     <>
-      <StaffBoard place="Requests" headline={HEADLINE[request.status](request.no)} state={state} chip={false} back={back} />
+      <StaffBoard
+        place="Requests"
+        headline={request.no}
+        state={`${request.projectName} · Stage ${request.n}`}
+        chip={false}
+        back={back}
+      />
 
-      <div className="mt-10 grid gap-10 lg:grid-cols-12 lg:gap-8">
-        <section className="grid content-start gap-8 lg:col-span-5" aria-label="What the site asked for">
-          <p className="text-17">
-            <ProjectLink id={request.projectId} name={request.projectName} className="py-3.5" />, milestone {request.n}. Raised by{" "}
-            {raiser?.name ?? request.by}
-            {raiser?.phone && (
-              <>
-                , <a href={`tel:${raiser.phone.replace(/\s/g, "")}`} className="link whitespace-nowrap py-3.5">{raiser.phone}</a>
-              </>
-            )}
-            .
-          </p>
-          <div>
-            <h2 className="register-title">What the site asked for</h2>
-            <ul className="sheet-rows ruled">
+      <div className="mt-6 grid gap-5 lg:grid-cols-12">
+        <div className="grid content-start gap-5 lg:col-span-5">
+          <Panel title="Request" aside={requestChip(request)}>
+            <div className="px-1 pb-4">
+              <StepTrack steps={REQUEST_STEPS} reached={reachedOf(request)} late={request.late} />
+            </div>
+            <dl className="grid grid-cols-2 gap-2">
+              <Fact label="Project">
+                <Link href={`/staff/projects/${request.projectId}/materials`} className="link -my-3 inline-flex min-h-11 items-center">
+                  {request.projectName}
+                </Link>
+              </Fact>
+              <Fact label="Raised">{formatStampShort(request.sentAt || request.at)}</Fact>
+              <Fact label="Needed by">
+                <span className="grid">
+                  <span>{formatShortDate(request.neededBy)}</span>
+                  {open && (
+                    <span className={`text-13 ${request.late || left < 0 ? "late-text" : "text-ink-soft"}`}>
+                      {left < 0 ? `${-left} days late` : left === 0 ? "Today" : `in ${left} days`}
+                    </span>
+                  )}
+                </span>
+              </Fact>
+              <Fact label="Waiting">{open ? <WaitChip days={request.days} /> : "–"}</Fact>
+              <Fact label="Site engineer" wide>
+                <span className="flex flex-wrap items-center gap-x-3">
+                  <span>{raiser?.name ?? request.by}</span>
+                  {raiser?.phone && (
+                    <a
+                      href={`tel:${raiser.phone.replace(/\s/g, "")}`}
+                      className="link inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <Icon name="phone" className="size-3.5" />
+                      {raiser.phone}
+                    </a>
+                  )}
+                </span>
+              </Fact>
+            </dl>
+          </Panel>
+
+          <Panel title="Items">
+            <ul className="grid gap-1">
               {request.lines.map((line) => {
                 const item = firm.catalogue.find((c) => c.id === line.material);
                 const ordered = request.ordered[line.id] ?? 0;
-                const pos = request.pos.map((po) => po.lines.filter((l) => l.lineId === line.id).reduce((t, l) => t + l.qty, 0));
+                const share = line.qty > 0 ? ordered / line.qty : 0;
                 return (
-                  <li key={line.id} className="grid gap-2 py-3">
-                    <p className="text-17 font-semibold">
-                      {item?.name ?? line.material}, {line.sub}
+                  <li key={line.id} className="glass-row grid gap-2 px-3 py-3">
+                    <p className="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <span className="text-15 font-semibold">
+                        {item?.name ?? line.material}, {line.sub}
+                      </span>
+                      <span className="figure text-15">
+                        {ordered.toLocaleString("en-IN")} / {line.qty.toLocaleString("en-IN")} {line.unit}
+                      </span>
                     </p>
-                    {line.outsideEstimate && (
-                      <p className="text-15">
-                        Not in the agreed estimate{line.note ? `, ${line.note}` : ""}. The Project Head raises a cost revision for it.
-                      </p>
-                    )}
-                    {item && (
-                      <MaterialStack
-                        item={item}
-                        requested={line.qty}
-                        ordered={pos}
-                        delivered={request.status === "Delivered"}
-                        width={160}
-                      />
-                    )}
-                    {!item && <p className="text-15">{`${ordered} of ${line.qty} ${line.unit} ordered.`}</p>}
+                    <Meter
+                      value={share}
+                      tone={request.status === "Delivered" ? "done" : share >= 1 ? "done" : "progress"}
+                      label={`${item?.name ?? line.material}, ordered`}
+                    />
                   </li>
                 );
               })}
             </ul>
-          </div>
-          <div>
-            <h2 className="register-title">Where it has got to</h2>
-            <div className="pt-4">
-              <RequestLadder status={request.status} stamps={stamps} late={request.late} />
-            </div>
-          </div>
-        </section>
+          </Panel>
+        </div>
 
-        {/* The paper report needs a full width for its table: on a phone it follows what the site
-            asked for; from lg it takes its own row under both columns. */}
-        <details className="lg:order-last lg:col-span-12">
-          <summary className="link inline-flex min-h-11 cursor-pointer items-center text-17">The material requirement report</summary>
-          <div className="mt-3">
+        <div className="grid content-start gap-5 lg:col-span-7">
+          <Panel title={heading} strong>
+            {!canBuy ? (
+              buyer && me.id !== buyer.id && (buyer.id === "prakash" || buyer.id === "divya") ? (
+                <SeeAsLine words={`With ${buyer.name}.`} person={{ id: buyer.id, first: buyer.first }} />
+              ) : (
+                <p className="px-1 text-15 text-ink-soft">With {buyer?.name ?? "procurement"}.</p>
+              )
+            ) : request.status === "New" ? (
+              <div className="grid justify-items-start gap-3 px-1">
+                <StatusChip tone="waiting">Not seen yet</StatusChip>
+                <MarkSeen no={request.no} person={me.id} primary className="min-h-12 w-full sm:w-auto" />
+              </div>
+            ) : request.status === "Seen" || request.status === "PO in part" ? (
+              <LinkPo key={request.no} request={request} person={me.id} />
+            ) : request.status === "PO uploaded" ? (
+              <div className="grid justify-items-start gap-3 px-1">
+                <StatusChip tone="done">Ordered in full</StatusChip>
+                <MarkDelivered request={request} person={me.id} />
+              </div>
+            ) : (
+              <p className="flex flex-wrap items-center gap-2 px-1 text-15">
+                <StatusChip tone="done">Delivered</StatusChip>
+                {request.deliveredAt && <span>{formatShortDate(datePart(request.deliveredAt))}</span>}
+                {request.deliveredBy && (
+                  <span className="text-ink-soft">{firm.person(request.deliveredBy)?.name ?? request.deliveredBy}</span>
+                )}
+              </p>
+            )}
+          </Panel>
+
+          {request.pos.length > 0 && (
+            <Panel title="Linked POs">
+              <GlassTable<PoView>
+                caption="Linked POs"
+                rows={request.pos}
+                rowKey={(po) => po.no}
+                columns={[
+                  {
+                    label: "PO",
+                    cell: (po) => (
+                      <span className="grid">
+                        <span>{po.no}</span>
+                        <span className="text-13 font-normal text-ink-soft">{po.vendor}</span>
+                      </span>
+                    ),
+                  },
+                  { label: "Lines", cell: (po) => <span className="text-13">{po.lineWords.join("; ")}</span> },
+                  { label: "Before GST", align: "right", cell: (po) => <span className="figure">{inr(po.amount)}</span> },
+                  { label: "With GST", align: "right", cell: (po) => <span className="figure">{inr(po.total)}</span> },
+                  {
+                    label: "Bill",
+                    cell: (po) =>
+                      po.billed ? <StatusChip tone="done">Billed</StatusChip> : <StatusChip tone="waiting">Not billed</StatusChip>,
+                  },
+                ]}
+                chip={(po) =>
+                  po.billed ? <StatusChip tone="done">Billed</StatusChip> : <StatusChip tone="waiting">Not billed</StatusChip>
+                }
+                wide="xl"
+              />
+            </Panel>
+          )}
+
+          {request.taskId && canBuy && (
+            <WorkOrders scope={request.projectId} person={me.id} taskId={request.taskId} title="Labour for this task" />
+          )}
+        </div>
+
+        <details className="glass p-3 sm:p-5 lg:col-span-12">
+          <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-1 text-17 font-semibold">
+            <Icon name="file" />
+            Requirement report
+          </summary>
+          <div className="mt-3 overflow-x-auto">
             <MaterialReport no={request.no} />
           </div>
         </details>
-
-        <section className="grid content-start gap-5 lg:col-span-7" aria-label="Link the Zoho PO">
-          <div>
-            <h2 className="register-title">
-              {request.status === "PO in part" ? "Link another PO" : request.status === "New" || request.status === "Seen" ? "Link the Zoho PO" : "The Zoho POs"}
-            </h2>
-            <p className="pt-2 text-15 text-ink-soft">POs are made in Zoho Books and linked here.</p>
-          </div>
-
-          {newest && (
-            <div className="grid justify-items-start gap-1">
-              <Stamp key={`${newest.at}-${newest.words}`} stamp={newest} />
-              <CarbonLine stamp={newest} />
-            </div>
-          )}
-
-          {request.pos.length > 0 && (
-            <ul className="sheet-rows ruled">
-              {request.pos.map((po) => (
-                <li key={po.no} className="grid gap-1 py-3">
-                  <p className="flex flex-wrap items-baseline justify-between gap-x-4">
-                    <span className="text-17 font-semibold">
-                      {po.no}, {po.vendor}
-                    </span>
-                    <span className="figure text-17">{withGstWords(po.total)}</span>
-                  </p>
-                  <p className="text-15 text-ink-soft">
-                    {po.lineWords.join("; ")}. {beforeGstWords(po.amount)}, GST {inr(po.gst)}. {po.file}.{" "}
-                    {po.billed ? "Billed." : "Not billed yet."}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {!canBuy ? (
-            buyer && me.id !== buyer.id && (buyer.id === "prakash" || buyer.id === "divya") ? (
-              <SeeAsLine words={`${buyer.name} ${buyerDoes}.`} person={{ id: buyer.id, first: buyer.first }} />
-            ) : (
-              <p className="text-15 text-ink-soft">
-                {buyer?.name ?? "Procurement"} {buyerDoes}.
-              </p>
-            )
-          ) : request.status === "New" ? (
-            <div className="grid justify-items-start gap-3">
-              <p className="text-17">
-                Mark it seen first, so {raiser?.first ?? "the site"} knows it has reached you. Then link the PO here.
-              </p>
-              <MarkSeen no={request.no} person={me.id} primary className="w-full sm:w-auto" />
-            </div>
-          ) : request.status === "Seen" || request.status === "PO in part" ? (
-            <LinkPo key={request.no} request={request} person={me.id} />
-          ) : request.status === "PO uploaded" ? (
-            <div className="grid justify-items-start gap-3">
-              <p className="text-17">Every line is ordered. {raiser?.first ?? "The site"} marks it delivered when it arrives; you can too.</p>
-              <MarkDelivered request={request} person={me.id} />
-            </div>
-          ) : (
-            <p className="text-17">
-              <StatusWord>Delivered</StatusWord>
-              {request.deliveredAt ? ` on ${formatShortDate(datePart(request.deliveredAt))}` : ""}
-              {request.deliveredBy ? `, marked by ${firm.person(request.deliveredBy)?.name ?? request.deliveredBy}` : ""}.
-            </p>
-          )}
-
-          <p className="lettering text-ink-soft">Stock after delivery is not tracked in this portal yet.</p>
-        </section>
       </div>
     </>
+  );
+}
+
+function Fact({ label, wide = false, children }: { label: string; wide?: boolean; children: ReactNode }) {
+  return (
+    <div className={`glass-inner min-w-0 px-3 py-2 ${wide ? "col-span-2" : ""}`}>
+      <dt className="lettering text-ink-soft">{label}</dt>
+      <dd className="min-w-0 text-15">{children}</dd>
+    </div>
   );
 }

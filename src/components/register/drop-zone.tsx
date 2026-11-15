@@ -44,7 +44,7 @@ export function DropZone({
   };
 
   return (
-    <div role="group" aria-labelledby={labelId} className="border-2 border-dashed border-chalk bg-paper px-4 py-3">
+    <div role="group" aria-labelledby={labelId} className="glass-inner border-dashed border-ink/20 px-4 py-3">
       <p id={labelId} className="text-15 font-semibold">
         {label}
       </p>
@@ -77,7 +77,6 @@ export function DropZone({
           ))}
         </ul>
       </div>
-      <p className="lettering mt-2 text-ink-soft">Sample files. This demo uploads nothing.</p>
     </div>
   );
 }

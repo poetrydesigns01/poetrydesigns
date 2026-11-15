@@ -1,6 +1,6 @@
 import { SiteUpdate } from "@/components/site/site-update";
 
-// A site update with photos for the client's thread.
+// Site photos, posted into the project's chat.
 export default function SiteUpdatePage() {
   return <SiteUpdate />;
 }

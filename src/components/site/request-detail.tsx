@@ -1,206 +1,137 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { MaterialStack, stackWords } from "@/components/instruments/material-stack";
-import { RequestLadder } from "@/components/instruments/request-ladder";
-import { Register, RegisterRow } from "@/components/register/register";
+import Link from "next/link";
 import { StaffBoard } from "@/components/register/staff-board";
+import { StatusChip } from "@/components/register/status-chip";
 import { MaterialReport } from "@/components/reports/material-report";
-import { ChalkTick, drawTick } from "@/components/staff/chalk-tick";
 import { useFirm, useViewer } from "@/lib/demo-store";
 import type { RequestView } from "@/lib/firm";
-import { TODAY } from "@/lib/demo-data";
-import { datePart, formatShortDate, formatStamp, formatStampShort } from "@/lib/format";
-import { usePrefersReducedMotion } from "@/lib/motion";
-import { DeliveredButton, requestMargin } from "./rows";
-import { amountWords, lowerFirst, stageName, upperFirst } from "./site-words";
+import { formatShortDate, formatStampShort } from "@/lib/format";
+import { DeliveredButton } from "./rows";
+import { Icon, PanelHead, procurementDays, requestStatus, requestTitle, taskOfRequest } from "./site-kit";
 import "./site.css";
 
-// One request, as the site engineer follows it: where it has got to, what was ordered
-// against each line and from whom (with the vendor's number to call), the delivery mark
-// once it is on site, and the requirement report that went to procurement.
+// One request as the site engineer follows it: four steps with their dates, how long
+// procurement took, each line with its PO and the vendor's number, and the delivery mark.
 
-function stateLine(r: RequestView): string {
-  if (r.queued) return "Waiting to send. It goes when the phone has signal.";
-  const late = r.late ? ` Late for site since ${formatShortDate(r.neededBy)}.` : "";
-  if (r.status === "Delivered") return `Delivered on ${formatShortDate(datePart(r.deliveredAt ?? r.at))}.`;
-  if (r.status === "New") return `New. Not seen by procurement yet.${late}`;
-  if (r.status === "Seen") return `Seen, waiting on a PO.${late}`;
-  return `${r.status}.${late}`;
+function Steps({ r }: { r: RequestView }) {
+  const firstPo = r.pos.map((po) => po.at).sort()[0];
+  const steps = [
+    { label: "Sent", at: r.queued ? undefined : r.sentAt || r.at },
+    { label: "Seen", at: r.seenAt ?? (firstPo ? firstPo : undefined) },
+    { label: "PO", at: firstPo },
+    { label: "Delivered", at: r.deliveredAt },
+  ];
+  const reached = steps.filter((s) => s.at).length;
+  return (
+    <ol className="grid grid-cols-4" aria-label="Progress">
+      {steps.map((s, i) => {
+        const done = Boolean(s.at);
+        return (
+          <li key={s.label} className="relative grid justify-items-center gap-1.5 text-center">
+            {i > 0 && (
+              <span
+                aria-hidden="true"
+                className={`absolute top-3.5 right-1/2 -left-1/2 h-0.5 ${i < reached ? "bg-kota" : "bg-ink/15"}`}
+              />
+            )}
+            <span
+              className={`relative grid size-7 place-items-center rounded-full border-2 ${
+                done ? "border-kota bg-kota text-paper" : "border-ink/20 bg-white/70 text-ink-soft"
+              }`}
+            >
+              {done ? <Icon name="check" className="size-4" /> : <span className="figure text-13">{i + 1}</span>}
+            </span>
+            <span className="text-13 font-semibold text-ink">{s.label}</span>
+            <span className="text-13 text-ink-soft">{s.at ? formatShortDate(s.at) : "—"}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 export function RequestDetail({ no }: { no: string }) {
   const firm = useFirm();
   const me = useViewer("site");
-  const reduced = usePrefersReducedMotion();
-  const [ticked, setTicked] = useState<{ no: string; keyboard: boolean; focus: boolean } | null>(null);
-  const tick = useRef<HTMLSpanElement>(null);
-  const where = useRef<HTMLDivElement>(null);
-  const deliverRef = useRef<HTMLButtonElement>(null);
-  // The delivery whose tick has been drawn. The screen stays mounted while hidden and runs
-  // its effects again when it is shown, so this keeps the tick to one drawing per delivery.
-  const drawn = useRef<string | null>(null);
   const request = firm.requests.find((r) => r.no === no);
-
-  // Once, after the delivery is recorded: the chalk tick for a pointer, and focus to the row
-  // when the button that has now gone had it.
-  useEffect(() => {
-    if (!ticked || drawn.current === ticked.no) return;
-    drawn.current = ticked.no;
-    if (!ticked.keyboard && !reduced) drawTick(tick.current);
-    if (ticked.focus) where.current?.focus({ preventScroll: true });
-  }, [ticked, reduced]);
-
-  const back = { label: "Back to my requests", href: "/staff/site/requests" };
+  const back = { label: "My requests", href: "/staff/site/requests" };
 
   if (!request) {
     return (
       <div className="site-screen">
-        <StaffBoard place="My requests" headline={no} chip={false} back={back} />
-        <p className="text-17 text-ink-soft">This request has not been raised yet.</p>
+        <StaffBoard place="Request" headline={no} chip={false} back={back} />
+        <p className="glass px-4 py-3 text-15 text-ink">Not raised yet</p>
       </div>
     );
   }
 
-  const project = firm.project(request.projectId);
-  const main = request.lines[0];
-  const mainItem = firm.catalogueAll.find((c) => c.id === main.material);
-  const orderedOf = (lineId: string) => request.pos.map((po) => po.lines.find((l) => l.lineId === lineId)?.qty ?? 0);
+  const s = requestStatus(request);
+  const days = procurementDays(request);
+  const ordered = request.pos.length > 0;
   const delivered = Boolean(request.deliveredAt);
+  const canDeliver = !delivered && !request.queued && ordered;
+  const task = taskOfRequest(request, firm, request.projectId);
   const raiser = firm.person(request.by);
-  const { margin, marginSub } = requestMargin(request);
-  const canDeliver = !delivered && !request.queued && request.pos.length > 0;
-  const stamps = firm.stampsFor(`mr:${request.no}`);
-  // The board says it was delivered and when, and a stamp made today says who. The row
-  // adds who only when that stamp is not on it.
-  const stampedToday = stamps[0]?.words === "Delivered" && datePart(stamps[0].at) === TODAY;
-  const deliveredBy = request.deliveredBy ? (firm.person(request.deliveredBy)?.name ?? request.deliveredBy) : null;
 
   return (
     <div className="site-screen">
-      <StaffBoard
-        place="My requests"
-        headline={request.no}
-        state={stateLine(request)}
-        chip={false}
-        back={back}
-        picture={
-          mainItem ? (
-            <MaterialStack
-              item={mainItem}
-              requested={main.qty}
-              ordered={orderedOf(main.id)}
-              delivered={delivered}
-              width={200}
-              tone="dark"
-              words="none"
-            />
-          ) : undefined
-        }
-        pictureWords={
-          // Once delivered the state line says so, and the words only say how much.
-          mainItem
-            ? delivered
-              ? `${upperFirst(amountWords(mainItem, main.qty))}.`
-              : stackWords(
-                  mainItem,
-                  main.qty,
-                  orderedOf(main.id).reduce((a, b) => a + b, 0),
-                  delivered,
-                )
-            : undefined
-        }
-      />
+      <StaffBoard place={request.no} headline={requestTitle(request, firm)} chip={false} back={back} />
 
-      {/* One column: the ladder needs its width beside the words, and the report is an A4 sheet. */}
-      <div className="grid gap-10">
-        <div className="grid content-start gap-10">
-          <div ref={where} tabIndex={-1} className="outline-none">
-            <Register title="Where it has got to">
-              <RegisterRow
-                id={`mr:${request.no}`}
-                margin={margin}
-                marginSub={marginSub}
-                title={project ? `${project.name}, milestone ${request.n}, ${lowerFirst(stageName(project, request.n))}` : request.projectName}
-                sentence={
-                  delivered ? (
-                    <>
-                      <span ref={tick} className="mr-2 inline-block align-[-0.2em] text-kota">
-                        <ChalkTick className="size-5 shrink-0" />
-                      </span>
-                      {stampedToday || !deliveredBy ? "On site." : `On site, marked by ${deliveredBy}.`}
-                    </>
-                  ) : (
-                    `Raised by ${raiser?.name ?? request.by} on ${formatStamp(request.at)}. Needed on site by ${formatShortDate(
-                      request.neededBy,
-                    )}.`
-                  )
-                }
-                instrument={<RequestLadder status={request.status} stamps={stamps} late={request.late} />}
-                action={
-                  canDeliver ? (
-                    <DeliveredButton
-                      ref={deliverRef}
-                      request={request}
-                      person={me.id}
-                      onRecorded={(keyboard) =>
-                        setTicked({ no: request.no, keyboard, focus: document.activeElement === deliverRef.current })
-                      }
-                    />
-                  ) : undefined
-                }
-                stamps={stamps}
-              />
-            </Register>
-          </div>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="grid gap-4">
+          <section className="glass-strong grid gap-5 p-4 sm:p-6" aria-label="Status">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusChip tone={s.tone}>{s.words}</StatusChip>
+                {request.late && !delivered && <StatusChip tone="late">Late for site</StatusChip>}
+              </div>
+              <p className="text-15 text-ink">
+                {ordered ? "PO in " : "Waiting "}
+                <span className={`figure ${!ordered && days > 3 ? "late-text" : ""}`}>{days} d</span>
+              </p>
+            </div>
+            <Steps r={request} />
+            {canDeliver && <DeliveredButton request={request} person={me.id} primary />}
+          </section>
 
-          <section className="register" aria-labelledby="lines-title">
-            <h2 id="lines-title" className="register-title">
-              What was asked for and ordered
-            </h2>
-            <ul>
+          <section className="glass p-2 sm:p-3" aria-labelledby="lines-title">
+            <PanelHead id="lines-title" title="Items" icon="box" count={request.lines.length} />
+            <ul className="grid gap-1">
               {request.lines.map((line) => {
                 const item = firm.catalogueAll.find((c) => c.id === line.material);
-                const ordered = orderedOf(line.id);
                 const pos = request.pos.filter((po) => po.lines.some((l) => l.lineId === line.id));
                 return (
-                  <li key={line.id} className="reg-item grid gap-3 py-4">
+                  <li key={line.id} className="glass-row grid gap-1.5 px-3 py-2.5">
                     <div className="flex items-baseline justify-between gap-3">
-                      <h3 className="min-w-0 text-17 font-semibold">
-                        {item?.name ?? line.material}, {line.sub}
-                      </h3>
-                      <span className="figure shrink-0 whitespace-nowrap text-17">
+                      <span className="min-w-0 text-15 text-ink">
+                        {(item?.name ?? line.material).replace(/\s*\(.*\)$/, "")}, {line.sub}
+                      </span>
+                      <span className="figure shrink-0 text-15 text-ink">
                         {line.qty.toLocaleString("en-IN")} {line.unit}
                       </span>
                     </div>
-                    {line.outsideEstimate && (
-                      <p className="text-17 font-semibold">
-                        Not in the agreed estimate{line.note ? `, ${line.note}` : ""}.
-                      </p>
-                    )}
-                    {/* With one line, the board already draws this stack and says how much is ordered. */}
-                    {item && request.lines.length > 1 && (
-                      <MaterialStack item={item} requested={line.qty} ordered={ordered} delivered={delivered} width={160} words="beside" />
-                    )}
-                    {pos.length === 0 && !request.queued && <p className="text-17 text-ink-soft">No PO for this line yet.</p>}
-                    {pos.map((po) => {
-                      const vendor = firm.vendors.find((v) => v.id === po.vendorId);
-                      const qty = po.lines.find((l) => l.lineId === line.id)?.qty ?? 0;
-                      return (
-                        <p key={po.no} className="text-17">
-                          {po.no} from {vendor?.name ?? po.vendor}
-                          {vendor && (
-                            <>
-                              ,{" "}
-                              <a href={`tel:${vendor.phone.replace(/\s/g, "")}`} className="link inline-flex min-h-14 items-center">
+                    {pos.length === 0 ? (
+                      <p className="text-13 text-ink-soft">No PO yet</p>
+                    ) : (
+                      pos.map((po) => {
+                        const vendor = firm.vendors.find((v) => v.id === po.vendorId);
+                        const qty = po.lines.find((l) => l.lineId === line.id)?.qty ?? 0;
+                        return (
+                          <p key={po.no} className="flex flex-wrap items-center gap-x-2 text-13 text-ink-soft">
+                            <span className="figure text-ink">{po.no.replace("PO-2026-", "PO ")}</span>
+                            <span>
+                              {vendor?.name ?? po.vendor} · {qty.toLocaleString("en-IN")} {line.unit}
+                            </span>
+                            {vendor && (
+                              <a href={`tel:${vendor.phone.replace(/\s/g, "")}`} className="link inline-flex min-h-11 items-center text-ink">
                                 {vendor.phone}
                               </a>
-                            </>
-                          )}
-                          . {qty.toLocaleString("en-IN")} {line.unit}, uploaded {formatStampShort(po.at)}.
-                        </p>
-                      );
-                    })}
+                            )}
+                          </p>
+                        );
+                      })
+                    )}
                   </li>
                 );
               })}
@@ -208,7 +139,42 @@ export function RequestDetail({ no }: { no: string }) {
           </section>
         </div>
 
-        <MaterialReport no={request.no} />
+        <section className="glass grid gap-1 p-2 sm:p-3" aria-label="Details">
+          <dl className="grid gap-0.5">
+            {[
+              ["Site", request.projectName],
+              ["Task", task ? task.title : "—"],
+              ["Need", formatShortDate(request.neededBy)],
+              ["By", raiser?.name ?? request.by],
+              ["Raised", formatStampShort(request.at)],
+            ].map(([k, v]) => (
+              <div key={k} className="glass-row flex items-center justify-between gap-3 px-3 py-2.5">
+                <dt className="lettering text-ink-soft">{k}</dt>
+                <dd className="min-w-0 text-right text-15 text-ink">
+                  {k === "Task" && task ? (
+                    <Link href="/staff/site/tasks" className="link inline-flex min-h-11 items-center">
+                      {v}
+                    </Link>
+                  ) : (
+                    v
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <details className="group px-1 pb-1">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-2 text-15 font-semibold text-ink hover:bg-white/50">
+              <span className="flex items-center gap-2">
+                <Icon name="sheet" className="size-5 text-laterite" />
+                Requirement report
+              </span>
+              <Icon name="chevron" className="size-5 text-ink-soft transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="mt-2 overflow-x-auto">
+              <MaterialReport no={request.no} />
+            </div>
+          </details>
+        </section>
       </div>
     </div>
   );

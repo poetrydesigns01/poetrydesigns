@@ -1,0 +1,400 @@
+/* The project chat: WhatsApp-style bubbles on glass. Only the chat uses these. */
+
+/* The panel fills what is left of the screen, so the composer stays at the bottom: under
+   the 61 px top bar, and on phones and tablets above the 59 px tab bar (the page takes back
+   the room the layout keeps under its content for that bar). */
+.chat-page {
+  margin-bottom: calc(59px + 0.75rem + env(safe-area-inset-bottom) + var(--trial-h, 0px) - 6rem);
+}
+
+.chat-fill-client {
+  height: calc(100svh - 61px - 1.5rem - 59px - env(safe-area-inset-bottom) - var(--trial-h, 0px));
+  min-height: 22rem;
+}
+
+@media (min-width: 1024px) {
+  .chat-page {
+    margin-bottom: 0;
+  }
+
+  .chat-fill-client {
+    height: calc(100svh - 61px - 3rem - var(--trial-h, 0px));
+    min-height: 28rem;
+  }
+}
+
+.chat-fill-staff {
+  height: min(48rem, calc(100svh - 7rem));
+  min-height: 26rem;
+}
+
+.chat-scroll {
+  overscroll-behavior: contain;
+  scroll-padding-block: 3rem 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(74 44 26 / 0.25) transparent;
+}
+
+.chat-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(74 44 26 / 0.25);
+}
+
+.chat-scroll::-webkit-scrollbar-button {
+  display: none;
+}
+
+.chat-scroll:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: -4px;
+}
+
+/* A centred date that rides at the top while its day scrolls by. Once it is stuck, a soft
+   cream fade sits behind it so it never lies on a bubble's words. */
+.chat-day {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+  padding-top: 8px;
+  pointer-events: none;
+  container-type: scroll-state;
+}
+
+/* The fade runs edge to edge, across the log's side padding (px-3, sm:px-5). */
+.chat-day-fade {
+  position: absolute;
+  inset: 0 -0.75rem -14px;
+  background: linear-gradient(to bottom, rgb(253 249 243 / 0.96) 62%, rgb(253 249 243 / 0));
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+@media (min-width: 640px) {
+  .chat-day-fade {
+    inset: 0 -1.25rem -14px;
+  }
+}
+
+@container scroll-state(stuck: top) {
+  .chat-day-fade {
+    opacity: 1;
+  }
+}
+
+.chat-day-pill {
+  position: relative;
+  padding: 3px 12px 2px;
+  border: 1px solid rgb(255 255 255 / 0.7);
+  border-radius: 999px;
+  background: rgb(255 252 247 / 0.92);
+  box-shadow: 0 2px 8px -4px rgb(74 44 26 / 0.3);
+  color: var(--color-ink);
+  font-size: var(--text-13);
+  font-weight: 600;
+}
+
+/* Bubbles */
+.chat-bubble {
+  position: relative;
+  max-width: min(84%, 30rem);
+  border-radius: 16px;
+  padding: 6px 10px 6px;
+  box-shadow: 0 1px 2px rgb(74 44 26 / 0.12);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  overflow-wrap: anywhere;
+}
+
+.chat-bubble-other {
+  border: 1px solid rgb(255 255 255 / 0.75);
+  background: rgb(255 252 247 / 0.9);
+}
+
+.chat-bubble-own {
+  border: 1px solid rgb(123 74 48 / 0.16);
+  background: rgb(243 224 207 / 0.94);
+}
+
+.chat-bubble-other.chat-first {
+  border-top-left-radius: 5px;
+}
+
+.chat-bubble-own.chat-first {
+  border-top-right-radius: 5px;
+}
+
+.chat-bubble.chat-has-photos {
+  padding: 4px;
+}
+
+/* Room on the last line of text for the time, as WhatsApp does. */
+.chat-time-room {
+  display: inline-block;
+  width: 3.75rem;
+  height: 1px;
+}
+
+.chat-bubble-own .chat-time-room {
+  width: 5rem;
+}
+
+.chat-time {
+  position: absolute;
+  right: 9px;
+  bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--color-ink-soft);
+  font-size: var(--text-13);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* A photo with no words: the time sits on the photo. */
+.chat-time-on-photo {
+  right: 10px;
+  bottom: 10px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgb(42 26 18 / 0.74);
+  color: var(--color-lime);
+}
+
+.chat-tick {
+  color: var(--color-ink-soft);
+}
+
+.chat-tick-read {
+  color: #2e7a52;
+}
+
+.chat-time-on-photo .chat-tick,
+.chat-time-on-photo .chat-tick-read {
+  color: var(--color-lime);
+}
+
+.chat-time-on-photo .chat-tick-read {
+  color: #9fd8b4;
+}
+
+/* Photos inside a bubble: a small grid, each a 4 by 3 tile. */
+.chat-photo {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--color-sand-2);
+  aspect-ratio: 4 / 3;
+}
+
+.chat-photo > figure {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--color-sand-2);
+}
+
+.chat-photo > figure > svg {
+  height: 100%;
+}
+
+.chat-photo > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+button.chat-photo {
+  cursor: zoom-in;
+  transition: opacity var(--dur-tap) var(--ease-lime);
+}
+
+button.chat-photo:hover {
+  opacity: 0.9;
+}
+
+button.chat-photo:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: 2px;
+}
+
+.chat-photo-more {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(42 26 18 / 0.58);
+  color: var(--color-lime);
+  font-size: var(--text-22);
+  font-weight: 650;
+}
+
+/* A system note: an approval, a letter, a payment. */
+.chat-note {
+  display: inline-flex;
+  max-width: min(92%, 34rem);
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgb(76 100 82 / 0.2);
+  border-radius: 14px;
+  background: rgb(232 238 228 / 0.88);
+  color: var(--color-ink);
+  font-size: var(--text-13);
+  line-height: 1.4;
+  text-align: left;
+}
+
+.chat-note-version {
+  border-color: rgb(138 101 28 / 0.22);
+  background: rgb(248 236 210 / 0.9);
+}
+
+/* Messages arrive with a short rise; nothing travels when motion is reduced. */
+@keyframes chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.chat-new {
+  animation: chat-in 220ms var(--ease-lime, ease-out) both;
+}
+
+/* The composer */
+.chat-input {
+  field-sizing: content;
+  min-height: 44px;
+  max-height: 8.5rem;
+  resize: none;
+  border-radius: 22px;
+  padding: 10px 16px;
+  line-height: 1.45;
+}
+
+.chat-round {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 999px !important;
+}
+
+.chat-round[aria-disabled="true"] {
+  opacity: 0.55;
+}
+
+.chat-tray {
+  animation: chat-in 180ms var(--ease-lime, ease-out) both;
+}
+
+.chat-pick {
+  position: relative;
+  display: block;
+  border-radius: 12px;
+  outline-offset: 2px;
+}
+
+.chat-pick[aria-pressed="true"] .chat-photo {
+  box-shadow: 0 0 0 3px var(--color-laterite);
+}
+
+.chat-pick-mark {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-laterite);
+  color: var(--color-lime);
+}
+
+/* The enlarged photo. */
+.chat-lightbox {
+  width: min(92vw, 56rem);
+  max-width: none;
+  max-height: 92svh;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-lime);
+  overflow: visible;
+}
+
+.chat-lightbox::backdrop {
+  background: rgb(26 16 11 / 0.82);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.chat-lightbox[open] {
+  animation: chat-zoom 200ms var(--ease-lime, ease-out) both;
+}
+
+@keyframes chat-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.chat-lightbox .chat-photo {
+  max-height: calc(92svh - 5rem);
+  border-radius: 16px;
+}
+
+.chat-lightbox .chat-photo > img {
+  object-fit: contain;
+  background: rgb(26 16 11);
+}
+
+.chat-dark-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgb(250 248 245 / 0.2);
+  background: rgb(250 248 245 / 0.12);
+  color: var(--color-lime);
+  transition: background-color var(--dur-tap) var(--ease-lime);
+}
+
+.chat-dark-btn:hover {
+  background: rgb(250 248 245 / 0.22);
+}
+
+.chat-dark-btn:focus-visible {
+  outline: 2px solid var(--color-brass-light);
+  outline-offset: 2px;
+}
+
+.chat-dark-btn.chat-on-photo {
+  border-color: rgb(250 248 245 / 0.3);
+  background: rgb(42 26 18 / 0.72);
+}
+
+.chat-dark-btn.chat-on-photo:hover {
+  background: rgb(42 26 18 / 0.86);
+}

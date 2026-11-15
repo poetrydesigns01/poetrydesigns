@@ -2,16 +2,18 @@
 
 import { useId, useState } from "react";
 import { LogRows } from "@/components/project/log-rows";
-import { Chip, ChipGroup, field } from "@/components/register/chips";
+import { field } from "@/components/register/chips";
 import { StaffBoard } from "@/components/register/staff-board";
 import { useFirm } from "@/lib/demo-store";
 import type { PersonId, ProjectId } from "@/lib/firm-data";
 import { inRange, logKinds, type LogFilter } from "./admin-data";
+import { Count, Panel, Segments } from "./glass-kit";
 
-// The audit trail for the whole firm, newest first. It can be narrowed by project, person,
-// kind of action and date, and nothing else: there are no actions on a line.
+// The audit trail for the whole firm, newest first, narrowed by project, person, kind of
+// action and date. Nothing here can be edited or deleted, by anyone.
 
-const KINDS: { id: Exclude<LogFilter, "all">; label: string }[] = [
+const KINDS: { id: LogFilter; label: string }[] = [
+  { id: "all", label: "All" },
   { id: "approvals", label: "Approvals" },
   { id: "payments", label: "Payments" },
   { id: "materials", label: "Materials" },
@@ -20,9 +22,9 @@ const KINDS: { id: Exclude<LogFilter, "all">; label: string }[] = [
 ];
 
 const RANGES: { id: "week" | "month" | "all"; label: string }[] = [
-  { id: "week", label: "This week" },
-  { id: "month", label: "This month" },
-  { id: "all", label: "All" },
+  { id: "week", label: "Week" },
+  { id: "month", label: "Month" },
+  { id: "all", label: "All time" },
 ];
 
 export function RecordLog() {
@@ -45,21 +47,16 @@ export function RecordLog() {
 
   return (
     <>
-      <StaffBoard
-        place="Log"
-        headline="The record."
-        state="Entries cannot be edited or deleted, including by admin."
-        chip={false}
-      />
-      <div className="mt-8 grid gap-6">
-        <div className="grid gap-4 lg:grid-cols-2">
+      <StaffBoard place="Log" headline="The record" state="Read only, for everyone." chip={false} />
+      <div className="mt-6 grid gap-5">
+        <section aria-label="Filters" className="glass grid gap-3 p-3 sm:p-4 lg:grid-cols-2">
           <div>
-            <label htmlFor={`${ids}-project`} className="block text-15 font-semibold">
+            <label htmlFor={`${ids}-project`} className="lettering block text-ink-soft">
               Project
             </label>
             <select
               id={`${ids}-project`}
-              className={`${field} mt-1.5`}
+              className={`${field} mt-1`}
               value={project}
               onChange={(e) => setProject(e.target.value as ProjectId | "all")}
             >
@@ -72,12 +69,12 @@ export function RecordLog() {
             </select>
           </div>
           <div>
-            <label htmlFor={`${ids}-person`} className="block text-15 font-semibold">
+            <label htmlFor={`${ids}-person`} className="lettering block text-ink-soft">
               Person
             </label>
             <select
               id={`${ids}-person`}
-              className={`${field} mt-1.5`}
+              className={`${field} mt-1`}
               value={person}
               onChange={(e) => setPerson(e.target.value as PersonId | "all")}
             >
@@ -89,27 +86,31 @@ export function RecordLog() {
               ))}
             </select>
           </div>
-        </div>
-        <ChipGroup label="Action">
-          {KINDS.map((k) => (
-            <Chip key={k.id} pressed={kind === k.id} onClick={() => setKind(kind === k.id ? "all" : k.id)}>
-              {k.label}
-            </Chip>
-          ))}
-        </ChipGroup>
-        <ChipGroup label="When">
-          {RANGES.map((r) => (
-            <Chip key={r.id} pressed={range === r.id} onClick={() => setRange(r.id)}>
-              {r.label}
-            </Chip>
-          ))}
-        </ChipGroup>
-
-        <section aria-label="Entries">
-          <h2 className="register-title">{shown.length === 1 ? "1 entry" : `${shown.length} entries`}, newest first</h2>
-          <LogRows entries={shown} />
         </section>
+        <div className="flex flex-wrap gap-3">
+          <Segments<LogFilter> label="Action" value={kind} onChange={setKind} options={KINDS} />
+          <Segments<"week" | "month" | "all"> label="When" value={range} onChange={setRange} options={RANGES} />
+        </div>
+
+        <Panel title="Entries" aside={<Count n={shown.length} />} strong>
+          <LogPage key={`${project}-${person}-${kind}-${range}`} entries={shown} />
+        </Panel>
       </div>
+    </>
+  );
+}
+
+/** Thirty entries at a time. */
+function LogPage({ entries }: { entries: Parameters<typeof LogRows>[0]["entries"] }) {
+  const [limit, setLimit] = useState(30);
+  return (
+    <>
+      <LogRows entries={entries.slice(0, limit)} />
+      {entries.length > limit && (
+        <button type="button" className="btn btn-glass mt-3 min-h-11 w-full sm:w-auto" onClick={() => setLimit((l) => l + 30)}>
+          Show more ({entries.length - limit})
+        </button>
+      )}
     </>
   );
 }

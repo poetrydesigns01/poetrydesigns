@@ -104,8 +104,8 @@ export function ProjectSwitch({ role }: { role: StaffRole }) {
         <span className="min-w-0 truncate lg:hidden">{short}</span>
         <span className="hidden min-w-0 truncate lg:inline">{label}</span>
       </summary>
-      <div className="absolute right-0 top-full z-40 mt-2 w-[min(22rem,calc(100vw-32px))] border border-ink bg-paper p-2 text-ink">
-        <p className="lettering px-2 pb-1 pt-1 text-ink-soft">Show the registers for</p>
+      <div className="glass-pop absolute right-0 top-full z-40 mt-2 w-[min(22rem,calc(100vw-32px))] p-1.5 text-ink">
+        <p className="lettering px-2.5 pb-1 pt-1.5 text-ink-soft">Projects</p>
         <ul className="grid">
           {role !== "site" && (
             <li>
@@ -113,7 +113,7 @@ export function ProjectSwitch({ role }: { role: StaffRole }) {
                 type="button"
                 aria-pressed={scope === "all"}
                 onClick={() => choose("all")}
-                className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 px-2 text-left text-17 hover:bg-sand-2 aria-pressed:bg-sand-2 aria-pressed:font-semibold aria-pressed:shadow-[inset_3px_0_0_var(--color-rosewood)]"
+                className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-xl px-2.5 text-left text-17 hover:bg-white/70 aria-pressed:bg-white/80 aria-pressed:font-semibold"
               >
                 <span>{allWords}</span>
                 <span className="lettering text-ink-soft">{mine.length}</span>
@@ -126,7 +126,7 @@ export function ProjectSwitch({ role }: { role: StaffRole }) {
                 type="button"
                 aria-pressed={scope === p.id}
                 onClick={() => choose(p.id)}
-                className="grid min-h-12 w-full cursor-pointer grid-cols-[40px_minmax(0,1fr)] items-center gap-x-3 px-2 py-1.5 text-left hover:bg-sand-2 aria-pressed:bg-sand-2 aria-pressed:font-semibold aria-pressed:shadow-[inset_3px_0_0_var(--color-rosewood)]"
+                className="grid min-h-12 w-full cursor-pointer grid-cols-[40px_minmax(0,1fr)] items-center gap-x-3 rounded-xl px-2.5 py-1.5 text-left hover:bg-white/70 aria-pressed:bg-white/80 aria-pressed:font-semibold"
               >
                 <span aria-hidden="true">
                   <ProgrammeStrip cells={p.strip} size={40} label={p.stageWords} />

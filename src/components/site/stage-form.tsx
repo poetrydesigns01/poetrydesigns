@@ -1,278 +1,252 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useId, useState, type MouseEvent } from "react";
-import { SamplePhoto } from "@/components/instruments/sample-photo";
-import { Chip, ChipGroup, field } from "@/components/register/chips";
+import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
+import { field } from "@/components/register/chips";
 import { useScope } from "@/components/register/project-switch";
 import { usePause } from "@/components/register/recording-pause";
-import { Register, RegisterRow } from "@/components/register/register";
-import { SampleTag } from "@/components/register/sample-tag";
 import { StaffBoard } from "@/components/register/staff-board";
-import { TODAY } from "@/lib/demo-data";
 import { useDemo, useFirm, useViewer } from "@/lib/demo-store";
-import { ageWords, daysSince } from "@/lib/firm";
-import type { PhotoKind, ProjectId } from "@/lib/firm-data";
-import { datePart, formatStamp } from "@/lib/format";
-import { PHOTO_WORDS, lastDone, lowerFirst, photoChoices, sitesFor, stageName, stageShort, storeysOf, underWay, upperFirst } from "./site-words";
+import type { ProjectView } from "@/lib/firm";
+import type { PhotoKind } from "@/lib/firm-data";
+import type { SiteStageView } from "@/lib/portal";
+import { StageMeter, milestoneLine } from "./milestone";
+import { Icon, PhotoTile, lockWords, stageLock, type IconName } from "./site-kit";
+import { PHOTO_WORDS, photoChoices, sitesFor } from "./site-words";
 import "./site.css";
 
-// Marking a stage's work done is what starts the money: the Project Head raises the
-// payment from it, and its photos go with the demand letter as proof. So it asks for two
-// or three photos and a note, then asks once more before the pause.
+// Marking the milestone in hand done makes the next instalment due: the Project Head raises
+// the demand letter from it, with these photos as proof. One checklist: the milestone's own
+// instalment received, its work, two or three photos. The button opens only when all are met.
+
+type Check = { key: string; icon: IconName; label: string; value: string; met: boolean; blocked?: boolean };
+
+function CheckTile({ check }: { check: Check }) {
+  const tone = check.met ? "bg-kota/15 text-kota" : check.blocked ? "bg-ink/10 text-ink" : "bg-brass/15 text-brass-deep";
+  return (
+    <li className="glass-inner flex min-w-0 items-center gap-3 px-3 py-3">
+      <span className={`grid size-10 shrink-0 place-items-center rounded-full ${tone}`}>
+        <Icon name={check.met ? "check" : check.blocked ? "lock" : check.icon} />
+      </span>
+      <span className="grid min-w-0 gap-0.5">
+        <span className="lettering text-ink-soft">{check.label}</span>
+        <span className="truncate text-17 font-semibold text-ink">
+          {check.value}
+          <span className="sr-only">{check.met ? ", done" : ", not yet"}</span>
+        </span>
+      </span>
+    </li>
+  );
+}
+
+function Checklist({ project, stage }: { project: ProjectView; stage: SiteStageView }) {
+  const demo = useDemo();
+  const firm = useFirm();
+  const pause = usePause();
+  const me = useViewer("site");
+  const ids = useId();
+  const [photos, setPhotos] = useState<PhotoKind[]>([]);
+  const [note, setNote] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [noteError, setNoteError] = useState(false);
+  const yes = useRef<HTMLButtonElement>(null);
+
+  // The confirm replaces the button that asked for it: keep the keyboard on it.
+  useEffect(() => {
+    if (confirming) yes.current?.focus();
+  }, [confirming]);
+
+  const n = stage.n;
+  const m = project.milestones.find((row) => row.n === n);
+  const gate = stageLock(firm, project.id, n);
+  const tasksDone = stage.tasks.filter((t) => t.state === "done").length;
+  const worked = Boolean(m?.siteNote) || stage.percent >= 100;
+  const busy = pause.pending !== null;
+
+  const checks: Check[] = [
+    {
+      key: "pay",
+      icon: "lock",
+      label: `Instalment ${n}`,
+      value: gate.locked ? "Not in" : "Received",
+      met: !gate.locked,
+      blocked: gate.locked,
+    },
+    {
+      key: "work",
+      icon: "flag",
+      label: "Tasks",
+      value: worked ? "Work finished" : `${tasksDone} of ${stage.tasks.length} done`,
+      met: worked,
+    },
+    { key: "photos", icon: "camera", label: "Photos", value: `${photos.length} of 2–3`, met: photos.length >= 2 },
+  ];
+  const ready = checks.every((c) => c.met);
+  // The first check not met says why the button is shut.
+  const reason = gate.locked
+    ? `Locked · ${lockWords(gate.blockedBy)}`
+    : !worked
+      ? "Work in progress"
+      : photos.length < 2
+        ? "Choose 2 photos"
+        : null;
+  const canPick = !gate.locked && worked;
+
+  const toggle = (kind: PhotoKind) => {
+    if (!photos.includes(kind) && photos.length >= 3) return;
+    setPhotos((current) => (current.includes(kind) ? current.filter((p) => p !== kind) : [...current, kind]));
+  };
+
+  const ask = () => {
+    if (!ready || busy) return;
+    if (!note.trim()) return setNoteError(true);
+    setNoteError(false);
+    setConfirming(true);
+  };
+
+  const confirm = (event: MouseEvent<HTMLButtonElement>) => {
+    if (busy || stageLock(firm, project.id, n).locked) return;
+    const what = { projectId: project.id, n, note: note.trim(), photos };
+    const { record } = demo;
+    pause.start({
+      what: `Milestone ${n} at ${project.name}, done`,
+      origin: event.currentTarget,
+      commit: () => {
+        record({ kind: "stage.done", ...what, by: me.id });
+        setPhotos([]);
+        setNote("");
+        setConfirming(false);
+      },
+    });
+  };
+
+  return (
+    <section className="glass-strong grid gap-5 p-4 sm:p-6" aria-labelledby={`${ids}-title`}>
+      <h2 id={`${ids}-title`} className="sr-only">
+        Milestone {n} checklist, {project.name}
+      </h2>
+
+      <ul className="grid gap-2 sm:grid-cols-3" aria-label="Checks">
+        {checks.map((c) => (
+          <CheckTile key={c.key} check={c} />
+        ))}
+      </ul>
+
+      {canPick && (
+        <>
+          <div role="group" aria-label="Proof photos" className="grid grid-cols-3 gap-2 lg:grid-cols-6">
+            {photoChoices(project.id).map((kind) => (
+              <button key={kind} type="button" aria-pressed={photos.includes(kind)} onClick={() => toggle(kind)} className="site-pick">
+                <PhotoTile kind={kind} decorative />
+                <span className="site-pick-tick" aria-hidden="true">
+                  <Icon name="check" className="size-4" />
+                </span>
+                <span className="sr-only">{PHOTO_WORDS[kind]}</span>
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <label htmlFor={`${ids}-note`} className="sr-only">
+              What was finished
+            </label>
+            <input
+              id={`${ids}-note`}
+              value={note}
+              onChange={(event) => {
+                setNote(event.target.value);
+                setNoteError(false);
+              }}
+              placeholder="What was finished"
+              className={field}
+              aria-invalid={noteError ? true : undefined}
+              aria-describedby={noteError ? `${ids}-note-error` : undefined}
+            />
+            {noteError && (
+              <p id={`${ids}-note-error`} className="late-text mt-1.5 text-15" role="alert">
+                Add one line
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      {confirming && ready ? (
+        <div className="glass-inner grid gap-3 p-3" role="group" aria-label="Confirm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-15 font-semibold text-ink">Mark milestone {n} done?</p>
+            {n < 10 && <span className="lettering text-ink-soft">Instalment {n + 1} falls due</span>}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className="btn btn-glass btn-sm"
+              onClick={() => {
+                if (busy) pause.cancel();
+                setConfirming(false);
+              }}
+            >
+              Not yet
+            </button>
+            <button ref={yes} type="button" className="btn btn-primary btn-sm" aria-disabled={busy ? true : undefined} onClick={confirm}>
+              Yes, done
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="btn btn-primary w-full gap-2" aria-disabled={!ready || busy ? true : undefined} onClick={ask}>
+          <Icon name={reason && gate.locked ? "lock" : "flag"} />
+          {reason ?? "Mark milestone done"}
+        </button>
+      )}
+    </section>
+  );
+}
 
 export function StageForm() {
   const demo = useDemo();
   const firm = useFirm();
-  const pause = usePause();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const me = useViewer("site");
   const scope = useScope("site");
-  const ids = useId();
 
   const sites = sitesFor(firm, me.id);
-  // The site comes from the address ("Your turn" passes ?project=nair), else the one in view.
   const asked = params.get("project");
-  const project = sites.find((p) => p.id === asked) ?? sites.find((p) => p.id === scope) ?? sites[0];
+  const askedSite = sites.find((p) => p.id === asked);
 
-  const [photos, setPhotos] = useState<PhotoKind[]>([]);
-  const [note, setNote] = useState("");
-  const [confirming, setConfirming] = useState<string | null>(null);
-  const [error, setError] = useState<{ field: "photos" | "note"; words: string } | null>(null);
+  // A link may name the site (?project=nair): make it the board's project, then drop it
+  // from the address so the board's project pill decides from here on.
+  useEffect(() => {
+    if (!askedSite) return;
+    if (scope !== askedSite.id) demo.setScope("site", askedSite.id);
+    router.replace(pathname, { scroll: false });
+  }, [askedSite, scope, demo, router, pathname]);
+
+  const project = askedSite ?? sites.find((p) => p.id === scope) ?? sites[0];
 
   if (!project) {
     return (
       <div className="site-screen">
-        <StaffBoard place="Stage" headline="Mark a stage done" chip={false} />
-        <p className="text-17 text-ink-soft">You are not on a site that is being built.</p>
+        <StaffBoard place="Milestone" headline="Milestone done" chip={false} />
+        <p className="glass px-4 py-3 text-15 text-ink">No site under way</p>
       </div>
     );
   }
 
-  const m = underWay(project);
-  const done = lastDone(project);
-  const head = firm.person(project.team.head);
-  const ready = Boolean(m?.siteNote);
-  const name = m ? lowerFirst(stageName(project, m.n)) : "";
-  const covers = m ? project.milestones.find((x) => x.n === m.n)?.covers : undefined;
-  const key = m ? `${project.id}:${m.n}` : null;
-  const set = pause.pending !== null;
-
-  const choose = (id: ProjectId) => {
-    setConfirming(null);
-    setError(null);
-    router.replace(`${pathname}?project=${id}`, { scroll: false });
-  };
-
-  const toggle = (kind: PhotoKind) => {
-    if (!photos.includes(kind) && photos.length >= 3) {
-      setError({ field: "photos", words: "Three photos at most. Take one off first." });
-      return;
-    }
-    setPhotos((current) =>
-      current.includes(kind) ? current.filter((p) => p !== kind) : current.length >= 3 ? current : [...current, kind],
-    );
-    setError(null);
-  };
-
-  const ask = () => {
-    if (!ready || set) return;
-    if (photos.length < 2) {
-      setError({ field: "photos", words: "Choose two or three photos of the finished work." });
-      return;
-    }
-    if (!note.trim()) {
-      setError({ field: "note", words: "Write a note on what was finished." });
-      return;
-    }
-    setError(null);
-    setConfirming(key);
-  };
-
-  const confirm = (event: MouseEvent<HTMLButtonElement>) => {
-    if (!m || set) return;
-    const what = { projectId: project.id, n: m.n, note: note.trim(), photos };
-    const { record } = demo;
-    pause.start({
-      what: `Milestone ${m.n} at ${project.name}, marked done`,
-      origin: event.currentTarget,
-      commit: () => {
-        record({ kind: "stage.done", ...what, by: me.id });
-        // The draft is cleared once it is recorded: Cancel keeps it to put right.
-        setPhotos([]);
-        setNote("");
-        setConfirming(null);
-      },
-    });
-  };
-
-  const markedToday = done && done.doneBy === me.id && done.doneOn && datePart(done.doneOn) === TODAY;
-  const doneRowId = done ? `pay:${project.id}:${done.n}` : "";
+  const stage = firm.siteStage(project.id);
 
   return (
     <div className="site-screen">
       <StaffBoard
-        place="Stage"
-        headline="Mark a stage done"
-        state={
-          m
-            ? `${project.name}. ${head?.name ?? "The Project Head"} raises the payment once a stage is marked done.`
-            : `Every stage at ${project.name} so far is marked done.`
-        }
-        chip={false}
+        place="Milestone done"
+        headline={stage ? stage.short : "All milestones done"}
+        state={stage ? milestoneLine(stage) : undefined}
+        picture={stage ? <StageMeter stage={stage} /> : undefined}
       />
 
-      {sites.length > 1 && (
-        <ChipGroup label="Site" columns={2} className="sm:max-w-[32rem]">
-          {sites.map((p) => (
-            <Chip key={p.id} size="site" pressed={p.id === project.id} onClick={() => choose(p.id)}>
-              {p.name}
-            </Chip>
-          ))}
-        </ChipGroup>
-      )}
-
-      <div className="staff-columns">
-        <div className="grid content-start gap-8">
-          {m && (
-            <section aria-labelledby={`${ids}-now`} className="grid gap-2">
-              <h2 id={`${ids}-now`} className="text-22 font-semibold">
-                Milestone {m.n}, {name} <SampleTag />
-              </h2>
-              {covers && <p className="text-17 text-ink-soft">{covers}</p>}
-              <p className="text-17 font-semibold">
-                {ready && m.siteNote ? `${upperFirst(m.siteNote)}.` : "Not finished yet."}
-              </p>
-            </section>
-          )}
-
-          {m && ready && (
-            <>
-              <div className="grid gap-2">
-                <ChipGroup label="Photos of the finished work, two or three" columns={3}>
-                  {photoChoices(project.id).map((kind, i) => (
-                    <button
-                      key={kind}
-                      type="button"
-                      aria-pressed={photos.includes(kind)}
-                      onClick={() => toggle(kind)}
-                      className="chip chip-site"
-                      style={{ flexDirection: "column", alignItems: "flex-start", padding: 8 }}
-                    >
-                      <SamplePhoto kind={kind} tag={i === 0} />
-                      <span className="px-1">{PHOTO_WORDS[kind]}</span>
-                    </button>
-                  ))}
-                </ChipGroup>
-                {error?.field === "photos" && (
-                  <p className="text-17 font-semibold text-brick" role="alert">
-                    {error.words}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor={`${ids}-note`} className="block text-17 font-semibold">
-                  Note for {head?.first ?? "the Project Head"}
-                </label>
-                <textarea
-                  id={`${ids}-note`}
-                  rows={3}
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  placeholder="Verandah and wet areas tiled, grouted and cleaned."
-                  className={`${field} mt-1.5 py-3`}
-                  aria-invalid={error?.field === "note" ? true : undefined}
-                  aria-describedby={error?.field === "note" ? `${ids}-note-error` : undefined}
-                />
-                {error?.field === "note" && (
-                  <p id={`${ids}-note-error`} className="mt-1.5 text-17 font-semibold text-brick" role="alert">
-                    {error.words}
-                  </p>
-                )}
-              </div>
-            </>
-          )}
-
-          {m && (
-            <div className="grid gap-3">
-              {confirming === key && ready ? (
-                <div className="grid gap-3 bg-sand-2 p-4">
-                  <p className="text-17">
-                    Mark milestone {m.n}, {name}, done at {project.name}? {head?.name ?? "The Project Head"} is asked to raise
-                    the payment, with your photos as proof.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" className="btn btn-primary w-full sm:w-auto" aria-disabled={set} onClick={confirm}>
-                      Yes, mark it done
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-quiet w-full bg-paper sm:w-auto"
-                      onClick={() => {
-                        if (set) pause.cancel();
-                        setConfirming(null);
-                      }}
-                    >
-                      Not yet
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <button
-                    type="button"
-                    className="btn btn-primary w-full sm:w-auto"
-                    aria-disabled={!ready || set ? true : undefined}
-                    aria-describedby={ready ? undefined : `${ids}-why`}
-                    onClick={ask}
-                  >
-                    Mark {name} done
-                  </button>
-                  {!ready && (
-                    <p id={`${ids}-why`} className="mt-2 text-17 text-ink-soft">
-                      {project.category !== "farmhouse" && storeysOf(project, m.n).length > 0
-                        ? `The ${stageShort(project, m.n)} is still going up.`
-                        : "The work on this stage is still going on."}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {done && (
-          <div className="grid content-start gap-3">
-            <Register title={markedToday ? "Marked done today" : "Last marked done"}>
-              <RegisterRow
-                id={doneRowId}
-                margin={ageWords(daysSince(done.doneOn ?? TODAY))}
-                title={`Milestone ${done.n}, ${lowerFirst(stageName(project, done.n))}`}
-                sentence={
-                  markedToday
-                    ? `${head?.first ?? "The Project Head"} raises the payment next.`
-                    : `Marked done on ${formatStamp(done.doneOn ?? TODAY)}.`
-                }
-                stamps={firm.stampsFor(doneRowId)}
-              >
-                {done.photos && done.photos.length > 0 && (
-                  <div className="grid gap-2">
-                    <div className="flex flex-wrap gap-2">
-                      {done.photos.map((kind, i) => (
-                        <SamplePhoto key={kind} kind={kind} tag={!m || !ready ? i === 0 : false} />
-                      ))}
-                    </div>
-                    <p className="text-17 text-ink-soft">These photos travel with the demand letter as stage proof.</p>
-                  </div>
-                )}
-              </RegisterRow>
-            </Register>
-          </div>
-        )}
-      </div>
+      {stage && <Checklist key={`${project.id}-${stage.n}`} project={project} stage={stage} />}
     </div>
   );
 }

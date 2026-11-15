@@ -48,14 +48,14 @@ export function stageShort(project: ProjectView, n: number): string {
   return lowerFirst(stageName(project, n)).split(/,| and /)[0].replace(/ structure$/, "");
 }
 
-/** The stage the site is working on now. */
+/** The construction milestone the site is working on now (row n opens milestone n). */
 export function underWay(project: ProjectView): MilestoneView | undefined {
-  return project.milestones.find((m) => m.state === "under-way");
+  return project.milestones.find((m) => m.n > 0 && m.work === "in-progress");
 }
 
-/** The last stage marked done, with or without its payment yet. */
+/** The last construction milestone finished. */
 export function lastDone(project: ProjectView): MilestoneView | undefined {
-  return [...project.milestones].reverse().find((m) => m.n > 0 && m.doneOn && m.state !== "under-way" && m.state !== "to-come");
+  return [...project.milestones].reverse().find((m) => m.n > 0 && m.work === "done");
 }
 
 /**

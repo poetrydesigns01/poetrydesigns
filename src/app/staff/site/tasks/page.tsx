@@ -1,6 +1,6 @@
 import { SiteTasks } from "@/components/site/site-tasks";
 
-// The site engineer's tasks, his junior's hand-ins and his hours this week.
+// The stage's site tasks with their progress, material, crews and drawings.
 export default function SiteTasksPage() {
   return <SiteTasks />;
 }

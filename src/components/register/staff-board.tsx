@@ -8,10 +8,10 @@ import { PersonMenu } from "./person-menu";
 import { ProjectSwitch } from "./project-switch";
 import { useStaffRole } from "./staff-shell";
 
-// The rosewood head of every staff page: the place and the date, one headline, one state
-// line, at most one primary button, and from 1024 px the project chip with the one
-// picture under it. On a phone the board is the top of the screen, so it also carries the
-// wordmark, the chip and the person menu in its first row.
+// The head of every staff page, one compact rosewood glass hero: the place and the date,
+// one short headline, at most one state line and one primary button, and from 1024 px the
+// project chip with the one picture under it. On a phone the board is the top of the
+// screen, so it also carries the wordmark, the chip and the person menu in its first row.
 
 export function StaffBoard({
   place,
@@ -63,7 +63,7 @@ export function StaffBoard({
     <header className="board on-dark">
       {/* A phone has no rail: the wordmark, the chip and the person menu head the board. The
           row is the anchor of the project list, so the list opens under the whole row. */}
-      <div className="relative -mt-2 flex min-h-12 items-center justify-between gap-2 lg:hidden">
+      <div className="relative -mt-1 flex min-h-12 items-center justify-between gap-2 border-b border-lime/10 pb-2 lg:hidden">
         <p className="display shrink-0 text-22 leading-none max-[359px]:text-17">Poetry Designs</p>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
           {chip && <ProjectSwitch role={role} />}
@@ -77,10 +77,13 @@ export function StaffBoard({
             {back.label}
           </Link>
         )}
-        <p className="lettering text-lime/75">
-          {place}, {weekdayDate(TODAY)}
-        </p>
-        <h1 className="display text-balance text-22 lg:text-32">{headline}</h1>
+        {/* A back link already says where the page sits, so it takes the eyebrow's place. */}
+        {!back && (
+          <p className="lettering text-lime/70">
+            {place} · {weekdayDate(TODAY)}
+          </p>
+        )}
+        <h1 className="display text-balance text-22">{headline}</h1>
         {state && <p className="max-w-[60ch] text-15 text-lime/80">{state}</p>}
         {figure && <div className="mt-2 lg:hidden">{figure}</div>}
         {button && <div className="mt-2">{button}</div>}

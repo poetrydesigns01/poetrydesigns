@@ -2,31 +2,29 @@
 
 import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
-import { ProgrammeStrip } from "@/components/instruments/programme-strip";
 import { Chip, ChipGroup, field } from "@/components/register/chips";
 import { DropZone } from "@/components/register/drop-zone";
 import { Field } from "@/components/register/field";
 import { usePause } from "@/components/register/recording-pause";
-import { SampleTag } from "@/components/register/sample-tag";
 import { TODAY } from "@/lib/demo-data";
 import { useDemo, useFirm } from "@/lib/demo-store";
-import { estimate, type DraftView, type StripCell } from "@/lib/firm";
+import { estimate, type DraftView } from "@/lib/firm";
 import type { CategoryId, PersonId, Template } from "@/lib/firm-data";
 import { formatDate, formatStampShort, inr } from "@/lib/format";
+import { StatusChip } from "@/components/register/status-chip";
 import { coordinateWords, draftName, parseMaps } from "./bd-words";
 
-// The four steps of opening a client's workspace. Each step is a form that keeps what was
-// typed while the screen is away, and "Save as draft" records it after the pause. A step
-// counts as done once it holds what the workspace needs: the client and site, the
+// The four steps of opening a client's workspace, each a glass form saved after the pause.
+// A step counts as done once it holds what the workspace needs: the client and site, the
 // estimate, the signed agreement, and the Project Head.
 
 export type StepNo = 1 | 2 | 3 | 4;
 
 export const STEP_NAMES: Record<StepNo, string> = {
   1: "Client and site",
-  2: "Category and estimate",
-  3: "Agreement and schedule",
-  4: "Team and hours",
+  2: "Estimate",
+  3: "Agreement",
+  4: "Team",
 };
 
 /** What a saved step 1 may also hold for a project already being built. */
@@ -42,6 +40,8 @@ export type StepProps = {
   /** The workspace is open: the steps are a record now and cannot be changed here. */
   locked: boolean;
   onSaved: (step: StepNo) => void;
+  /** The save is the screen's one primary action until every step is done. */
+  primary?: boolean;
 };
 
 /** Which steps hold what the workspace needs, as the record counts them. */
@@ -81,10 +81,12 @@ function SaveStep({
   check,
   data,
   onSaved,
+  primary = true,
 }: {
   draft: DraftView;
   step: StepNo;
   locked: boolean;
+  primary?: boolean;
   /** An error in words, or "" when the step can be saved. */
   check: () => string;
   data: () => Record<string, unknown>;
@@ -100,7 +102,7 @@ function SaveStep({
 
   if (locked) return null;
   return (
-    <div className="grid justify-items-start gap-2 border-t border-sand pt-4">
+    <div className="grid justify-items-start gap-2 border-t border-ink/10 pt-4">
       {error && (
         <p className="text-15 font-semibold text-brick" role="alert">
           {error}
@@ -109,7 +111,7 @@ function SaveStep({
       <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2">
         <button
           type="submit"
-          className="btn btn-quiet w-full sm:w-auto"
+          className={`btn ${primary ? "btn-primary" : "btn-glass"} w-full sm:w-auto`}
           aria-disabled={waiting}
           onClick={(event) => {
             event.preventDefault();
@@ -129,9 +131,9 @@ function SaveStep({
             });
           }}
         >
-          Save as draft
+          Save step
         </button>
-        {receipt && <p className="lettering text-ink-soft">Saved. {formatStampShort(receipt)}.</p>}
+        {receipt && <StatusChip tone="done">Saved {formatStampShort(receipt)}</StatusChip>}
       </div>
     </div>
   );
@@ -141,18 +143,16 @@ function SaveStep({
 function StepSheet({ step, locked, children }: { step: StepNo; locked: boolean; children: ReactNode }) {
   const id = useId();
   return (
-    <section aria-labelledby={id} className="grid gap-6">
-      <div className="border-b border-ink pb-2">
-        <p className="lettering text-ink-soft">Step {step} of 4</p>
-        <h2 id={id} className="text-22 font-semibold">
+    <section aria-labelledby={id} className="glass-strong grid gap-5 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id={id} className="text-17 font-semibold text-ink">
+          <span className="figure mr-2 text-ink-soft">{step}</span>
           {STEP_NAMES[step]}
         </h2>
+        {locked && <StatusChip tone="locked">Locked</StatusChip>}
       </div>
-      {locked && (
-        <p className="text-15 text-ink-soft">The workspace is open, so this is kept as it was saved. The admin changes it from here on.</p>
-      )}
-      <form onSubmit={(event) => event.preventDefault()} className="grid gap-6">
-        <fieldset disabled={locked} className="grid min-w-0 gap-6">
+      <form onSubmit={(event) => event.preventDefault()} className="grid gap-5">
+        <fieldset disabled={locked} className="grid min-w-0 gap-5">
           {children}
         </fieldset>
       </form>
@@ -185,14 +185,14 @@ function NumberInput({
         value={value}
         onChange={(event) => onChange(Math.max(0, Number(event.target.value) || 0))}
       />
-      {unit && <span className="text-15 text-ink-soft">{unit}</span>}
+      {unit && <span className="text-15 text-ink">{unit}</span>}
     </span>
   );
 }
 
 // ---- Step 1, client and site ----
 
-export function StepClient({ draft, locked, onSaved }: StepProps) {
+export function StepClient({ draft, locked, onSaved, primary }: StepProps) {
   const saved = draft.step1 as Step1Saved | undefined;
   const ids = useId();
   const [name, setName] = useState(draft.step1?.name ?? (draft.id === "kulkarni" ? "Kulkarni Eco Home" : ""));
@@ -210,25 +210,25 @@ export function StepClient({ draft, locked, onSaved }: StepProps) {
   const firm = useFirm();
   const milestones = templateIn(firm.templates, draft.step2?.category ?? "city-villa").milestones;
 
-  const mapsError = maps.trim() && !pin ? "Paste a Google Maps link with a pin." : "";
+  const mapsError = maps.trim() && !pin ? "No pin in this link" : "";
 
   const check = () => {
-    if (!name.trim()) return "Give the project a name.";
-    if (!owners[0].trim()) return "Add the owner's name.";
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "Add the email the invite goes to.";
-    if (phone.replace(/\D/g, "").length < 10) return "Add a phone number with at least 10 digits.";
-    if (!address.trim()) return "Add the site address.";
-    if (!pin) return "Paste a Google Maps link with a pin.";
-    if (!(perimeter > 0)) return "Add the plot perimeter in feet.";
+    if (!name.trim()) return "Name the project";
+    if (!owners[0].trim()) return "Add the owner";
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "Add the email";
+    if (phone.replace(/\D/g, "").length < 10) return "Phone needs 10 digits";
+    if (!address.trim()) return "Add the address";
+    if (!pin) return "Paste a Maps pin link";
+    if (!(perimeter > 0)) return "Add the plot perimeter";
     return "";
   };
 
   return (
     <StepSheet step={1} locked={locked}>
-      <Field label="Project name" hint="As the client and the team will see it">
+      <Field label="Project name">
         <input type="text" className={field} value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Owner">
           <input
             type="text"
@@ -238,7 +238,7 @@ export function StepClient({ draft, locked, onSaved }: StepProps) {
             onChange={(e) => setOwners([e.target.value, owners[1]])}
           />
         </Field>
-        <Field label="Second owner" hint="If the agreement names two">
+        <Field label="Second owner">
           <input
             type="text"
             className={field}
@@ -247,7 +247,7 @@ export function StepClient({ draft, locked, onSaved }: StepProps) {
             onChange={(e) => setOwners([owners[0], e.target.value])}
           />
         </Field>
-        <Field label="Email" hint="The invite goes here">
+        <Field label="Email">
           <input type="email" className={field} autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
         <Field label="Phone">
@@ -257,8 +257,8 @@ export function StepClient({ draft, locked, onSaved }: StepProps) {
       <Field label="Site address">
         <textarea rows={2} className={`${field} py-2`} value={address} onChange={(e) => setAddress(e.target.value)} />
       </Field>
-      <div className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <Field label="Google Maps link" hint="Drop a pin on the plot, then copy its link" error={mapsError || undefined}>
+      <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <Field label="Maps pin link" error={mapsError || undefined}>
           <input
             type="url"
             inputMode="url"
@@ -283,7 +283,7 @@ export function StepClient({ draft, locked, onSaved }: StepProps) {
           </Chip>
         </div>
         {underWay && (
-          <div className="grid gap-6 border-l border-laterite pl-4 sm:grid-cols-3">
+          <div className="glass-inner grid gap-5 p-3 sm:grid-cols-3">
             <Field label="Paid up to milestone">
               <select className={field} value={paidUpTo} onChange={(e) => setPaidUpTo(Number(e.target.value))}>
                 <option value={-1}>Nothing paid yet</option>
@@ -295,13 +295,12 @@ export function StepClient({ draft, locked, onSaved }: StepProps) {
                 ))}
               </select>
             </Field>
-            <Field label="Hours used before construction">
+            <Field label="Hours used, before">
               <NumberInput value={usedBefore} onChange={setUsedBefore} step={0.5} />
             </Field>
-            <Field label="Hours used during construction">
+            <Field label="Hours used, during">
               <NumberInput value={usedDuring} onChange={setUsedDuring} step={0.5} />
             </Field>
-            <p className="text-15 text-ink-soft sm:col-span-3">Earlier approvals are imported and marked Imported.</p>
           </div>
         )}
       </div>
@@ -310,6 +309,7 @@ export function StepClient({ draft, locked, onSaved }: StepProps) {
         draft={draft}
         step={1}
         locked={locked}
+        primary={primary}
         check={check}
         onSaved={onSaved}
         data={() => ({
@@ -354,7 +354,7 @@ function partBRows(template: Template, saved: NonNullable<DraftView["step2"]> | 
   });
 }
 
-export function StepEstimate({ draft, locked, onSaved }: StepProps) {
+export function StepEstimate({ draft, locked, onSaved, primary }: StepProps) {
   const saved = draft.step2;
   const ids = useId();
   const { templates } = useFirm();
@@ -378,10 +378,10 @@ export function StepEstimate({ draft, locked, onSaved }: StepProps) {
   const wall = result.partB.items.find((item) => item.name === partB.find((p) => p.computed)?.name);
 
   const check = () => {
-    if (!(area > 0)) return "Add the built-up area.";
-    if (!(rate > 0)) return "Add the rate per sq ft.";
-    if (addOns.some((a) => (a.name.trim() === "") !== (a.amount === 0))) return "Give every add-on a name and an amount, or remove it.";
-    if (partB.some((p) => p.on && p.computed) && !(perimeter > 0)) return "Add the plot perimeter in step 1 first: the compound wall is worked out from it.";
+    if (!(area > 0)) return "Add the area";
+    if (!(rate > 0)) return "Add the rate";
+    if (addOns.some((a) => (a.name.trim() === "") !== (a.amount === 0))) return "Complete or remove each add-on";
+    if (partB.some((p) => p.on && p.computed) && !(perimeter > 0)) return "Add the plot perimeter in step 1";
     return "";
   };
 
@@ -400,19 +400,18 @@ export function StepEstimate({ draft, locked, onSaved }: StepProps) {
           </Chip>
         ))}
       </ChipGroup>
-      {template.note && <p className="-mt-3 text-15 text-ink-soft">{template.note}</p>}
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Built-up area">
           <NumberInput value={area} onChange={setArea} unit="sq ft" step={50} />
         </Field>
-        <Field label="Rate before GST" hint={`The template rate is ${inr(template.ratePerSqFt)}`}>
+        <Field label="Rate before GST" hint={`Template ${inr(template.ratePerSqFt)}`}>
           <NumberInput value={rate} onChange={setRate} unit="₹ per sq ft" step={50} />
         </Field>
       </div>
 
       <fieldset className="grid min-w-0 gap-3">
         <legend className="mb-1 text-15 font-semibold">Add-ons</legend>
-        {addOns.length === 0 && <p className="text-15 text-ink-soft">None. Add-ons are priced into Part A.</p>}
+        {addOns.length === 0 && <p className="text-15 text-ink-soft">None</p>}
         {addOns.map((addOn, i) => (
           <div key={i} className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto]">
             <label className="block">
@@ -438,22 +437,20 @@ export function StepEstimate({ draft, locked, onSaved }: StepProps) {
                 }
               />
             </label>
-            <button type="button" className="btn btn-quiet" onClick={() => setAddOns(addOns.filter((_, j) => j !== i))}>
+            <button type="button" className="btn btn-glass min-h-12" onClick={() => setAddOns(addOns.filter((_, j) => j !== i))}>
               Remove
             </button>
           </div>
         ))}
         <div>
-          <button type="button" className="btn btn-quiet" onClick={() => setAddOns([...addOns, { name: "", amount: 0 }])}>
+          <button type="button" className="btn btn-glass min-h-11 px-4 text-15" onClick={() => setAddOns([...addOns, { name: "", amount: 0 }])}>
             Add an add-on
           </button>
         </div>
       </fieldset>
 
       <fieldset className="grid min-w-0 gap-3">
-        <legend className="mb-1 text-15 font-semibold">
-          Part B, the work around the house <SampleTag>Billing to be confirmed</SampleTag>
-        </legend>
+        <legend className="mb-1 text-15 font-semibold">Part B</legend>
         <ul className="grid gap-4">
           {partB.map((row, i) => {
             const set = (patch: Partial<PartBRow>) => setPartB(partB.map((p, j) => (j === i ? { ...p, ...patch } : p)));
@@ -493,49 +490,36 @@ export function StepEstimate({ draft, locked, onSaved }: StepProps) {
         </ul>
       </fieldset>
 
-      <section aria-labelledby={`${ids}-sum`} className="grid gap-1 bg-sand-2 px-4 py-4">
-        <h3 id={`${ids}-sum`} className="text-17 font-semibold">
-          The estimate as it stands
+      <section aria-labelledby={`${ids}-sum`} className="glass-inner grid gap-1 p-4">
+        <h3 id={`${ids}-sum`} className="text-15 font-semibold">
+          Estimate
         </h3>
         <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-15">
-          <dt>Part A, the house, with GST</dt>
+          <dt>Part A with GST</dt>
           <dd className="figure text-right text-17">{inr(result.partA.total)}</dd>
-          <dt>Part B, with GST</dt>
+          <dt>Part B with GST</dt>
           <dd className="figure text-right text-17">{inr(result.partB.total)}</dd>
-          <dt className="font-semibold">Grand total, with GST</dt>
+          <dt className="font-semibold">Total with GST</dt>
           <dd className="figure text-right text-22">{inr(result.grandTotal)}</dd>
         </dl>
-        <p className="text-15 text-ink-soft">
-          GST at 18%. Valid until {formatDate(result.validUntil)}, 15 days from today.
-        </p>
-        {draft.id === "kulkarni" && (
-          <p className="text-15">
-            <Link href="/staff/bd/estimate/kulkarni" className="link inline-flex min-h-11 items-center">
-              Open the estimate to download
-            </Link>{" "}
-            <span className="text-ink-soft">(as last saved)</span>
-          </p>
-        )}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <StatusChip tone="waiting">Valid until {formatDate(result.validUntil)}</StatusChip>
+          {draft.id === "kulkarni" && (
+            <Link href="/staff/bd/estimate/kulkarni" className="btn btn-glass min-h-11 px-4 text-15">
+              Estimate sheet
+            </Link>
+          )}
+        </div>
       </section>
 
-      <SaveStep draft={draft} step={2} locked={locked} check={check} onSaved={onSaved} data={() => step2} />
+      <SaveStep draft={draft} step={2} locked={locked} primary={primary} check={check} onSaved={onSaved} data={() => step2} />
     </StepSheet>
   );
 }
 
 // ---- Step 3, agreement and schedule ----
 
-/** Sign-up and ten milestones on Part A, all still to come: the eleven cells of the strip. */
-function scheduleCells(rows: { n: number; name: string }[]): StripCell[] {
-  return rows.map((row) => ({
-    n: row.n,
-    label: row.n === 0 ? "Sign-up" : String(row.n),
-    state: "to-come",
-    words: row.n === 0 ? "Sign-up, to come" : `Milestone ${row.n}, ${row.name}, to come`,
-  }));
-}
-
-export function StepAgreement({ draft, locked, onSaved }: StepProps) {
+export function StepAgreement({ draft, locked, onSaved, primary }: StepProps) {
   const saved = draft.step3 as Step3Saved | undefined;
   const surname = (draft.step1?.clients[0] ?? "Client").split(" ").slice(-1)[0];
   const [files, setFiles] = useState<string[]>(saved?.agreementFile ? [saved.agreementFile] : []);
@@ -549,11 +533,11 @@ export function StepAgreement({ draft, locked, onSaved }: StepProps) {
   const [reference, setReference] = useState(saved?.signUp?.reference ?? "");
 
   const check = () => {
-    if (!result) return "Save the category and estimate in step 2 first: the contract value comes from it.";
-    if (files.length === 0) return "Choose the signed agreement.";
+    if (!result) return "Save step 2 first";
+    if (files.length === 0) return "Choose the signed agreement";
     // A draft agreement is the usual slip: the workspace must open on the signed one.
-    if (files.some((f) => /unsigned/i.test(f))) return "This is the unsigned draft. Choose the signed agreement.";
-    if (!signedOn) return "Add the date it was signed.";
+    if (files.some((f) => /unsigned/i.test(f))) return "That is the unsigned draft";
+    if (!signedOn) return "Add the signed date";
     return "";
   };
 
@@ -566,7 +550,7 @@ export function StepAgreement({ draft, locked, onSaved }: StepProps) {
         chosen={files}
         onChoose={setFiles}
       />
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Signed on">
           <input type="date" className={field} value={signedOn} max={TODAY} onChange={(e) => setSignedOn(e.target.value)} />
         </Field>
@@ -575,15 +559,15 @@ export function StepAgreement({ draft, locked, onSaved }: StepProps) {
           {result ? (
             <>
               <p className="figure mt-1.5 text-22">{inr(value)}</p>
-              <p className="text-15 text-ink-soft">Part A before GST, from the estimate. Change it in step 2.</p>
+              <p className="text-15 text-ink-soft">Part A, before GST</p>
             </>
           ) : (
-            <p className="mt-1.5 text-15 text-ink-soft">Comes from the estimate in step 2.</p>
+            <p className="mt-1.5 text-15 text-ink-soft">From step 2</p>
           )}
         </div>
       </div>
 
-      <fieldset className="grid min-w-0 gap-6 sm:grid-cols-3">
+      <fieldset className="grid min-w-0 gap-5 sm:grid-cols-3">
         <legend className="mb-3 text-15 font-semibold">Sign-up received</legend>
         <Field label="Amount with GST">
           <NumberInput value={signUpAmount} onChange={setSignUpAmount} step={1000} />
@@ -591,22 +575,19 @@ export function StepAgreement({ draft, locked, onSaved }: StepProps) {
         <Field label="Received on">
           <input type="date" className={field} value={signUpOn} max={TODAY} onChange={(e) => setSignUpOn(e.target.value)} />
         </Field>
-        <Field label="Reference" hint="UTR or cheque number">
+        <Field label="UTR or cheque">
           <input type="text" className={field} autoComplete="off" value={reference} onChange={(e) => setReference(e.target.value)} />
         </Field>
       </fieldset>
 
       {result && (
-        <section aria-label="Payment schedule" className="grid gap-3">
-          <p className="text-15 font-semibold">
-            Payment schedule <SampleTag>Sample milestones</SampleTag>
-          </p>
-          <ProgrammeStrip cells={scheduleCells(result.schedule)} size={264} label="Sign-up and ten milestones, all to come." />
+        <section aria-label="Payment schedule" className="glass-inner grid gap-2 p-3">
+          <p className="text-15 font-semibold">Payment schedule</p>
           <table className="w-full border-collapse text-15">
             <caption className="sr-only">Sign-up and ten milestones on Part A, with GST</caption>
             <tbody>
               {result.schedule.map((row) => (
-                <tr key={row.n} className="border-t border-sand align-baseline">
+                <tr key={row.n} className="border-t border-ink/10 align-baseline">
                   <th scope="row" className="py-1.5 pr-3 text-left font-normal">
                     {row.n === 0 ? "Sign-up" : `${row.n}. ${row.name}`}
                   </th>
@@ -623,6 +604,7 @@ export function StepAgreement({ draft, locked, onSaved }: StepProps) {
         draft={draft}
         step={3}
         locked={locked}
+        primary={primary}
         check={check}
         onSaved={onSaved}
         data={() => ({
@@ -638,7 +620,7 @@ export function StepAgreement({ draft, locked, onSaved }: StepProps) {
 
 // ---- Step 4, team and hours ----
 
-export function StepTeam({ draft, locked, onSaved }: StepProps) {
+export function StepTeam({ draft, locked, onSaved, primary }: StepProps) {
   const firm = useFirm();
   const saved = draft.step4 as Step4Saved | undefined;
   const seedTeam = draft.id === "kulkarni" ? firm.projects.find((p) => p.id === "kulkarni")?.team : undefined;
@@ -658,9 +640,9 @@ export function StepTeam({ draft, locked, onSaved }: StepProps) {
   const [handoff, setHandoff] = useState(saved?.handoff ?? "");
 
   const check = () => {
-    if (!poc) return "Choose the point of contact.";
-    if (!head) return "Choose the Project Head.";
-    if (!procurement) return "Choose who buys for this site.";
+    if (!poc) return "Choose the point of contact";
+    if (!head) return "Choose the Project Head";
+    if (!procurement) return "Choose procurement";
     return "";
   };
 
@@ -679,7 +661,7 @@ export function StepTeam({ draft, locked, onSaved }: StepProps) {
 
   return (
     <StepSheet step={4} locked={locked}>
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Point of contact" hint={titleOf(poc)}>
           {select(poc, setPoc, staff("bd"), "Choose a person")}
         </Field>
@@ -706,8 +688,7 @@ export function StepTeam({ draft, locked, onSaved }: StepProps) {
       </ChipGroup>
       <fieldset className="grid min-w-0 gap-3">
         <legend className="mb-1 text-15 font-semibold">Advisory hours</legend>
-        <p className="text-15 text-ink-soft">20 by default: 12 before construction and 8 during. Change them if the agreement says otherwise.</p>
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Before construction">
             <NumberInput value={before} onChange={setBefore} unit="hours" step={0.5} />
           </Field>
@@ -716,13 +697,14 @@ export function StepTeam({ draft, locked, onSaved }: StepProps) {
           </Field>
         </div>
       </fieldset>
-      <Field label="Hand-off note for the Project Head" hint="What the client cares about, and anything promised">
+      <Field label="Hand-off note">
         <textarea rows={3} className={`${field} py-2`} value={handoff} onChange={(e) => setHandoff(e.target.value)} />
       </Field>
       <SaveStep
         draft={draft}
         step={4}
         locked={locked}
+        primary={primary}
         check={check}
         onSaved={onSaved}
         data={() => ({

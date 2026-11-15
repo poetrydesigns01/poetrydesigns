@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useOnHidden } from "@/components/craft/seal";
@@ -35,18 +36,19 @@ function Strip({ sentence, onStop }: { sentence: string; onStop: () => void }) {
   return (
     <aside
       ref={ref}
-      className={`trial-strip on-dark${fresh ? " enter-rise" : ""}`}
-      aria-label="A change you are trying"
+      className={`trial-strip-glass sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 mx-auto mb-3 w-[calc(100%-2rem)] max-w-3xl lg:bottom-4${fresh ? " enter-rise" : ""}`}
+      aria-label="A change you are previewing"
     >
-      <span className="trial-strip-edge" aria-hidden="true" />
-      <div className="trial-strip-body">
-        <p className="trial-strip-words">{sentence}</p>
-        {/* Quiet, both: the screen under the strip keeps its own one filled control. */}
-        <div className="flex shrink-0 items-center gap-4">
-          <button type="button" className="link inline-flex min-h-11 cursor-pointer items-center text-15" onClick={onStop}>
-            Stop trying
+      <div className="glass-pop flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-1.5 pl-4 pr-2">
+        <p className="min-w-0 flex-1 text-15">
+          <span className="glass-chip chip-waiting mr-2">Preview</span>
+          {sentence}
+        </p>
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" className="btn btn-glass min-h-11 px-4 text-15" onClick={onStop}>
+            Stop
           </button>
-          <Link href="/client/changes#waiting" className="btn btn-quiet">
+          <Link href="/client/changes" className="btn btn-glass min-h-11 px-4 text-15">
             Decide
           </Link>
         </div>
@@ -63,6 +65,11 @@ function Strip({ sentence, onStop }: { sentence: string; onStop: () => void }) {
  */
 export function TrialStrip() {
   const { stopTrying } = useDemo();
+  // A preview belongs to the changes screen, which shows it in its own hero. Any other client
+  // screen (a reload included) takes it off the house, so no strip follows her around.
+  const path = usePathname() ?? "";
+  const onClient = path.startsWith("/client");
+  const offChanges = onClient && !path.startsWith("/client/changes");
   const { trialSentence, tried, pending } = useProjection();
   // What a screen reader is told, half a second after the trial last changed.
   const [spoken, setSpoken] = useState("");
@@ -70,6 +77,10 @@ export function TrialStrip() {
   const lastTried = useRef<string[]>([]);
   const triedIds = tried.map((change) => change.id).join(" ");
   const pendingIds = pending.map((change) => change.id).join(" ");
+
+  useEffect(() => {
+    if (offChanges && triedIds) stopTrying();
+  }, [offChanges, triedIds, stopTrying]);
 
   useEffect(() => {
     const before = lastTried.current;
@@ -90,7 +101,7 @@ export function TrialStrip() {
 
   return (
     <>
-      {trialSentence && <Strip sentence={trialSentence} onStop={stop} />}
+      {trialSentence && !onClient && <Strip sentence={trialSentence} onStop={stop} />}
       <p ref={statusRef} role="status" tabIndex={-1} className="sr-only">
         {spoken}
       </p>

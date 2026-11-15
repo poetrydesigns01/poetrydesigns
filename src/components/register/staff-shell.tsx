@@ -137,7 +137,7 @@ function MoreSheet({ places, role, active }: { places: Place[]; role: StaffRole;
     if (ref.current) ref.current.open = false;
   };
 
-  const item = "flex min-h-12 items-center px-4 text-17 hover:bg-sand-2";
+  const item = "flex min-h-12 items-center rounded-xl px-3 text-17 hover:bg-white/70";
 
   return (
     <details
@@ -159,7 +159,7 @@ function MoreSheet({ places, role, active }: { places: Place[]; role: StaffRole;
       >
         More
       </summary>
-      <div className="fixed inset-x-0 bottom-[calc(var(--tab-h)+env(safe-area-inset-bottom))] z-20 border-t border-ink bg-paper pb-2 pt-3">
+      <div className="glass-pop fixed inset-x-2 bottom-[calc(var(--tab-h)+env(safe-area-inset-bottom)+8px)] z-20 p-1.5">
         <ul>
           {places.map((place) => (
             <li key={place.href}>
@@ -173,9 +173,9 @@ function MoreSheet({ places, role, active }: { places: Place[]; role: StaffRole;
               </Link>
             </li>
           ))}
-          <li className={places.length > 0 ? "mt-1 border-t border-sand pt-1" : undefined}>
+          <li className={places.length > 0 ? "mt-1 border-t border-ink/10 pt-1" : undefined}>
             <Link href={`/help/${role}`} className={item} onNavigate={close}>
-              Guide for this screen
+              Guide
             </Link>
           </li>
           <li>
@@ -235,13 +235,17 @@ export function StaffShell({ children }: { children: ReactNode }) {
         {/* The server draws the starting state; a tab that holds events takes them up as it
             wakes, and nothing fills or moves for that. */}
         <Settle>
-          <div className="staff-shell" data-site-bar={siteBar ? "" : undefined} data-site={role === "site" ? "" : undefined}>
+          <div
+            className="staff-shell glass-world"
+            data-site-bar={siteBar ? "" : undefined}
+            data-site={role === "site" ? "" : undefined}
+          >
             <aside className="staff-rail">
               <div className="px-6">
                 <p className="display text-22 leading-none">Poetry Designs</p>
-                <p className="lettering mt-2 text-ink-soft">{PLACE_NAME[role]}</p>
+                <p className="lettering mt-1.5 text-ink-soft">{PLACE_NAME[role]}</p>
               </div>
-              <div className="mt-6 px-3">
+              <div className="mt-5 px-2.5">
                 <PersonMenu role={role} variant="rail" />
               </div>
               <nav aria-label="Places" className="mt-4">
@@ -263,7 +267,7 @@ export function StaffShell({ children }: { children: ReactNode }) {
               <ul className="rail-foot text-15">
                 <li>
                   <Link href={`/help/${role}`} className="link inline-flex min-h-11 items-center text-ink-soft">
-                    Guide for this screen
+                    Guide
                   </Link>
                 </li>
                 <li>

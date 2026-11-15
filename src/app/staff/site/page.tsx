@@ -1,6 +1,6 @@
 import { SiteToday } from "@/components/site/site-today";
 
-// The site engineer's Today: what the site needs, what he asked for, and his junior's tasks.
+// The site engineer's Today: the stage, what needs him, and the tasks that matter now.
 export default function SitePage() {
   return <SiteToday />;
 }

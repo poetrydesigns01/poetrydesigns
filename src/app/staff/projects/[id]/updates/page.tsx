@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { ProjectUpdates } from "@/components/project/updates";
 import type { ProjectId } from "@/lib/firm-data";
 
-// The project thread. A staff post is emailed to the client.
+// The project update log: the chat between the team and the client.
 export default function Page({ params }: PageProps<"/staff/projects/[id]/updates">) {
   return (
     <Suspense>

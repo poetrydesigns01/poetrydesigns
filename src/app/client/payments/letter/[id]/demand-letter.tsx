@@ -2,214 +2,148 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Seal } from "@/components/craft/seal";
-import { HouseMark, markForStop } from "@/components/house/house-mark";
-import { SamplePhoto } from "@/components/instruments/sample-photo";
-import { MoneyRoute } from "@/components/payments/money-route";
-import { SampleTag } from "@/components/register/sample-tag";
-import { client, project, TODAY, type Milestone } from "@/lib/demo-data";
-import { useDemo, useProjection } from "@/lib/demo-store";
-import { projects } from "@/lib/firm-data";
-import { datePart, formatDate, formatStamp, inr, listWords } from "@/lib/format";
-import { STOREYS } from "@/lib/house-model";
-import { personName } from "@/lib/projection";
+import { ArrowLeftIcon, DownloadIcon, LockIcon } from "@/components/payments/icons";
+import { StatusChip } from "@/components/register/status-chip";
+import { useDemo, useFirm } from "@/lib/demo-store";
+import { datePart, formatDate, formatStampShort, inr } from "@/lib/format";
 
-function lowerFirst(text: string): string {
-  return text.charAt(0).toLowerCase() + text.slice(1);
-}
+// One stage's demand letter, the only thing a client downloads: it prints as the letter
+// alone (see .letter-sheet in globals.css). Until the letter is raised the page says so.
 
-// Where the lines of the letter will go, once it is written.
-const UNWRITTEN_LINES = ["w-2/5", "w-full", "w-full", "w-4/5", "w-full", "w-3/5"];
-
-/** A time when one is known, a date when only that is. */
-function when(at: string): string {
-  return at.length > 10 ? formatStamp(at) : formatDate(at);
-}
-
-export function DemandLetter({ milestone }: { milestone: Milestone }) {
+export function DemandLetter({ n }: { n: number }) {
   const demo = useDemo();
-  const projection = useProjection();
-  const projected = projection.milestones.find((m) => m.id === milestone.id);
-  const issued = projected?.money === "paid" || projected?.money === "approved";
+  const firm = useFirm();
+  const stages = firm.payments("iyer");
+  const stage = stages.find((s) => s.n === n);
+  const project = firm.project("iyer");
+  const raised = !!stage?.letterNo && ["due", "client-paid", "paid"].includes(stage.state);
 
-  if (!issued || !projected || !projected.letterNo) {
+  const back = (
+    <Link href="/client/payments" className="btn btn-glass min-h-11 gap-2">
+      <ArrowLeftIcon />
+      Payments
+    </Link>
+  );
+
+  if (!stage || !raised || !stage.letterNo) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-8 sm:py-12">
-        <Link href="/client/payments" className="link inline-flex min-h-11 items-center">
-          Back to payments
-        </Link>
-        <div className="mt-4 border border-dashed border-ink/50 px-6 py-8 sm:px-12 sm:py-12">
-          <h1 className="display display-lg">This letter has not been written yet</h1>
-          <p className="mt-4 max-w-[58ch] text-17 text-ink-soft">
-            It is written when you approve the payment for the {lowerFirst(milestone.name)}.
-          </p>
-          <Link href="/client/payments#due" className="btn btn-primary mt-6">
-            Go to payments
-          </Link>
-          <div className="mt-10 space-y-6" aria-hidden="true">
-            {UNWRITTEN_LINES.map((width, index) => (
-              <div key={index} className={`border-t border-dashed border-ink/40 ${width}`} />
-            ))}
-          </div>
-        </div>
+      <div className="mx-auto grid max-w-3xl gap-4 px-4 py-6 sm:px-6 lg:py-10">
+        <div>{back}</div>
+        <section className="glass grid justify-items-start gap-3 p-6 sm:p-8">
+          <span className="inline-grid h-11 w-11 place-items-center rounded-full bg-white/60 text-ink-soft">
+            <LockIcon />
+          </span>
+          <h1 className="display text-32 text-ink">Letter not raised yet</h1>
+          {stage && (
+            <p className="flex flex-wrap items-center gap-2 text-15 text-ink-soft">
+              {stage.instalmentLabel} · {stage.dueWeekLabel}
+              <StatusChip tone={stage.tone}>{stage.status}</StatusChip>
+            </p>
+          )}
+          {stage?.canRequestLetter && (
+            <button type="button" className="btn btn-primary mt-2 min-h-11" onClick={() => demo.requestDemandLetter(stage.n)}>
+              Request demand letter
+            </button>
+          )}
+        </section>
       </div>
     );
   }
 
-  const issuedOn = projected.letterIssuedOn ?? (projected.approvedAt ? datePart(projected.approvedAt) : TODAY);
-  const approvedOn = projected.approvedAt ? datePart(projected.approvedAt) : issuedOn;
-  const receivedBefore = projection.milestones
-    .filter((m) => m.id < milestone.id && m.money === "paid")
-    .reduce((sum, m) => sum + m.agreedTotal, 0);
-  // What the work was done under: the agreement, and every addendum approved by the day of the letter.
-  const addenda = projection.changes
-    .filter((change) => change.status === "approved" && change.addendum)
-    .filter((change) => (change.decidedOn ?? change.raisedOn) <= issuedOn)
-    .map((change) => change.addendum as string)
-    .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
-  const agreement = listWords([`the construction agreement dated ${formatDate(project.agreementSignedOn)}`, ...addenda]);
-  // The part of the house this payment is for.
-  const covered = STOREYS.filter((storey) => storey.milestoneId === milestone.id).map((storey) => storey.id);
-
-  // The stage behind the letter: who marked it done and when, from this tab or the seed.
-  const seed = projects.find((p) => p.id === "iyer")?.milestones.find((m) => m.n === milestone.id);
-  const done = demo.events.find((e) => e.kind === "stage.done" && e.projectId === "iyer" && e.n === milestone.id);
-  const doneAt = done?.at ?? seed?.doneOn ?? projected.workCompletedOn;
-  const doneBy = done ? personName(done.by, demo.events) : seed?.doneBy ? personName(seed.doneBy) : "the site engineer";
-  const photos = (done?.kind === "stage.done" ? done.photos : seed?.photos) ?? [];
+  const issuedOn = stage.letterRaisedAt ? datePart(stage.letterRaisedAt) : null;
+  const earlier = stages.filter((s) => s.n < n).reduce((total, s) => total + s.received, 0);
+  // The Project Head signs every letter, whoever in the office raised it.
+  const signatory = firm.person(project?.team.head ?? "vikram");
+  const owners = project?.clients.join(" and ") ?? "the owners";
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-8 sm:py-12">
-      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-4">
-        <Link href="/client/payments" className="link inline-flex min-h-11 items-center">
-          Back to payments
-        </Link>
-        <button type="button" className="btn btn-primary" onClick={() => window.print()}>
-          Download letter and stage proof
-        </button>
+    <div className="mx-auto grid max-w-3xl gap-4 px-4 py-6 sm:px-6 lg:py-10">
+      <div className="no-print flex flex-wrap items-center justify-between gap-3">
+        {back}
+        <div className="flex flex-wrap items-center gap-3">
+          <StatusChip tone={stage.tone}>{stage.status}</StatusChip>
+          <button type="button" className="btn btn-primary min-h-11 gap-2" onClick={() => window.print()}>
+            <DownloadIcon />
+            Download
+          </button>
+        </div>
       </div>
 
-      <MoneyRoute milestone={projected} approvedOn={approvedOn} />
-      <p className="no-print mb-4">
-        <SampleTag>Sample letter format, to be confirmed by Poetry</SampleTag>
-      </p>
-
-      <article className="letter-sheet border border-ink/25 bg-paper px-6 py-8 sm:px-12 sm:py-12">
-        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5">
+      <article className="letter-sheet glass-strong grid gap-6 p-6 text-15 text-ink sm:p-10">
+        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-ink/15 pb-5">
           <div>
             <p className="display text-32 leading-none">Poetry Designs</p>
-            <p className="mt-2 text-15 text-ink-soft">
-              Poetry Constructions, Bengaluru <SampleTag>Sample letterhead</SampleTag>
-            </p>
+            <p className="lettering mt-2 text-ink-soft">Demand letter</p>
           </div>
-          <p className="text-right text-15">
-            Letter no. {projected.letterNo}
-            <br />
-            {formatDate(issuedOn)}
-          </p>
+          <dl className="grid gap-0.5 sm:text-right">
+            <dt className="sr-only">Letter no.</dt>
+            <dd className="figure">{stage.letterNo}</dd>
+            <dt className="sr-only">Date</dt>
+            <dd className="text-ink-soft">{issuedOn ? formatDate(issuedOn) : ""}</dd>
+          </dl>
         </header>
 
-        <p className="mt-8">
-          To
+        <p>
+          To the Branch Manager,
           <br />
-          The Branch Manager
-          <br />
-          Home loan bank of {client.name} and {client.coOwner} <SampleTag>Sample addressee</SampleTag>
+          home loan bank of {owners}
         </p>
 
-        <h1 className="mt-8 text-22 font-semibold leading-snug">
-          Request for payment: milestone {milestone.id}, {lowerFirst(milestone.name)}
-        </h1>
+        <div className="grid gap-1">
+          <h1 className="text-22 font-semibold leading-snug">
+            {stage.instalmentLabel}: {stage.milestoneName}, {stage.dueWeekLabel.toLowerCase()}
+          </h1>
+          <p className="text-ink-soft">
+            {project?.name}
+            {project?.address ? `, ${project.address}` : ""}
+          </p>
+        </div>
 
-        <p className="mt-5">
-          This is to confirm that the work described below has been completed at {project.name}, {project.address}{" "}
-          (project {project.code} <SampleTag>Sample code</SampleTag>), under {agreement}. The owner approved this payment stage on {formatDate(approvedOn)}.
-        </p>
-
-        <dl className="mt-6 border-t border-ink">
-          <LetterRow
-            term="Work covered"
-            value={
-              <span className="flex items-start gap-4">
-                <span className="min-w-0 flex-1">{milestone.covers}</span>
-                {/* The drawing is in rosewood line on screen and in black on paper. */}
-                <span className="shrink-0 text-center print:[--color-ink-soft:#000] print:[--color-rosewood:#000]" aria-hidden="true">
-                  <HouseMark tone="line" upTo={markForStop(milestone.id).upTo} highlight={covered} className="w-[84px] shrink-0" />
-                  <span className="lettering mt-0.5 block">This payment</span>
-                </span>
-              </span>
-            }
-          />
-          {projected.workCompletedOn && <LetterRow term="Work completed on" value={formatDate(projected.workCompletedOn)} />}
-          <LetterRow term={`Milestone amount (${milestone.percent}%)`} value={inr(projected.agreedAmount)} money />
-          <LetterRow term="GST at 18%" value={inr(projected.agreedTotal - projected.agreedAmount)} money />
-          <LetterRow term="Received in earlier payments" value={inr(receivedBefore)} money />
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 border-b border-ink py-4">
-            <dt className="font-semibold">Amount now payable</dt>
-            <dd className="figure text-32">{inr(projected.agreedTotal)}</dd>
+        <dl className="grid">
+          {stage.workDoneAt && <Line term="Work done" value={formatDate(stage.workDoneAt)} />}
+          <Line term="Instalment amount" value={inr(stage.amount)} money />
+          <Line term="GST 18%" value={inr(stage.gst)} money />
+          <Line term="Received earlier" value={inr(earlier)} money />
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 border-t border-ink/30 pt-4">
+            <dt className="font-semibold">Payable now</dt>
+            <dd className="figure text-32">{inr(stage.total)}</dd>
           </div>
         </dl>
 
-        <p className="mt-6">
-          Please release the amount payable to Poetry Constructions by bank transfer, quoting letter no.{" "}
-          <span className="whitespace-nowrap">{projected.letterNo}</span>. Account details: as on your agreement (sample).
+        <p>
+          Please pay Poetry Constructions by bank transfer
+          {stage.dueDate ? ` by ${formatDate(stage.dueDate)}` : ""}, quoting <span className="whitespace-nowrap">{stage.letterNo}</span>.
         </p>
 
-        <div className="mt-12 grid gap-8 sm:grid-cols-2">
+        <footer className="grid gap-6 border-t border-ink/15 pt-5 sm:grid-cols-2">
           <div>
-            <p className="display text-22">Vikram Desai</p>
-            <p className="border-t border-ink pt-2">
-              Project Head, for Poetry Constructions <SampleTag>Sample signatory</SampleTag>
-              <br />
-              <span className="text-ink-soft">Authorised signatory</span>
-            </p>
+            <p className="display text-22">{signatory?.name ?? "Vikram Desai"}</p>
+            <p className="text-ink-soft">Project Head, Poetry Constructions</p>
           </div>
-          <div>
-            <p className="display flex items-center gap-3 text-22">
-              {client.name}
-              <Seal tone="line" size={24} />
-            </p>
-            <p className="border-t border-ink pt-2">
-              Owner
-              <br />
-              <span className="text-ink-soft">Approved in the portal on {formatDate(approvedOn)}</span>
-            </p>
+          <div className="grid content-start gap-1 sm:text-right">
+            {stage.clientPaidAt && <Proof label="Payment made" at={stage.clientPaidAt} extra={stage.clientRef} />}
+            {stage.receivedAt && <Proof label="Received" at={stage.receivedAt} />}
           </div>
-        </div>
-      </article>
-
-      {/* The second printed sheet: the work the letter is for, as the site recorded it. */}
-      <article className="letter-sheet mt-8 border border-ink/25 bg-paper px-6 py-8 [break-before:page] sm:px-12 sm:py-12">
-        <h2 className="display text-22 leading-snug">Stage proof</h2>
-        <p className="mt-1 text-15 text-ink-soft">
-          Letter no. {projected.letterNo}, milestone {milestone.id}, {lowerFirst(milestone.name)}
-        </p>
-        <ul className="mt-6 grid gap-3 border-t border-ink pt-5">
-          {doneAt && (
-            <li>
-              Work marked done by {doneBy}, site engineer, on {when(doneAt)}.
-            </li>
-          )}
-          {photos.length > 0 && (
-            <li className="flex flex-wrap gap-2">
-              {photos.slice(0, 3).map((kind, i) => (
-                <SamplePhoto key={`${kind}-${i}`} kind={kind} tag={i === 0} />
-              ))}
-            </li>
-          )}
-          {projected.acceptedAt && <li>Accepted as finished by {client.name} on {when(projected.acceptedAt)}.</li>}
-          <li>Project Head: Vikram Desai.</li>
-        </ul>
+        </footer>
       </article>
     </div>
   );
 }
 
-function LetterRow({ term, value, money }: { term: string; value: ReactNode; money?: boolean }) {
+function Line({ term, value, money }: { term: string; value: ReactNode; money?: boolean }) {
   return (
-    <div className="grid gap-x-6 border-b border-sand py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 border-t border-ink/10 py-2.5">
       <dt className="text-ink-soft">{term}</dt>
-      <dd className={money ? "figure sm:text-right" : ""}>{value}</dd>
+      <dd className={money ? "figure text-right" : "text-right"}>{value}</dd>
     </div>
+  );
+}
+
+function Proof({ label, at, extra }: { label: string; at: string; extra?: string }) {
+  return (
+    <p className="text-13 text-ink-soft">
+      <span className="font-semibold text-ink">{label}</span> · {formatStampShort(at)}
+      {extra ? ` · ${extra}` : ""}
+    </p>
   );
 }

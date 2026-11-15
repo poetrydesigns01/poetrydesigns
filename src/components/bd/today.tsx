@@ -1,28 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { ProgrammeStrip } from "@/components/instruments/programme-strip";
+import type { ReactNode } from "react";
+import {
+  dated,
+  Empty,
+  IconArrow,
+  IconCheck,
+  IconSend,
+  Panel,
+  rowBtn,
+  Stat,
+  Stats,
+  StepDots,
+} from "@/components/architect/glass-ui";
 import { useScope } from "@/components/register/project-switch";
 import { usePause } from "@/components/register/recording-pause";
-import { Register, RegisterRow } from "@/components/register/register";
 import { StaffBoard } from "@/components/register/staff-board";
+import { StatusChip } from "@/components/register/status-chip";
 import { useDemo, useFirm } from "@/lib/demo-store";
 import type { TurnItem } from "@/lib/firm";
-import { countWord, formatDate } from "@/lib/format";
-import { BoardPlot } from "./board-plot";
-import { draftName, onboardedWords, phaseMargin, pipeline, THIS_MONTH } from "./bd-words";
+import { TODAY } from "@/lib/demo-data";
+import { addDays, hours } from "@/lib/format";
+import type { Tone } from "@/lib/portal";
+import { draftName, phaseChip, pipeline, THIS_MONTH } from "./bd-words";
+import { BdTaskRow, bdTasksOf } from "./plan-panel";
 
-// Rohan's Today. Which signed clients still need setting up, who has not signed in, who
-// asked for hours, and how many clients were onboarded this month. The board's picture is
-// the plot being set out for the draft he is working on: a stake for each step done.
+// Rohan's Today: what needs him (drafts to finish, plans to generate, hours asked, invites
+// not taken up), the month's count, the plan tasks the business team supports (sign-up,
+// design brief, approvals) and the projects he onboarded.
 
-function headlineFor(n: number): string {
-  if (n === 0) return "Nothing needs you today, Rohan.";
-  return `${countWord(n, true)} ${n === 1 ? "thing needs" : "things need"} you today, Rohan.`;
-}
-
-/** The invite row's one action: send it again, after the pause. */
-function ResendInvite({ item }: { item: TurnItem }) {
+function ResendInvite({ item, className }: { item: TurnItem; className: string }) {
   const demo = useDemo();
   const pause = usePause();
   const projectId = item.projectId;
@@ -30,130 +38,200 @@ function ResendInvite({ item }: { item: TurnItem }) {
   return (
     <button
       type="button"
-      className="btn btn-quiet"
+      className={className}
       aria-disabled={pause.pending !== null}
       onClick={(event) => {
         if (pause.pending !== null) return;
         const { record } = demo;
         pause.start({
-          what: `The invite for ${item.title}, sent again`,
+          what: `Invite for ${item.title}, sent again`,
           origin: event.currentTarget,
           commit: () => record({ kind: "invite.resent", projectId, by: "rohan" }),
         });
       }}
     >
-      Send the invite again
+      <IconSend /> Resend
     </button>
-  );
-}
-
-function TurnRow({ item, boardDraft }: { item: TurnItem; boardDraft?: string }) {
-  const demo = useDemo();
-  const kind = item.id.split(":")[0];
-  let action = null;
-  let sentence = item.sentence;
-  if (kind === "draft") {
-    // The board picture already says how many steps are done; the row says what is missing.
-    sentence = sentence.replace(/^\d of 4 steps done\. /, "");
-    // The board's one button already continues the draft it shows; only another draft
-    // gets its own Continue here.
-    if (item.id !== `draft:${boardDraft}`) {
-      action = (
-        <Link href={item.href} className="btn btn-quiet">
-          Continue
-        </Link>
-      );
-    }
-  } else if (kind === "hours") {
-    action = (
-      <Link
-        href={`/staff/bd/hours#${item.id}`}
-        className="btn btn-quiet"
-        onClick={() => demo.setFocusRow({ href: "/staff/bd/hours", id: item.id })}
-      >
-        Add hours
-      </Link>
-    );
-  } else if (kind === "invite") {
-    action = <ResendInvite item={item} />;
-  }
-  return (
-    <RegisterRow
-      id={item.id}
-      margin={item.margin}
-      marginSub={item.marginSub}
-      client={item.client}
-      overdue={item.overdue}
-      title={item.title}
-      sentence={sentence}
-      figure={item.figure}
-      action={action}
-      stamps={item.stamps}
-    />
   );
 }
 
 export function BdToday() {
   const firm = useFirm();
+  const demo = useDemo();
   const scope = useScope("bd");
   const turns = firm.turns("rohan", scope);
-  const onboarded = firm.onboardedIn(THIS_MONTH).length;
-  const current = scope === "all" ? null : firm.project(scope);
-
-  // The plot on the board is the draft being set up: Kulkarni first, then a new one.
   const drafts = firm.drafts.filter((d) => d.by === "rohan");
-  const working = drafts.find((d) => !d.opened && d.stepsDone > 0);
-  const shown = working ?? drafts.find((d) => d.id === "kulkarni");
-  const pegs = (shown ? (shown.opened ? 4 : shown.stepsDone) : 0) as 0 | 1 | 2 | 3 | 4;
-  const pictureWords = shown
-    ? shown.opened
-      ? `${draftName(shown)}, workspace opened${shown.openedAt ? ` ${formatDate(shown.openedAt)}` : ""}.`
-      : `${draftName(shown)}, ${shown.stepsDone} of 4 steps done.`
-    : undefined;
-
+  const working = drafts.filter((d) => !d.opened && d.stepsDone > 0);
   const projects = pipeline(firm.projects).filter((p) => scope === "all" || p.id === scope);
-  const state = `${current ? `${current.name}. ` : ""}${onboardedWords(onboarded)}`;
+  const notSignedIn = projects.filter((p) => !p.clientSignedInOn).length;
+  const asked = firm.creditRequests.filter((r) => r.open && (scope === "all" || r.projectId === scope));
+  const onboarded = firm.onboardedIn(THIS_MONTH).length;
+  const first = working[0];
+  // Workspaces opened with no plan yet: onboarding ends with the plan.
+  const soon = addDays(TODAY, 14);
+  const unplanned = drafts.filter((d) => d.opened && d.projectId && !firm.plan(d.projectId));
+  const bdTasks = projects
+    .flatMap((p) => bdTasksOf(firm, p.id).map((task) => ({ ...task, project: p.name })))
+    // Open, and started or starting within two weeks.
+    .filter((x) => x.t.state !== "done" && x.t.plannedStart <= soon)
+    .sort((a, b) => b.t.daysLate - a.t.daysLate || a.t.plannedStart.localeCompare(b.t.plannedStart));
+
+  const n = turns.length + unplanned.length;
+  const headline = n === 0 ? "All clear, Rohan" : `${n} ${n === 1 ? "needs" : "need"} you, Rohan`;
+
+  const row = (item: TurnItem) => {
+    const cls = rowBtn;
+    let sub: ReactNode = null;
+    let chip: { tone: Tone; words: string } = {
+      tone: "waiting",
+      words: item.margin,
+    };
+    let action: ReactNode = null;
+    if (item.id.startsWith("draft:")) {
+      const d = drafts.find((x) => `draft:${x.id}` === item.id);
+      sub = d ? <StepDots done={d.stepsDone} label={`${d.stepsDone} of 4 steps`} /> : null;
+      chip = {
+        tone: "progress",
+        words: d ? `${d.stepsDone}/4 steps` : "Draft",
+      };
+      action = (
+        <Link href={item.href} className={cls}>
+          Continue <IconArrow />
+        </Link>
+      );
+    } else if (item.id.startsWith("invite:")) {
+      sub = <span className="text-13 text-ink-soft">Invited · {item.margin}</span>;
+      chip = { tone: "late", words: "Not signed in" };
+      action = <ResendInvite item={item} className={cls} />;
+    } else {
+      const r = asked.find((x) => x.id === item.id);
+      sub = <span className="text-13 text-ink-soft">{r ? firm.project(r.projectId)?.name : ""}</span>;
+      chip = {
+        tone: "waiting",
+        words: r ? `${hours(r.hours)} asked` : item.margin,
+      };
+      action = (
+        <Link
+          href={`/staff/bd/hours#${item.id}`}
+          className={cls}
+          onClick={() => demo.setFocusRow({ href: "/staff/bd/hours", id: item.id })}
+        >
+          Add hours
+        </Link>
+      );
+    }
+    const title = item.id.startsWith("draft:") ? (drafts.find((x) => `draft:${x.id}` === item.id) ?? null) : null;
+    return (
+      <li key={item.id} className="glass-row flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
+        <div className="grid min-w-0 flex-[1_1_12rem] gap-1">
+          <p className="truncate text-15 font-semibold text-ink">
+            {title
+              ? draftName(title)
+              : item.id.startsWith("invite:")
+                ? item.title
+                : (asked.find((x) => x.id === item.id)?.by ?? item.title)}
+          </p>
+          {sub}
+        </div>
+        <StatusChip tone={chip.tone}>{chip.words}</StatusChip>
+        {action}
+      </li>
+    );
+  };
 
   return (
     <>
       <StaffBoard
         place="Today"
-        headline={headlineFor(turns.length)}
-        state={state}
+        headline={headline}
         primary={
-          working
-            ? { label: `Continue ${draftName(working)}`, href: `/staff/bd/onboard/${working.id}` }
-            : { label: "Start a new project", href: "/staff/bd/onboard/new" }
+          first
+            ? {
+                label: `Continue ${draftName(first)}`,
+                href: `/staff/bd/onboard/${first.id}`,
+              }
+            : { label: "New project", href: "/staff/bd/onboard/new" }
         }
-        picture={<BoardPlot pegs={pegs} />}
-        pictureWords={pictureWords}
       />
-      <div className="staff-columns mt-8">
-        <Register title="Your turn" empty="Nothing needs you today.">
-          {turns.map((item) => (
-            <TurnRow key={item.id} item={item} boardDraft={working?.id} />
-          ))}
-        </Register>
-        {/* The pipeline at a glance: where each project stands, in the margin, and its strip.
-            The full list, with sign-ins and dates, is on Projects. */}
-        <Register title="Your projects" limit={4} empty="No projects onboarded yet.">
-          {projects.map((p) => {
-            const { margin, sub } = phaseMargin(p);
-            // An invite not yet taken up waits in Your turn with its age; here it is only "Invited".
-            const invited = p.phase === "invited" && !p.clientSignedInOn;
-            return (
-              <RegisterRow
-                key={p.id}
-                id={`project:${p.id}`}
-                margin={invited ? "Invited" : margin}
-                marginSub={invited ? undefined : sub}
-                title={p.name}
-                href={`/staff/projects/${p.id}`}
-                instrument={<ProgrammeStrip cells={p.strip} size={120} />}
-              />
-            );
-          })}
-        </Register>
+      <div className="mt-6 grid gap-4 lg:mt-8">
+        <Stats label="At a glance">
+          <Stat label="Setting up" value={working.length} href="/staff/bd/onboard" />
+          <Stat label="Onboarded this month" value={onboarded} />
+          <Stat label="Not signed in" value={notSignedIn} tone={notSignedIn > 0 ? "late" : undefined} />
+          <Stat label="Hours asked" value={asked.length} href="/staff/bd/hours" />
+        </Stats>
+
+        <div className="grid items-start gap-4 min-[1200px]:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+          <div className="grid min-w-0 gap-4">
+            <Panel title="Needs you">
+              {n === 0 ? (
+                <Empty>
+                  <span className="inline-flex items-center gap-2">
+                    <IconCheck /> Nothing waiting
+                  </span>
+                </Empty>
+              ) : (
+                <ul className="grid grid-cols-1 gap-1">
+                  {unplanned.map((d) => (
+                    <li key={`plan:${d.id}`} className="glass-row flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
+                      <div className="grid min-w-0 flex-[1_1_12rem] gap-1">
+                        <p className="truncate text-15 font-semibold text-ink">{draftName(d)}</p>
+                        <span className="figure text-13 text-ink-soft">{d.projectId ? firm.project(d.projectId)?.code : ""}</span>
+                      </div>
+                      <StatusChip tone="waiting">No plan</StatusChip>
+                      <Link href={`/staff/bd/onboard/${d.id}`} className={rowBtn}>
+                        Plan <IconArrow />
+                      </Link>
+                    </li>
+                  ))}
+                  {turns.map(row)}
+                </ul>
+              )}
+            </Panel>
+
+            <Panel title="Business team">
+              {bdTasks.length === 0 ? (
+                <Empty>Nothing open</Empty>
+              ) : (
+                <ul className="grid grid-cols-1 gap-1">
+                  {bdTasks.map((task) => (
+                    <BdTaskRow key={task.t.id} task={task} project={task.project} />
+                  ))}
+                </ul>
+              )}
+            </Panel>
+          </div>
+
+          <Panel
+            title="Projects"
+            aside={
+              <Link href="/staff/bd/projects" className={rowBtn}>
+                All <IconArrow />
+              </Link>
+            }
+          >
+            {projects.length === 0 ? (
+              <Empty>None yet</Empty>
+            ) : (
+              <ul className="grid grid-cols-1 gap-1">
+                {projects.slice(0, 6).map((p) => {
+                  const chip = phaseChip(p);
+                  return (
+                    <li key={p.id}>
+                      <Link href={`/staff/projects/${p.id}`} className="glass-row flex min-h-11 items-center gap-3 px-3 py-2">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-15 text-ink">{p.name}</span>
+                          <span className="block text-13 text-ink-soft">{p.onboardedOn ? dated(p.onboardedOn) : "—"}</span>
+                        </span>
+                        <StatusChip tone={chip.tone}>{chip.words}</StatusChip>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Panel>
+        </div>
       </div>
     </>
   );

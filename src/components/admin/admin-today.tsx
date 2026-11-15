@@ -2,106 +2,59 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ProgrammeStrip } from "@/components/instruments/programme-strip";
-import { Chip, ChipGroup } from "@/components/register/chips";
 import { useScope } from "@/components/register/project-switch";
-import { Register, RegisterRow } from "@/components/register/register";
 import { StaffBoard } from "@/components/register/staff-board";
+import { StatusChip } from "@/components/register/status-chip";
 import { TODAY } from "@/lib/demo-data";
 import { useDemo, useFirm } from "@/lib/demo-store";
-import { ageWords, daysSince, type Firm, type ProjectView, type StampView, type StripCell } from "@/lib/firm";
-import { countWord, dayCount, inr, listWords, percent, weekdayDate } from "@/lib/format";
-import {
-  dayWords,
-  exceptionRow,
-  healthWords,
-  moneyLine,
-  newestFirstStamps,
-  projectTurn,
-  type Money,
-} from "./admin-data";
-import { CourseTrench, trenchWords } from "./course-trench";
+import type { Firm, ProjectView, TurnItem } from "@/lib/firm";
+import { formatShortDate, percent, weekdayDate } from "@/lib/format";
+import { milestoneStage } from "@/lib/workflow-template";
+import type { PaymentStageView, Tone } from "@/lib/portal";
+import { exceptionRow } from "./admin-data";
+import { Count, GlassTable, Icon, inrShort, Panel, Segments, StatCard, StatRow, WaitChip } from "./glass-kit";
+import { healthOf, portfolio } from "./portfolio";
 
-// Shalini's Today. What needs her, which projects lose money on paper or in cash, where
-// work is stuck, and how many clients were onboarded this month. The board draws every
-// project as a course over a trench, all at one scale, and names the ones in trouble; every
-// project below carries the same drawing, so a deep trench stands out down the list.
+// Shalini's Today: the portfolio in five figures, what needs her, and every project with
+// its code, the milestone in hand, the next instalment's week, margin and cash, a loss in
+// brick. Each row opens the project's programme.
 
-type Sort = "listed" | "margin" | "cash" | "days";
+type Sort = "listed" | "margin" | "cash";
 
-const SORTS: { id: Exclude<Sort, "listed">; label: string }[] = [
-  { id: "margin", label: "Lowest margin" },
-  { id: "cash", label: "Lowest cash" },
-  { id: "days", label: "Longest at stage" },
-];
-
-/** The money half of a project's sentence at 1280: "Healthy, with 19% margin so far and ₹28,500 in hand." */
-function moneyWords(p: ProjectView, money: Money): string {
-  const cash = money.cash < 0 ? `short of cash by ${inr(-money.cash)}` : `${inr(money.cash)} in hand`;
-  if (money.margin === null) return `No margin until building starts; ${cash}.`;
-  if (p.phase === "handed-over") return `Margin ${percent(money.marginPercent ?? 0)} on the whole contract; ${cash}.`;
-  return `${healthWords(p, money)}, with ${percent(money.marginPercent ?? 0)} margin so far and ${cash}.`;
+/** A short label for an exception, by its kind. */
+function exceptionWords(item: TurnItem): { words: string; tone: Tone } {
+  const [, kind, sub] = item.id.split(":");
+  if (kind === "cash") return { words: "Short of cash", tone: "late" };
+  if (kind === "margin") return { words: "Losing money", tone: "late" };
+  if (kind === "letter") return { words: "Payment overdue", tone: "late" };
+  if (kind === "unseen") return { words: "Request not seen", tone: "waiting" };
+  if (kind === "client" && sub === "pay") return { words: "Payment with client", tone: "waiting" };
+  if (kind === "client" && sub === "rev") return { words: "Held price passed", tone: "waiting" };
+  if (kind === "client") return { words: "Design with client", tone: "waiting" };
+  if (kind === "split") return { words: "Split asked", tone: "waiting" };
+  return { words: "Look", tone: "progress" };
 }
 
-/** A strip with no peg over it: on a phone, past three pegs, "With client" is said in words. */
-function withoutPeg(cells: StripCell[]): StripCell[] {
-  return cells.map((cell) => (cell.state === "raised" ? { ...cell, state: "built" } : cell));
+/**
+ * An overdue-letter exception read against the payment stage as it stands now: the client
+ * may already have marked it paid, so the chip and the spoken title follow the stage.
+ */
+function letterStage(item: TurnItem, firm: Firm): PaymentStageView | undefined {
+  const [, kind, projectId, n] = item.id.split(":");
+  if (kind !== "letter" || !projectId) return undefined;
+  return firm.payments(projectId as ProjectView["id"]).find((s) => String(s.n) === n);
 }
 
-/** Hands out the phone's peg budget down the list: a project with a payment raised takes two. */
-function withPegs(rows: { p: ProjectView; money: Money }[], budget: number, firm: Firm) {
-  let pegs = budget;
-  const out = [];
-  for (const { p, money } of rows) {
-    const turn = projectTurn(p, firm);
-    const raised = p.strip.some((cell) => cell.state === "raised");
-    const pegged = !raised || pegs >= 2;
-    if (raised && pegged) pegs -= 2;
-    out.push({ p, money, turn: { ...turn, client: turn.client && pegged }, pegged });
-  }
-  return out;
+function letterTitle(name: string, s: PaymentStageView): string {
+  if (s.state === "client-paid")
+    return `${name}, ${s.instalmentLabel}: payment made${s.clientPaidAt ? ` ${formatShortDate(s.clientPaidAt)}` : ""}, to confirm in the bank.`;
+  return `${name}, ${s.instalmentLabel}: ${s.status.toLowerCase()}.`;
 }
 
-function sorted(rows: { p: ProjectView; money: Money }[], sort: Sort) {
+function sorted(rows: ProjectView[], sort: Sort) {
   if (sort === "listed") return rows;
-  const key = (row: { p: ProjectView; money: Money }) =>
-    sort === "margin"
-      ? (row.money.marginPercent ?? Number.POSITIVE_INFINITY)
-      : sort === "cash"
-        ? row.money.cash
-        : -row.p.daysAtStage;
+  const key = (p: ProjectView) => (sort === "margin" ? (p.marginPercent ?? Number.POSITIVE_INFINITY) : p.cash);
   return [...rows].sort((a, b) => key(a) - key(b));
-}
-
-/** Whether a project needs the owner: losing money on the work done, or short of cash. */
-function inTrouble(p: ProjectView): boolean {
-  return p.margin !== null && p.phase !== "handed-over" && (p.margin < 0 || p.cash < 0);
-}
-
-/** Each project's name in the room of a word: "Bhat", and "Cottage" beside "Iyer". */
-function shortNames(projects: ProjectView[]): Map<string, string> {
-  const names = new Map<string, string>();
-  const taken = new Set<string>();
-  for (const p of projects) {
-    const words = p.name.split(" ");
-    const name = taken.has(words[0]) ? words[words.length - 1] : words[0];
-    taken.add(name);
-    names.set(p.id, name);
-  }
-  return names;
-}
-
-/** The board's words: who is losing money and who is short of cash, worst first. */
-function troubleWords(projects: ProjectView[], names: Map<string, string>): string {
-  const building = projects.filter(inTrouble);
-  const losing = building.filter((p) => (p.margin ?? 0) < 0).sort((a, b) => (a.margin ?? 0) - (b.margin ?? 0));
-  const short = building.filter((p) => (p.margin ?? 0) >= 0).sort((a, b) => a.cash - b.cash);
-  const said = (list: ProjectView[]) => listWords(list.map((p) => names.get(p.id) ?? p.name));
-  const parts: string[] = [];
-  if (losing.length > 0) parts.push(`${said(losing)} ${losing.length === 1 ? "is" : "are"} losing money`);
-  if (short.length > 0) parts.push(`${said(short)} ${short.length === 1 ? "is" : "are"} short of cash`);
-  if (parts.length === 0) return "Every project is making a margin, with cash in hand.";
-  return `${parts.join("; ")}.`;
 }
 
 export function AdminToday() {
@@ -110,195 +63,244 @@ export function AdminToday() {
   const scope = useScope("admin");
   const [sort, setSort] = useState<Sort>("listed");
 
-  // The firm's own figures: a bill the admin deleted is already out of them.
-  const live = firm.projects.filter((p) => p.phase !== "draft");
-  const inScope = (id?: string) => scope === "all" || id === scope;
-  const projects = live.filter((p) => inScope(p.id)).map((p) => ({ p, money: p as Money }));
-  const rows = firm.exceptions.filter((item) => inScope(item.projectId)).map((item) => exceptionRow(item, firm));
-  const month = weekdayDate(TODAY).split(" ").pop() ?? "this month";
-  const onboarded = firm.onboardedIn(TODAY.slice(0, 7)).filter((p) => inScope(p.id));
-  const scoped = scope === "all" ? null : firm.project(scope);
-
-  const n = rows.length;
-  const headline =
-    n === 0
-      ? "Nothing needs you today, Shalini."
-      : `${countWord(n, true)} ${n === 1 ? "thing needs" : "things need"} you, Shalini.`;
-  const onboardWords = `${onboarded.length === 0 ? "No" : onboarded.length} ${
-    onboarded.length === 1 ? "client" : "clients"
-  } onboarded in ${month}.`;
-  const state = scoped
-    ? `${scoped.name}: ${scoped.stageWords.charAt(0).toLowerCase()}${scoped.stageWords.slice(1)}.`
-    : `${live.length} projects. ${onboardWords}`;
-
-  // One scale for every drawing on the page, so a deep trench reads as deep.
-  const scale = Math.max(1, ...live.flatMap((p) => [Math.abs(p.margin ?? 0), Math.abs(p.cash)]));
-  const names = shortNames(live);
-
-  // The board: the chosen project drawn large; with every project in scope, each one small,
-  // side by side, and the ones in trouble named in the words under them.
-  const picture = scoped ? (
-    <CourseTrench
-      margin={scoped.margin}
-      cash={scoped.cash}
-      inDesign={scoped.margin === null}
-      tone="dark"
-      width={320}
-      height={120}
-    />
-  ) : (
-    // Each drawing keeps near its drawn size, so a tablet does not blow the bricks up.
-    <ul className="grid grid-cols-7 gap-x-2 sm:max-w-[36rem] sm:gap-x-3" style={{ maxHeight: "none" }}>
-      {live.map((p) => (
-        <li key={p.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)] justify-items-start gap-1">
-          <div className="w-full max-w-[56px]">
-            <CourseTrench
-              margin={p.margin}
-              cash={p.cash}
-              inDesign={p.margin === null}
-              scale={scale}
-              tone="dark"
-              width={56}
-              height={132}
-              className="w-full"
-            />
-          </div>
-          {/* On a phone only the projects in trouble are named, as the words below name them.
-              From 1024 px the longest name may reach a few pixels into the gap rather than be cut. */}
-          <span
-            className={`lettering max-w-full truncate lg:overflow-visible ${inTrouble(p) ? "font-semibold text-lime" : "hidden text-lime/75 sm:block"}`}
-          >
-            {names.get(p.id)}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-  const pictureWords = scoped
-    ? `${scoped.name}: ${trenchWords(scoped.margin, scoped.marginPercent, scoped.cash)}`
-    : troubleWords(live, names);
-
-  // At most three peg glyphs on a phone: the client rows in "Needs you" first, then each
-  // project with a payment raised (its turn margin and its strip, two pegs a row).
-  const list = withPegs(sorted(projects, sort), 3 - rows.filter((row) => row.client).length, firm);
+  const live = firm.projects.filter((p) => p.phase !== "draft" && (scope === "all" || p.id === scope));
+  const sum = portfolio(live, firm);
+  const exceptions = firm.exceptions.filter((item) => scope === "all" || item.projectId === scope);
+  const month = weekdayDate(TODAY).split(" ").pop() ?? "";
+  const onboarded = firm.onboardedIn(TODAY.slice(0, 7)).filter((p) => scope === "all" || p.id === scope);
+  // An opened project with no plan yet: the admin's turn to generate one.
+  const noPlan = live.filter((p) => firm.plan(p.id) === null);
+  const n = noPlan.length + exceptions.length;
 
   return (
     <>
-      <StaffBoard place="Today" headline={headline} state={state} picture={picture} pictureWords={pictureWords} />
+      <StaffBoard place="Today" headline={n === 0 ? "All clear, Shalini" : `${n} need you, Shalini`} />
 
-      <div className="mt-8 grid gap-12">
-        <Register title="Needs you" empty="Nothing needs you today." limit={8}>
-          {rows.map((row) => (
-            <RegisterRow
-              key={row.item.id}
-              id={row.item.id}
-              margin={row.margin}
-              marginSub={row.marginSub}
-              client={row.client}
-              // The whole row is one link, to the record tab that answers it. Built here
-              // rather than with `href` so a request's row can be outlined where it lands.
-              title={
-                <Link
-                  href={row.href}
-                  className="reg-link hover:underline hover:decoration-1 hover:underline-offset-4"
-                  onClick={() => {
-                    if (row.focus) demo.setFocusRow({ href: row.href, id: row.focus });
-                  }}
-                >
-                  {row.item.title}
-                </Link>
-              }
-              stamps={row.item.stamps}
+      <div className="mt-6 grid gap-5">
+        {/* On a phone the list that needs her comes first; the figures follow it. */}
+        <div className="order-2 sm:order-none">
+          <StatRow cols={5} label="Portfolio">
+            <StatCard label="Contract value" value={inrShort(sum.contract)} sub={`${live.length} projects`} icon="file" />
+            <StatCard label="Received" value={inrShort(sum.received)} sub="Before GST" icon="rupee" />
+            <StatCard
+              label="Outstanding"
+              value={inrShort(sum.outstanding)}
+              sub={`${sum.dueStages} due`}
+              icon="clock"
+              tone={sum.overdue > 0 ? "late" : undefined}
             />
-          ))}
-        </Register>
+            <StatCard
+              label="Margin so far"
+              value={sum.marginPercent === null ? "–" : percent(sum.marginPercent)}
+              sub={inrShort(sum.margin)}
+              icon="chart"
+              tone={sum.margin < 0 ? "late" : undefined}
+            />
+            <StatCard label="Cash" value={inrShort(sum.cash)} sub="Received less spent" icon="rupee" tone={sum.cash < 0 ? "late" : undefined} />
+          </StatRow>
+        </div>
 
-        <section aria-label="Every project" className="grid gap-4">
-          <ChipGroup label="Sort the projects">
-            {SORTS.map((s) => (
-              <Chip key={s.id} pressed={sort === s.id} onClick={() => setSort(sort === s.id ? "listed" : s.id)}>
-                {s.label}
-              </Chip>
-            ))}
-          </ChipGroup>
-          <Register title="Every project" limit={12}>
-            {list.map(({ p, money, turn, pegged }) => (
-              <RegisterRow
-                key={p.id}
-                id={`project:${p.id}`}
-                margin={turn.margin}
-                marginSub={turn.marginSub}
-                client={turn.client}
-                title={p.name}
-                href={`/staff/projects/${p.id}`}
-                sentence={
-                  <>
-                    <span className="lg:hidden">{moneyLine(p, money)}</span>
-                    <span className="hidden lg:inline">
-                      {p.stageWords}, {p.daysAtStage === 0 ? "from today" : `${dayCount(p.daysAtStage)} at this stage`}.
-                      {p.next ? ` Next, ${p.next.words.charAt(0).toLowerCase()}${p.next.words.slice(1)}.` : ""}{" "}
-                      {moneyWords(p, money)}
-                    </span>
-                  </>
-                }
-                instrument={
-                  <div className="grid gap-2 lg:justify-items-end">
-                    {pegged ? (
-                      <ProgrammeStrip cells={p.strip} size={120} />
-                    ) : (
-                      <>
-                        <span className="lg:hidden">
-                          <ProgrammeStrip cells={withoutPeg(p.strip)} size={120} />
+        <div className="order-1 grid items-start gap-5 sm:order-none xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <Panel title="Needs you" aside={<Count n={n} tone={n > 0 ? "late" : undefined} />} strong>
+            {n === 0 ? (
+              <p className="px-1 py-3 text-15 text-ink-soft">Nothing today.</p>
+            ) : (
+              <ul className="grid gap-1">
+                {noPlan.map((p) => (
+                  <li key={`no-plan:${p.id}`}>
+                    <Link
+                      href={`/staff/projects/${p.id}/programme`}
+                      className="glass-row grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5"
+                      title={`${p.name}: no plan yet`}
+                    >
+                      <span className="grid min-w-0">
+                        <span className="truncate text-15 font-semibold">{p.name}</span>
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <StatusChip tone="waiting">No plan</StatusChip>
                         </span>
-                        <span className="hidden lg:block">
-                          <ProgrammeStrip cells={p.strip} size={120} />
+                      </span>
+                      <Icon name="arrow" className="size-4 text-ink-soft" />
+                      <span className="sr-only">{p.name}: no plan yet, generate it</span>
+                    </Link>
+                  </li>
+                ))}
+                {exceptions.slice(0, 8).map((item) => {
+                  const row = exceptionRow(item, firm);
+                  const p = item.projectId ? firm.project(item.projectId) : undefined;
+                  const letter = letterStage(item, firm);
+                  const { words, tone } = letter ? { words: letter.status, tone: letter.tone } : exceptionWords(item);
+                  const title = letter ? letterTitle(p?.name ?? "Project", letter) : item.title;
+                  return (
+                    <li key={item.id}>
+                      <Link
+                        href={row.href}
+                        onClick={() => {
+                          if (row.focus) demo.setFocusRow({ href: row.href, id: row.focus });
+                        }}
+                        className="glass-row grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5"
+                        title={title}
+                      >
+                        <span className="grid min-w-0">
+                          <span className="truncate text-15 font-semibold">{p?.name ?? "Firm"}</span>
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <StatusChip tone={tone}>{words}</StatusChip>
+                            {letter ? (
+                              letter.state === "client-paid" &&
+                              letter.clientPaidAt && <span className="glass-chip">Paid {formatShortDate(letter.clientPaidAt)}</span>
+                            ) : item.id.startsWith("ex:cash:") && item.figure ? (
+                              // Short of cash: the shortfall, not the age of the letter behind it.
+                              <span className="glass-chip figure">{item.figure}</span>
+                            ) : (
+                              item.days > 0 && <WaitChip days={item.days} />
+                            )}
+                          </span>
                         </span>
-                      </>
-                    )}
-                    <span className="hidden lg:block">
-                      <CourseTrench
-                        margin={money.margin}
-                        cash={money.cash}
-                        inDesign={money.margin === null}
-                        scale={scale}
-                        width={120}
-                        height={56}
-                      />
-                    </span>
-                  </div>
-                }
-              />
-            ))}
-          </Register>
-        </section>
+                        <Icon name="arrow" className="size-4 text-ink-soft" />
+                        <span className="sr-only">{title}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Panel>
 
-        <Register title={`Onboarded in ${month}`} empty={`No clients onboarded in ${month} yet.`}>
-          {onboarded.map((p) => (
-            <OnboardedRow key={p.id} p={p} />
-          ))}
-        </Register>
+          <Panel title="Queues">
+            <div className="grid grid-cols-2 gap-2">
+              <Queue label="Client approvals" n={sum.approvals} icon="check" />
+              <Queue label="Open requests" n={sum.openRequests} sub={sum.lateRequests > 0 ? `${sum.lateRequests} late` : undefined} icon="box" />
+              <Queue label="Payments due" n={sum.dueStages} sub={sum.overdue > 0 ? `${sum.overdue} overdue` : undefined} icon="rupee" />
+              <Queue label={`Onboarded, ${month.slice(0, 3)}`} n={onboarded.length} icon="users" />
+            </div>
+          </Panel>
+        </div>
+
+        <div className="order-3 flex flex-wrap items-center justify-between gap-3 sm:order-none">
+          <h2 className="px-1 text-17 font-semibold text-ink">Projects</h2>
+          <Segments<Sort>
+            label="Sort projects"
+            value={sort}
+            onChange={setSort}
+            options={[
+              { id: "listed", label: "Listed" },
+              { id: "margin", label: "Margin" },
+              { id: "cash", label: "Cash" },
+            ]}
+          />
+        </div>
+        <div className="order-4 sm:order-none">
+          <ProjectTable projects={sorted(live, sort)} firm={firm} />
+        </div>
       </div>
     </>
   );
 }
 
-/** A client onboarded this month: when the workspace was opened, and its invite. */
-function OnboardedRow({ p }: { p: ProjectView }) {
-  const firm = useFirm();
-  const stamps: StampView[] = newestFirstStamps([
-    ...firm.stampsFor(`invite:${p.id}`),
-    ...firm.stampsFor("draft:kulkarni").filter((s) => p.id === "kulkarni" && s.words.startsWith("Workspace opened")),
-  ]);
-  const by = firm.person(p.onboardedBy)?.name ?? "Business development";
-  const opened = p.onboardedOn ? dayWords(p.onboardedOn) : "";
+function Queue({ label, n, sub, icon }: { label: string; n: number; sub?: string; icon: "check" | "box" | "rupee" | "users" }) {
   return (
-    <RegisterRow
-      id={`invite:${p.id}`}
-      margin={ageWords(p.onboardedOn ? daysSince(p.onboardedOn) : 0)}
-      title={p.name}
-      href={`/staff/projects/${p.id}`}
-      sentence={`${p.stageWords}. ${by} opened it${opened ? ` on ${opened}` : ""} for ${listWords(p.clients)}.`}
-      stamps={stamps}
-    />
+    <div className="glass-inner grid content-start gap-0.5 p-3">
+      <p className="lettering flex items-center gap-1.5 text-ink-soft">
+        <Icon name={icon} className="size-3.5" />
+        {label}
+      </p>
+      <p className="figure text-22">{n}</p>
+      {sub && <p className="text-13 late-text">{sub}</p>}
+    </div>
   );
+}
+
+/** Every project: code, milestone in hand, next instalment's week, margin and cash, a loss in brick. */
+export function ProjectTable({ projects, firm }: { projects: ProjectView[]; firm: Firm }) {
+  return (
+    <section aria-label="Projects" className="glass-strong p-3 sm:p-5">
+      <GlassTable<ProjectView>
+        caption="Projects"
+        rows={projects}
+        rowKey={(p) => p.id}
+        wide="lg"
+        chip={(p) => {
+          const h = healthOf(p);
+          return <StatusChip tone={h.tone}>{h.words}</StatusChip>;
+        }}
+        columns={[
+          {
+            label: "Project",
+            cell: (p) => (
+              <span className="grid min-w-0">
+                <Link href={`/staff/projects/${p.id}/programme`} className="link -my-3 inline-flex min-h-11 items-center">
+                  {p.name}
+                </Link>
+                <span className="figure text-13 font-normal text-ink-soft">{p.code || "–"}</span>
+              </span>
+            ),
+          },
+          {
+            label: "Milestone",
+            cell: (p) => {
+              const m = milestoneWords(p);
+              return (
+                <span className="grid min-w-0">
+                  <span className="figure font-semibold">{m.tag}</span>
+                  <span className="truncate text-13 font-normal text-ink-soft">{m.words}</span>
+                </span>
+              );
+            },
+          },
+          {
+            label: "Next instalment",
+            cell: (p) => {
+              const s = nextInstalment(p, firm);
+              if (!s) return <span className="text-ink-soft">–</span>;
+              return (
+                <span className="grid min-w-0 justify-items-start">
+                  <span className={`figure ${s.overdueDays > 0 ? "late-text" : "font-semibold"}`}>
+                    {s.n === 0 ? "Sign-up" : `No. ${s.n}`} · {s.dueWeekLabel}
+                  </span>
+                  <span className={`text-13 font-normal ${s.overdueDays > 0 ? "late-text" : "text-ink-soft"}`}>{s.status}</span>
+                </span>
+              );
+            },
+          },
+          {
+            label: "Margin",
+            align: "right",
+            cell: (p) =>
+              p.margin === null ? (
+                <span className="text-ink-soft">–</span>
+              ) : (
+                <span className={`figure ${p.margin < 0 ? "late-text" : ""}`}>{percent(p.marginPercent ?? 0)}</span>
+              ),
+          },
+          {
+            label: "Cash",
+            align: "right",
+            cell: (p) => <span className={`figure whitespace-nowrap ${p.cash < 0 ? "late-text" : ""}`}>{inrShort(p.cash)}</span>,
+          },
+          {
+            label: "Health",
+            phone: false,
+            width: "w-36",
+            cell: (p) => {
+              const h = healthOf(p);
+              return <StatusChip tone={h.tone}>{h.words}</StatusChip>;
+            },
+          },
+        ]}
+      />
+    </section>
+  );
+}
+
+/** "M4" and its work, or the stage in hand before construction. */
+function milestoneWords(p: ProjectView): { tag: string; words: string } {
+  if (p.phase === "handed-over") return { tag: "Done", words: "Handed over" };
+  if (p.currentMilestone !== null) return { tag: `M${p.currentMilestone}`, words: milestoneStage(p.currentMilestone)?.short ?? "" };
+  const stage = p.plan?.stages.find((s) => s.id === p.plan?.currentStage);
+  return stage ? { tag: "Pre", words: stage.short } : { tag: "–", words: "No plan" };
+}
+
+/** The first instalment not yet received. */
+function nextInstalment(p: ProjectView, firm: Firm): PaymentStageView | undefined {
+  if (p.phase === "handed-over") return undefined;
+  return firm.payments(p.id).find((s) => s.state !== "paid");
 }
