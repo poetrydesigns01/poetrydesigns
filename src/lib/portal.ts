@@ -24,7 +24,13 @@ import {
   type WorkOrderStatus,
 } from "./portal-data";
 import type { ProjectedChange } from "./projection";
-import { weekEnd, weekStart, type PlanStageState, type PlanStageView, type PlanTaskView, type PlanView } from "./workflow-plan";
+import {
+  constructionWeekOf,
+  mondayOf,
+  preWeekOf,
+  weekEnd,
+  weekStart,
+  type PlanStageState, type PlanStageView, type PlanTaskView, type PlanView } from "./workflow-plan";
 import {
   WORKFLOW_TEMPLATE,
   fallsInMilestone,
@@ -210,6 +216,22 @@ export type TimelineInstalment = {
   /** The milestone it falls inside (0 before construction). */
   milestone: number;
   unlocks: number | null;
+  /** Its share of the contract value, as the workflow sets it. */
+  percent: number;
+  /**
+   * Its expected due week on its clock: the planned week, moved by any days approved client
+   * changes added. Every week label on the plan uses this, so label, bar and pin agree.
+   */
+  expectedWeek: number;
+  /** Monday and Sunday of the expected due week: where its bar on the plan ends. */
+  dueStart: string;
+  dueEnd: string;
+  /**
+   * The project has reached its expected due week (or the money is already asked for or in). Until
+   * then the plan draws it as a red bar from construction week 1, as Poetry's schedule
+   * sheet does; once reached it is drawn plainly ("free").
+   */
+  reached: boolean;
   state: PaymentState;
   status: string;
   tone: Tone;
@@ -791,7 +813,11 @@ export function derivePortal(input: PortalInput): Portal {
           m.fallsInDoneOn && m.fallsInDoneOn <= (letterRaisedAt ? datePart(letterRaisedAt) : TODAY) ? m.fallsInDoneOn : undefined,
         dueWeek: inst?.week ?? 1,
         dueClock: inst?.clock ?? "pre",
-        dueWeekLabel: inst?.clock === "construction" ? `Week ${inst.week}` : `Week ${inst?.week ?? 1} before construction`,
+        // The week the instalment is now expected in: a client change can move it later.
+        dueWeekLabel:
+          inst?.clock === "construction"
+            ? `Week ${plan ? Math.max(inst.week, constructionWeekOf(plan, expectedDueDate)) : inst.week}`
+            : `Week ${inst?.week ?? 1} before construction`,
         plannedDueDate,
         expectedDueDate,
         plannedDate: expectedDueDate,
@@ -816,20 +842,37 @@ export function derivePortal(input: PortalInput): Portal {
     }
     payments.set(p.id, list);
     const timeline = timelines.get(p.id);
-    if (timeline) {
-      timeline.instalments = list.map((s) => ({
-        n: s.n,
-        label: s.instalmentLabel,
-        clock: s.dueClock,
-        week: s.dueWeek,
-        plannedDate: s.plannedDueDate,
-        expectedDate: s.expectedDueDate,
-        milestone: s.milestone,
-        unlocks: s.unlocks,
-        state: s.state,
-        status: s.status,
-        tone: s.tone,
-      }));
+    if (timeline && plan) {
+      timeline.instalments = list.map((s) => {
+        // Client changes add whole days, so the expected date can fall mid-week; the bar,
+        // the pin, the week label and "reached" all follow the week that date falls in.
+        const dueStart = mondayOf(s.expectedDueDate);
+        const expectedWeek =
+          s.dueClock === "construction" ? constructionWeekOf(plan, dueStart) : preWeekOf(plan, dueStart);
+        return {
+          n: s.n,
+          label: s.instalmentLabel,
+          clock: s.dueClock,
+          week: s.dueWeek,
+          expectedWeek,
+          plannedDate: s.plannedDueDate,
+          expectedDate: s.expectedDueDate,
+          milestone: s.milestone,
+          unlocks: s.unlocks,
+          percent: instalmentOf(s.n)?.percent ?? 0,
+          dueStart,
+          dueEnd: addDays(dueStart, 6),
+          reached:
+            TODAY >= dueStart ||
+            s.state === "work-done" ||
+            s.state === "due" ||
+            s.state === "client-paid" ||
+            s.state === "paid",
+          state: s.state,
+          status: s.status,
+          tone: s.tone,
+        };
+      });
     }
   }
 

@@ -3,17 +3,22 @@
  */
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { formatDate } from "@/lib/format";
 import type { TimelineView, Tone } from "@/lib/portal";
 import { WORKFLOW_TEMPLATE, WORKFLOW_TRACKS, type WorkflowClock, type WorkflowStage } from "@/lib/workflow-template";
 
 // A week-by-week chart: a label column, then one column per week (pre-construction weeks 1
 // to 7, then construction weeks 1 to 50). Each row is a stage drawn as a bar: the planned
 // weeks as a pale outline, where it stands as a filled bar, and any days it runs past plan
-// in brick. Instalments sit on their own row as numbered dots, and today is a line. On a
-// phone the chart scrolls sideways inside its panel, label column held, and opens on today.
+// in brick. Each instalment has its own slim row just above the milestone it opens, as on
+// Poetry's schedule sheet: a brick bar from construction week 1 to its due week while that
+// week is ahead, a plain hairline once reached ("free"), and a diamond in its due week
+// toned by where the money stands. Today is a line. On a phone the chart scrolls sideways
+// inside its panel, label column held, and opens on today.
 
-export type BarTone = "done" | "current" | "progress" | "waiting" | "late" | "locked" | "plan" | "track";
+/** "due": an instalment whose due week is ahead (red); "free": one reached, drawn plainly. */
+export type BarTone = "done" | "current" | "progress" | "waiting" | "late" | "locked" | "plan" | "track" | "due" | "free";
 
 export type GanttBar = { from: number; to: number; tone: BarTone };
 
@@ -29,11 +34,15 @@ export type GanttRow = {
   /** At the right of the label: "+12 d". */
   aside?: ReactNode;
   strong?: boolean;
+  /** An instalment's slim row. */
+  slim?: boolean;
+  /** The label where the column is narrow: "Inst. 5". */
+  short?: string;
+  /** An instalment's due week: a diamond in that column. */
+  pin?: { col: number; tone: Tone; title: string };
   /** For a screen reader: "Milestone 4, under way, weeks 16 to 19". */
   sr: string;
 };
-
-export type GanttMarker = { col: number; text: string; tone: Tone; title: string };
 
 export type GanttColumn = { clock: WorkflowClock; week: number; label: string; current?: boolean };
 
@@ -42,18 +51,31 @@ const FILL: Record<BarTone, string> = {
   current: "bg-rosewood",
   progress: "bg-laterite",
   waiting: "bg-brass",
-  late: "bg-brick",
+  late: "bg-brick/25",
   locked: "bg-ink/20",
   plan: "bg-rosewood/70",
   track: "bg-ink/15",
+  due: "bg-brick",
+  free: "bg-ink/40",
 };
 
-const DOT: Record<Tone, string> = {
-  done: "bg-kota text-lime",
-  progress: "bg-laterite text-lime",
-  waiting: "bg-brass text-lime",
-  late: "bg-brick text-lime",
-  locked: "bg-white/70 text-ink-soft ring-1 ring-ink/20",
+/**
+ * Extra days are hatched brick, so the only solid brick on a chart is an instalment due
+ * ahead. The same pattern draws the key's swatch.
+ */
+const PATTERN: Partial<Record<BarTone, CSSProperties>> = {
+  late: { backgroundImage: "repeating-linear-gradient(135deg, var(--color-brick) 0 2px, transparent 2px 4px)" },
+};
+
+/** Bar heights: an instalment's bar is half a stage bar, a reached one a hairline. */
+const HEIGHT: Partial<Record<BarTone, string>> = { due: "h-1", free: "h-0.5" };
+
+const DIAMOND: Record<Tone, string> = {
+  done: "bg-kota",
+  progress: "bg-laterite",
+  waiting: "bg-brass",
+  late: "bg-brick",
+  locked: "bg-white ring-[1.5px] ring-ink/35",
 };
 
 /** The template's week columns: pre-construction 1 to 7, then construction 1 to the last stage week. */
@@ -87,19 +109,71 @@ export function stageLabel(s: Pick<WorkflowStage, "milestone" | "short">): { tag
   return s.milestone !== null ? { tag: `M${s.milestone}`, label: s.short } : { label: s.short };
 }
 
-/** The template itself: every stage on its planned weeks, instalments on their weeks. */
-export function templateGantt(): { cols: GanttColumn[]; rows: GanttRow[]; markers: GanttMarker[] } {
+/** The stage an instalment opens: its row sits just above that stage's. */
+function opensStage(n: number, unlocks: number | null): string {
+  return n === 0 ? "sign-up" : `m${unlocks ?? n}`;
+}
+
+/** An instalment's slim row: red from construction week 1 to its due week until reached. */
+function instalmentRow(
+  cols: GanttColumn[],
+  i: { n: number; label: string; percent: number; clock: WorkflowClock },
+  due: number,
+  ahead: boolean,
+  pin: { tone: Tone; title: string },
+  words: string,
+): GanttRow {
+  const start = colOfWeek(cols, "construction", 1);
+  return {
+    id: `instalment-${i.n}`,
+    label: `${i.n === 0 ? "Sign-up" : i.label} · ${i.percent}%`,
+    short: i.n === 0 ? "Sign-up" : `Inst. ${i.n}`,
+    slim: true,
+    bars: i.clock === "construction" ? [{ from: start, to: Math.max(start, due), tone: ahead ? "due" : "free" }] : [],
+    pin: { col: due, ...pin },
+    sr: words,
+  };
+}
+
+/**
+ * The template itself: every stage on its planned weeks, each instalment on its own row.
+ * With no today, the instalments read as on the sheet for a project about to start: each
+ * one red from construction week 1 to its due week, except instalment 1 (due in week 1),
+ * which is free, and the sign-up advance, already in before construction.
+ */
+export function templateGantt(): { cols: GanttColumn[]; rows: GanttRow[] } {
   const cols = templateColumns();
-  const rows: GanttRow[] = WORKFLOW_TEMPLATE.stages.map((s) => {
-    const from = colOfWeek(cols, s.clock, s.from);
-    const to = colOfWeek(cols, s.clock, s.to);
-    return {
+  const rows: GanttRow[] = [];
+  for (const s of WORKFLOW_TEMPLATE.stages) {
+    for (const i of WORKFLOW_TEMPLATE.instalments.filter((x) => opensStage(x.n, x.unlocks) === s.id)) {
+      const due = colOfWeek(cols, i.clock, i.week);
+      const ahead = i.clock === "construction" && i.week > 1;
+      const week = i.clock === "pre" ? `pre-construction week ${i.week}` : `week ${i.week}`;
+      rows.push(
+        instalmentRow(
+          cols,
+          i,
+          due,
+          ahead,
+          { tone: "locked", title: `${i.label} · ${i.percent}% · ${weeksWords(i.clock, i.week, i.week)}` },
+          `${i.label}, ${i.percent}%, due ${week}${ahead ? ", red until the project reaches that week" : ""}`,
+        ),
+      );
+    }
+    rows.push({
       id: s.id,
       ...stageLabel(s),
-      bars: [{ from, to, tone: s.phase === "construction" ? "progress" : s.phase === "close-out" ? "done" : "plan" }],
+      bars: [
+        {
+          from: colOfWeek(cols, s.clock, s.from),
+          to: colOfWeek(cols, s.clock, s.to),
+          // Construction stages in the plain plan tone, so brick is the only red on the template.
+          tone: s.phase === "close-out" ? "done" : "plan",
+        },
+      ],
       sr: `${s.name}, ${weeksWords(s.clock, s.from, s.to)}`,
-    };
-  });
+    });
+  }
   for (const t of WORKFLOW_TRACKS)
     rows.push({
       id: t.id,
@@ -107,13 +181,7 @@ export function templateGantt(): { cols: GanttColumn[]; rows: GanttRow[]; marker
       bars: [{ from: colOfWeek(cols, t.clock, t.from), to: colOfWeek(cols, t.clock, t.to), tone: "track" }],
       sr: `${t.name}, ${weeksWords(t.clock, t.from, t.to)}`,
     });
-  const markers: GanttMarker[] = WORKFLOW_TEMPLATE.instalments.map((i) => ({
-    col: colOfWeek(cols, i.clock, i.week),
-    text: i.n === 0 ? "S" : String(i.n),
-    tone: "waiting",
-    title: `${i.label} · ${i.percent}% · ${weeksWords(i.clock, i.week, i.week)}`,
-  }));
-  return { cols, rows, markers };
+  return { cols, rows };
 }
 
 const STATE_TONE = { done: "done", current: "current", held: "waiting", upcoming: "locked" } as const;
@@ -129,7 +197,7 @@ function instalmentTone(i: TimelineView["instalments"][number]): Tone {
 }
 
 /** A project's timeline as rows: planned outline, where it stands, extra days in brick. */
-export function projectGantt(t: TimelineView): { cols: GanttColumn[]; rows: GanttRow[]; markers: GanttMarker[]; today: number } {
+export function projectGantt(t: TimelineView): { cols: GanttColumn[]; rows: GanttRow[]; today: number } {
   const cols: GanttColumn[] = t.weeks.map((w) => ({ clock: w.clock, week: w.week, label: w.label, current: w.current }));
   // The column a date falls in, read off the plan's own weeks.
   const colOfDate = (date: string): number => {
@@ -137,7 +205,33 @@ export function projectGantt(t: TimelineView): { cols: GanttColumn[]; rows: Gant
     const i = t.weeks.findIndex((w) => w.start <= date && date <= w.end);
     return i >= 0 ? i : t.weeks.length - 1;
   };
-  const rows: GanttRow[] = t.stages.map((s) => {
+  const rows: GanttRow[] = [];
+  for (const s of t.stages) {
+    for (const i of t.instalments.filter((x) => opensStage(x.n, x.unlocks) === s.id)) {
+      // One rule on every chart: red until its due week is reached, never for the sign-up
+      // advance or instalment 1 (due in construction week 1), which the sheet draws free.
+      const ahead = !i.reached && i.clock === "construction" && i.week > 1;
+      // The expected due week (moved by approved client changes): label, bar and pin agree.
+      const w = i.expectedWeek;
+      const week = i.clock === "pre" ? `pre-construction week ${w}` : `week ${w}`;
+      rows.push(
+        instalmentRow(
+          cols,
+          i,
+          colOfWeek(cols, i.clock, w),
+          ahead,
+          {
+            // A due week still ahead keeps a hollow pin, clear against its brick bar.
+            tone: ahead ? "locked" : instalmentTone(i),
+            title: `${i.label} · ${weeksWords(i.clock, w, w)} · ${ahead ? "not reached yet" : i.status}`,
+          },
+          `${i.label}, ${i.percent}%, due ${week}, ${formatDate(i.expectedDate)}, ${ahead ? "not reached yet" : i.status}`,
+        ),
+      );
+    }
+    rows.push(stageRow(s));
+  }
+  function stageRow(s: TimelineView["stages"][number]): GanttRow {
     const pFrom = colOfWeek(cols, s.clock, s.fromWeek);
     const pTo = colOfWeek(cols, s.clock, s.toWeek);
     const eFrom = colOfDate(s.expectedStart);
@@ -160,7 +254,7 @@ export function projectGantt(t: TimelineView): { cols: GanttColumn[]; rows: Gant
       aside: s.extraDays > 0 ? <span className="late-text text-13 whitespace-nowrap">+{s.extraDays} d</span> : undefined,
       sr: `${s.name}, ${words}, ${weeksWords(s.clock, s.fromWeek, s.toWeek)}${s.extraDays > 0 ? `, ${s.extraDays} extra days` : ""}`,
     };
-  });
+  }
   for (const tr of WORKFLOW_TRACKS)
     rows.push({
       id: tr.id,
@@ -168,13 +262,7 @@ export function projectGantt(t: TimelineView): { cols: GanttColumn[]; rows: Gant
       bars: [{ from: colOfWeek(cols, tr.clock, tr.from), to: colOfWeek(cols, tr.clock, tr.to), tone: "track" }],
       sr: `${tr.name}, ${weeksWords(tr.clock, tr.from, tr.to)}`,
     });
-  const markers: GanttMarker[] = t.instalments.map((i) => ({
-    col: colOfDate(i.expectedDate),
-    text: i.n === 0 ? "S" : String(i.n),
-    tone: instalmentTone(i),
-    title: `${i.label} · ${i.status}`,
-  }));
-  return { cols, rows, markers, today: cols.findIndex((c) => c.current) };
+  return { cols, rows, today: cols.findIndex((c) => c.current) };
 }
 
 /** Header spans: "Pre" over the pre-construction weeks, then W1, W5, W10 ... */
@@ -198,13 +286,11 @@ export function Gantt({
   caption,
   cols,
   rows,
-  markers,
   today = -1,
 }: {
   caption: string;
   cols: GanttColumn[];
   rows: GanttRow[];
-  markers: GanttMarker[];
   today?: number;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -230,8 +316,8 @@ export function Gantt({
 
   const n = cols.length;
   const spans = headerSpans(cols);
-  const markerRow = rows.length + 2;
-  const lastRow = markerRow + 1;
+  const lastRow = rows.length + 2;
+  const heights = rows.map((r) => (r.slim ? "1.25rem" : "2.25rem")).join(" ");
   const col = (i: number) => i + 2;
 
   return (
@@ -240,7 +326,7 @@ export function Gantt({
         className="relative grid [--gantt-label:8rem] sm:[--gantt-label:12rem]"
         style={{
           gridTemplateColumns: `var(--gantt-label) repeat(${n}, minmax(0.75rem, 1fr))`,
-          gridTemplateRows: `1.75rem repeat(${rows.length}, 2.25rem) 2.25rem`,
+          gridTemplateRows: `1.75rem ${heights}`,
           minWidth: `calc(var(--gantt-label) + ${n * 0.75}rem)`,
         }}
       >
@@ -284,20 +370,29 @@ export function Gantt({
             return (
               <li key={r.id} className="contents">
                 <span
-                  className="sticky left-0 z-20 shadow-[-4px_0_0_0_var(--color-sand-2)] flex min-w-0 items-center gap-1.5 border-t border-ink/10 bg-sand-2 pr-2 pl-1"
+                  className={`sticky left-0 z-20 shadow-[-4px_0_0_0_var(--color-sand-2)] flex min-w-0 items-center gap-1.5 bg-sand-2 pr-2 pl-1 ${
+                    r.slim ? "" : "border-t border-ink/10"
+                  }`}
                   style={{ gridColumn: 1, gridRow: row }}
                   title={r.label}
                 >
                   {r.tag && <span className="figure shrink-0 text-13 font-semibold text-ink">{r.tag}</span>}
-                  <span className={`min-w-0 flex-1 truncate text-13 ${r.strong ? "font-semibold text-ink" : "text-ink-soft"}`}>
-                    {r.label}
-                  </span>
+                  {r.short ? (
+                    <span aria-hidden="true" className="min-w-0 flex-1 truncate text-13 text-ink-soft">
+                      <span className="sm:hidden">{r.short}</span>
+                      <span className="max-sm:hidden">{r.label}</span>
+                    </span>
+                  ) : (
+                    <span className={`min-w-0 flex-1 truncate text-13 ${r.strong ? "font-semibold text-ink" : "text-ink-soft"}`}>
+                      {r.label}
+                    </span>
+                  )}
                   {r.aside}
                   <span className="sr-only">{r.sr}</span>
                 </span>
                 <span
                   aria-hidden="true"
-                  className={`border-t border-ink/10 ${r.strong ? "bg-white/40" : ""}`}
+                  className={`${r.slim ? "" : "border-t border-ink/10"} ${r.strong ? "bg-white/40" : ""}`}
                   style={{ gridColumn: `2 / ${n + 2}`, gridRow: row }}
                 />
                 {r.planned && (
@@ -311,36 +406,23 @@ export function Gantt({
                   <span
                     key={j}
                     aria-hidden="true"
-                    className={`mx-0.5 h-2 self-center rounded-full ${FILL[b.tone]}`}
-                    style={{ gridColumn: `${col(b.from)} / ${col(b.to) + 1}`, gridRow: row }}
+                    className={`mx-0.5 self-center rounded-full ${HEIGHT[b.tone] ?? "h-2"} ${FILL[b.tone]}`}
+                    style={{ gridColumn: `${col(b.from)} / ${col(b.to) + 1}`, gridRow: row, ...PATTERN[b.tone] }}
                   />
                 ))}
+                {r.pin && (
+                  <span
+                    aria-hidden="true"
+                    title={r.pin.title}
+                    className={`z-10 size-2 rotate-45 self-center justify-self-center rounded-xs ${DIAMOND[r.pin.tone]}`}
+                    style={{ gridColumn: col(r.pin.col), gridRow: row }}
+                  />
+                )}
               </li>
             );
           })}
         </ul>
 
-        {/* Instalments */}
-        <span
-          className="sticky left-0 z-20 shadow-[-4px_0_0_0_var(--color-sand-2)] flex items-center border-t border-ink/10 bg-sand-2 pl-1 text-13 font-semibold text-ink"
-          style={{ gridColumn: 1, gridRow: markerRow }}
-        >
-          Instalments
-        </span>
-        <span aria-hidden="true" className="border-t border-ink/10" style={{ gridColumn: `2 / ${n + 2}`, gridRow: markerRow }} />
-        <ul className="contents">
-          {markers.map((m) => (
-            <li
-              key={`${m.text}-${m.col}`}
-              title={m.title}
-              className={`figure z-10 inline-grid size-5 place-items-center self-center justify-self-center rounded-full text-13 font-semibold ${DOT[m.tone]}`}
-              style={{ gridColumn: col(m.col), gridRow: markerRow }}
-            >
-              <span aria-hidden="true">{m.text}</span>
-              <span className="sr-only">{m.title}</span>
-            </li>
-          ))}
-        </ul>
       </div>
     </div>
   );
@@ -352,7 +434,16 @@ export function GanttKey({ items }: { items: { tone: BarTone; words: string }[] 
     <ul className="flex flex-wrap gap-x-4 gap-y-1 px-1" aria-label="Key">
       {items.map((i) => (
         <li key={i.words} className="inline-flex items-center gap-1.5 text-13 text-ink-soft">
-          <span aria-hidden="true" className={`block h-2 w-4 rounded-full ${FILL[i.tone]}`} />
+          <span
+            aria-hidden="true"
+            className={`relative block w-4 rounded-full ${HEIGHT[i.tone] ?? "h-2"} ${FILL[i.tone]}`}
+            style={PATTERN[i.tone]}
+          >
+            {/* An instalment's swatch ends in its due-week diamond, as on the chart. */}
+            {(i.tone === "due" || i.tone === "free") && (
+              <span className="absolute top-1/2 -right-0.5 size-1.5 -translate-y-1/2 rotate-45 rounded-xs bg-white ring-[1.5px] ring-ink/35" />
+            )}
+          </span>
           {i.words}
         </li>
       ))}

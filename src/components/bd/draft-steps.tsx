@@ -14,6 +14,7 @@ import { useDemo, useFirm } from "@/lib/demo-store";
 import { estimate, type DraftView } from "@/lib/firm";
 import type { CategoryId, PersonId, Template } from "@/lib/firm-data";
 import { formatDate, formatStampShort, inr } from "@/lib/format";
+import { customerInitials, layoutCode, plotNumber, projectCode } from "@/lib/workflow-plan";
 import { StatusChip } from "@/components/register/status-chip";
 import { coordinateWords, draftName, parseMaps } from "./bd-words";
 
@@ -50,7 +51,7 @@ export type StepProps = {
 /** Which steps hold what the workspace needs, as the record counts them. */
 export function stepsDone(draft: DraftView): Record<StepNo, boolean> {
   return {
-    1: Boolean(draft.step1),
+    1: Boolean(draft.step1?.layout && draft.step1?.plotNo),
     2: Boolean(draft.step2),
     3: Boolean(draft.step3?.agreementFile),
     4: Boolean(draft.step4?.head),
@@ -203,6 +204,8 @@ export function StepClient({ draft, locked, onSaved, primary }: StepProps) {
   const [email, setEmail] = useState(saved?.email ?? "");
   const [phone, setPhone] = useState(saved?.phone ?? "");
   const [address, setAddress] = useState(saved?.address ?? "");
+  const [layout, setLayout] = useState(saved?.layout ?? "");
+  const [plotNo, setPlotNo] = useState(saved?.plotNo ?? "");
   const [maps, setMaps] = useState(saved?.maps ?? "");
   const [perimeter, setPerimeter] = useState(saved?.plotPerimeter ?? 0);
   const [underWay, setUnderWay] = useState(saved?.underWay ?? false);
@@ -214,6 +217,11 @@ export function StepClient({ draft, locked, onSaved, primary }: StepProps) {
   const milestones = templateIn(firm.templates, draft.step2?.category ?? "city-villa").milestones;
 
   const mapsError = maps.trim() && !pin ? "No pin in this link" : "";
+  const layoutError = layout && layout.length < 2 ? "Layout: 2 to 6 letters or digits" : "";
+  const plotError = plotNo && !/\d/.test(plotNo) ? "Plot no. needs a number" : "";
+  // The project code as it will be: layout, plot number, the owner's initials.
+  const initials = customerInitials(owners[0]);
+  const code = layoutError || plotError ? "" : projectCode(layout, plotNo, owners[0]);
 
   const check = () => {
     if (!name.trim()) return "Name the project";
@@ -221,6 +229,10 @@ export function StepClient({ draft, locked, onSaved, primary }: StepProps) {
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "Add the email";
     if (phone.replace(/\D/g, "").length < 10) return "Phone needs 10 digits";
     if (!address.trim()) return "Add the address";
+    if (!layout) return "Add the layout";
+    if (layoutError) return layoutError;
+    if (!plotNo) return "Add the plot no.";
+    if (plotError) return plotError;
     if (!pin) return "Paste a Maps pin link";
     if (!(perimeter > 0)) return "Add the plot perimeter";
     return "";
@@ -257,8 +269,56 @@ export function StepClient({ draft, locked, onSaved, primary }: StepProps) {
           <input type="tel" className={field} autoComplete="off" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </Field>
       </div>
+      <div className="grid grid-cols-2 gap-5 sm:grid-cols-[9rem_9rem_minmax(0,1fr)]">
+        <Field label="Layout">
+          <input
+            type="text"
+            className={`${field} figure uppercase`}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            maxLength={6}
+            placeholder="CFS"
+            value={layout}
+            onChange={(e) => setLayout(layoutCode(e.target.value))}
+          />
+        </Field>
+        <Field label="Plot no.">
+          <input
+            type="text"
+            className={`${field} figure uppercase`}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            maxLength={8}
+            placeholder="501"
+            value={plotNo}
+            onChange={(e) => setPlotNo(plotNumber(e.target.value))}
+          />
+        </Field>
+        <div className="col-span-2 flex flex-col sm:col-span-1" aria-live="polite">
+          <span className="block text-15 font-semibold">Project code</span>
+          <span className="mt-auto flex min-h-12 items-center pt-1.5">
+            {layoutError || plotError ? (
+              <span className="text-15 font-semibold text-brick">{layoutError || plotError}</span>
+            ) : initials ? (
+              <span className={`glass-chip figure text-15 ${code ? "chip-done" : ""}`}>
+                {code || `${layout || "···"}_${plotNo || "···"}_${initials}`}
+              </span>
+            ) : (
+              <span className="text-15 text-ink-soft">From the owner&rsquo;s name</span>
+            )}
+          </span>
+        </div>
+      </div>
       <Field label="Site address">
-        <textarea rows={2} className={`${field} py-2`} value={address} onChange={(e) => setAddress(e.target.value)} />
+        <textarea
+          rows={2}
+          className={`${field} py-2`}
+          placeholder="Road, area, PIN"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+        />
       </Field>
       <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto]">
         <Field label="Maps pin link" error={mapsError || undefined}>
@@ -321,6 +381,8 @@ export function StepClient({ draft, locked, onSaved, primary }: StepProps) {
           email: email.trim(),
           phone: phone.trim(),
           address: address.trim(),
+          layout,
+          plotNo,
           maps: maps.trim(),
           lat: pin?.lat ?? 0,
           lng: pin?.lng ?? 0,

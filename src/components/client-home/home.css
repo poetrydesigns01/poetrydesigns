@@ -283,6 +283,48 @@
   background: var(--color-brick);
 }
 
+.wk-diamond[data-size="sm"] {
+  width: 8px;
+  height: 8px;
+}
+
+/* An instalment's own slim row, as on the schedule sheet. */
+.wk-inst {
+  padding-block: 1px;
+}
+
+.wk-inst .wk-lane {
+  height: 14px;
+}
+
+/* From construction week 1 to the due week: a slim brick bar while the week is ahead,
+   a plain hairline once reached ("free"). */
+.wk-inst-bar {
+  position: absolute;
+  top: 50%;
+  height: 4px;
+  min-width: 4px;
+  margin-top: -2px;
+  border-radius: 999px;
+  background: var(--color-brick);
+}
+
+.wk-inst-bar[data-ahead="false"] {
+  height: 0;
+  margin-top: -1px;
+  border-radius: 0;
+  border-top: 2px solid rgb(42 26 18 / 0.4);
+  background: none;
+}
+
+.wk-mark {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+}
+
 .wk-pin {
   position: absolute;
   top: 2px;
@@ -309,6 +351,52 @@
 
 .wk-key[data-kind="added"] {
   background: var(--color-brick);
+}
+
+.wk-key[data-kind="due"] {
+  height: 4px;
+  background: var(--color-brick);
+}
+
+/* Reached: a hairline ending in its due-week diamond. */
+.wk-key[data-kind="free"] {
+  position: relative;
+  height: 0;
+  border-radius: 0;
+  border-top: 2px solid rgb(42 26 18 / 0.4);
+}
+
+.wk-key[data-kind="free"]::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  border: 1.5px solid rgb(42 26 18 / 0.35);
+  background: rgb(255 255 255 / 0.8);
+  transform: rotate(45deg);
+}
+
+/* A phone's instalment while its due week is ahead: brick pill. */
+.wk-due-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgb(246 219 210 / 0.85);
+  color: var(--color-brick);
+  font-weight: 700;
+}
+
+.wk-due-pill::before {
+  content: "";
+  width: 10px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 /* A phone's stacked plan: a thin bar of the part done under the current stage. */

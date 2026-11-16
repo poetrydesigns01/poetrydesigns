@@ -108,11 +108,16 @@ export function ProjectOverview({ projectId }: { projectId: ProjectId }) {
             <Fact label="Rate">
               <span className="figure">{inr(p.ratePerSqFt)}</span> / sq ft
             </Fact>
-            <Fact label="Plot">
-              <span className="figure">{p.plotPerimeter}</span> ft around
+            <Fact label="Perimeter">
+              <span className="figure">{p.plotPerimeter}</span> ft
             </Fact>
-            <Fact label="Code">{p.code || "–"}</Fact>
+            <Fact label="Code">
+              <span className="figure">{p.code || "–"}</span>
+            </Fact>
             <Fact label="Address" wide>
+              <span className="block">
+                Layout <span className="figure">{p.layout}</span> · Plot <span className="figure">{p.plotNo}</span>
+              </span>
               {p.address}
             </Fact>
           </dl>

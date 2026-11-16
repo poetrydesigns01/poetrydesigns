@@ -6,7 +6,6 @@ import type { DemoState } from "./demo-store";
 import {
   DIVYA_ACCESS_AT,
   EARLIER_BILLS,
-  KULKARNI_CODE,
   LOW_HOURS,
   cottageEstimate,
   designSummaries,
@@ -95,6 +94,7 @@ import {
   generatePlan,
   instalmentDate,
   planProgress,
+  projectCode,
   type PlanTeam,
   type PlanView,
   type ProjectPlan,
@@ -709,7 +709,9 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       (draft as Record<string, unknown>)[key] = { ...((draft[key] as object | undefined) ?? {}), ...e.data };
     }
     const opened = of("workspace.opened").find((e) => e.draftId === seed.id);
-    const done = [draft.step1, draft.step2, draft.step3?.agreementFile ? draft.step3 : undefined, draft.step4?.head ? draft.step4 : undefined];
+    // Step 1 holds the client and the site, layout and plot number included (they make the code).
+    const siteDone = draft.step1?.layout && draft.step1?.plotNo ? draft.step1 : undefined;
+    const done = [siteDone, draft.step2, draft.step3?.agreementFile ? draft.step3 : undefined, draft.step4?.head ? draft.step4 : undefined];
     const stepsDone = done.filter(Boolean).length;
     const nextIndex = done.findIndex((step) => !step);
     const missing =
@@ -754,7 +756,12 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       if (opened && draft) {
         const value = (draft.step2?.area ?? p.builtUpArea) * (draft.step2?.rate ?? p.ratePerSqFt);
         const template = templateOf(draft.step2?.category ?? p.category);
-        p.code = KULKARNI_CODE;
+        // The code from the layout and plot number BD entered, and the first client's initials.
+        p.layout = draft.step1?.layout || p.layout;
+        p.plotNo = draft.step1?.plotNo || p.plotNo;
+        p.address = draft.step1?.address || p.address;
+        if (draft.step1?.clients.length) p.clients = [...draft.step1.clients];
+        p.code = projectCode(p.layout, p.plotNo, draft.step1?.clients[0] ?? p.clients[0]);
         p.phase = "invited";
         p.onboardedOn = opened.at;
         p.invitedAt = opened.at;

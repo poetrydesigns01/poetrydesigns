@@ -12,6 +12,7 @@ import { StatusChip } from "@/components/register/status-chip";
 import { useDemo, useFirm } from "@/lib/demo-store";
 import type { DraftView } from "@/lib/firm";
 import type { DraftId } from "@/lib/firm-data";
+import { projectCode } from "@/lib/workflow-plan";
 import { draftName, firstNames } from "./bd-words";
 import { PlanPanel } from "./plan-panel";
 import {
@@ -92,6 +93,8 @@ function OpenWorkspace({ draft, ready }: { draft: DraftView; ready: boolean }) {
   // Only Kulkarni Eco Home has a project waiting for it.
   const openable = draft.id === "kulkarni";
   const waiting = pause.pending !== null;
+  // The code the project opens with: layout, plot number and the first owner's initials.
+  const code = projectCode(draft.step1?.layout ?? "", draft.step1?.plotNo ?? "", clients[0] ?? "");
 
   return (
     <Panel
@@ -103,7 +106,10 @@ function OpenWorkspace({ draft, ready }: { draft: DraftView; ready: boolean }) {
             <StatusChip tone="done">{draft.openedAt ? `Opened ${dated(draft.openedAt)}` : "Opened"}</StatusChip>
           </>
         ) : (
-          <StatusChip tone={ready ? "done" : "locked"}>{ready ? "Ready" : `${draft.stepsDone}/4 steps`}</StatusChip>
+          <>
+            {code && <span className="figure text-15 text-ink">{code}</span>}
+            <StatusChip tone={ready ? "done" : "locked"}>{ready ? "Ready" : `${draft.stepsDone}/4 steps`}</StatusChip>
+          </>
         )
       }
     >

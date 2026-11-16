@@ -9,6 +9,7 @@ import { ArrowLeftIcon, DownloadIcon, LockIcon } from "@/components/payments/ico
 import { StatusChip } from "@/components/register/status-chip";
 import { useDemo, useFirm } from "@/lib/demo-store";
 import { datePart, formatDate, formatStampShort, inr } from "@/lib/format";
+import { siteLine } from "@/lib/workflow-plan";
 
 // One stage's demand letter, the only thing a client downloads: it prints as the letter
 // alone (see .letter-sheet in globals.css). Until the letter is raised the page says so.
@@ -98,7 +99,7 @@ export function DemandLetter({ n }: { n: number }) {
           </h1>
           <p className="text-ink-soft">
             {project?.name}
-            {project?.address ? `, ${project.address}` : ""}
+            {project ? `, ${siteLine(project)}` : ""}
           </p>
         </div>
 

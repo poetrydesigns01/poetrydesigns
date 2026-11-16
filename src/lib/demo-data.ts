@@ -19,11 +19,14 @@ export const client = {
 };
 
 export const project = {
-  /** CFS_501_NK shape (category, running number, client initials); format to be confirmed. */
+  /** Layout CFS, plot 504, Meera Iyer: projectCode() in workflow-plan.ts gives the same. */
   code: "CFS_504_MI",
+  /** The residential layout the plot is in. A sample layout code (CFS comes from Poetry's workflow sheet). */
+  layout: "CFS",
+  plotNo: "504",
   name: "Iyer Residence",
   category: "City villa",
-  address: "Plot 47, Lakeside Layout, Kanakapura Road, Bengaluru 560062",
+  address: "Kanakapura Road, Bengaluru 560062",
   plotArea: 2993,
   builtUpArea: 3350,
   ratePerSqFt: 2600,

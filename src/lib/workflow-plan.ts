@@ -11,7 +11,7 @@ import {
   type WorkflowStageId,
   type WorkflowTrack,
 } from "./workflow-template";
-import type { CategoryId, PersonId, ProjectId } from "./firm-data";
+import type { PersonId, ProjectId } from "./firm-data";
 
 // A project's plan: the workflow template's tasks with dates worked out from a start date
 // and a person given to each by role from the project team. Pure: nothing here reads a
@@ -20,28 +20,49 @@ import type { CategoryId, PersonId, ProjectId } from "./firm-data";
 
 // ---- Project codes ----
 
-/**
- * Category codes for project codes. Sample: the workbook shows only "CFS_501_NK" (category
- * code, running number, client initials). The real codes per category are to be confirmed
- * by Poetry.
- */
-export const CATEGORY_CODES: Record<CategoryId, string> = {
-  "city-villa": "CFS",
-  farmhouse: "FHS",
-  eco: "ECO",
-  "cement-blocks": "CBS",
-};
+/** A layout code as BD types it: upper case, 2 to 6 letters or digits ("CFS"). */
+export function layoutCode(value: string): string {
+  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6);
+}
 
-/** "CFS_504_MI": category code, running number, the first client's initials. Format to be confirmed. */
-export function projectCode(category: CategoryId, number: number, clientName: string): string {
-  const initials = clientName
+/** A plot number as BD types it: letters, digits, "/" and "-", upper case ("501", "12A"). */
+export function plotNumber(value: string): string {
+  return value.trim().replace(/\s+/g, "").replace(/[^A-Za-z0-9/-]/g, "").toUpperCase().slice(0, 8);
+}
+
+/** The customer's initials, upper case: "Neeraj Kumar" gives "NK", "Ryan D'Souza" gives "RD". */
+export function customerInitials(name: string): string {
+  return name
     .replace(/[^A-Za-z\s]/g, "")
     .split(/\s+/)
     .filter(Boolean)
     .map((word) => word[0].toUpperCase())
     .join("")
     .slice(0, 3);
-  return `${CATEGORY_CODES[category]}_${number}_${initials || "XX"}`;
+}
+
+/**
+ * Poetry's project code, as their workflow sheet writes it: layout, plot number and the
+ * customer's initials, joined by "_" ("CFS_501_NK" is layout CFS, plot 501, Neeraj Kumar).
+ * Empty until the layout, the plot number and the customer's name are all known.
+ */
+export function projectCode(layout: string, plotNo: string, customerName: string): string {
+  const l = layoutCode(layout);
+  const n = plotNumber(plotNo);
+  const i = customerInitials(customerName);
+  if (!l || !n || !i) return "";
+  return `${l}_${n}_${i}`;
+}
+
+/**
+ * The site in one line, for a letter or a report: "Plot 504, CFS Layout, Kanakapura Road,
+ * Bengaluru 560062". A project's address holds only the road, area and PIN; the layout and
+ * plot number are kept apart (they make the code), so they are put back in front here.
+ */
+export function siteLine(site: { layout?: string; plotNo?: string; address?: string }): string {
+  const plot = site.plotNo ? `Plot ${site.plotNo}` : "";
+  const layout = site.layout ? `${site.layout} Layout` : "";
+  return [plot, layout, site.address ?? ""].filter(Boolean).join(", ");
 }
 
 // ---- Weeks and dates ----
@@ -245,8 +266,6 @@ export type PlanSeed = {
   constructionStart?: string;
   generatedAt: string;
   generatedBy: PersonId;
-  /** Running number in the project code. */
-  codeNumber: number;
   progress: PlanProgressSeed;
   /** Re-allocations made before the demo: template task id to person. */
   assigned?: Record<string, PersonId>;

@@ -31,13 +31,13 @@ const CHANGES_PAGE: Page = {
 const SUMMARY: Record<House, Fact[]> = {
   iyer: [
     { label: "Parties", value: "Meera & Arjun Iyer" },
-    { label: "Plot", value: "Plot 47, Lakeside Layout" },
+    { label: "Plot", value: "Plot 504, CFS Layout" },
     { label: "Area", value: "3,200 sq ft" },
     { label: "Signed", value: "25 May 2026" },
   ],
   "iyer-cottage": [
     { label: "Parties", value: "Meera & Arjun Iyer" },
-    { label: "Plot", value: "Survey 112, Nandi Hills" },
+    { label: "Plot", value: "Plot 112, NHF Layout" },
     { label: "Area", value: "1,800 sq ft" },
     { label: "Signed", value: "2 Oct 2026" },
   ],
@@ -50,7 +50,7 @@ const PAGES: Record<House, Page[]> = {
       tab: "Parties",
       clauses: [
         "This agreement is made on 25 May 2026 between Poetry Designs, Bengaluru, the builder, and Meera Iyer and Arjun Iyer, the owners.",
-        "The property is Plot 47, Lakeside Layout, Kanakapura Road, Bengaluru 560062.",
+        "The property is Plot 504, CFS Layout, Kanakapura Road, Bengaluru 560062.",
         "Poetry Designs will design and build a city villa of 3,200 sq ft built-up area on it, as shown in the drawings the owners approve.",
         "Kavya Reddy, client relations, is the owners' point of contact. A Project Head is named for the building work.",
       ],
@@ -73,7 +73,7 @@ const PAGES: Record<House, Page[]> = {
       tab: "Parties",
       clauses: [
         "This agreement is made on 2 October 2026 between Poetry Designs, Bengaluru, the builder, and Meera Iyer and Arjun Iyer, the owners.",
-        "The property is Survey 112, Nandi Hills Road, Chikkaballapur 562101.",
+        "The property is Plot 112, NHF Layout, Nandi Hills Road, Chikkaballapur 562101.",
         "Poetry Designs will design and build a farmhouse of 1,800 sq ft built-up area on it, as shown in the drawings the owners approve.",
         "Kavya Reddy, client relations, is the owners' point of contact. Lakshmi Narayan is the Project Head.",
       ],

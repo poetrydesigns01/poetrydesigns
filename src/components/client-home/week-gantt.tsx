@@ -1,6 +1,7 @@
 /*
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
+import { Fragment } from "react";
 import { TODAY } from "@/lib/demo-data";
 import { addDays, daysBetween, formatDate, formatShortDate } from "@/lib/format";
 import type { TimelineInstalment, TimelineStage, TimelineView } from "@/lib/portal";
@@ -8,11 +9,13 @@ import { CheckIcon, LockIcon } from "./icons";
 
 // The weekly plan, read like Poetry's schedule sheet: pre-construction weeks then
 // construction weeks across, every workflow stage down, each with its planned run (dashed)
-// over its expected run (solid), the days her changes added in brick, the instalments as
-// diamonds in the week they fall due, and a line for today. From 768 px; phones get the
-// stacked list in timeline-list.tsx.
+// over its expected run (solid), the days her changes added in brick, and a line for today.
+// Each instalment has its own slim row just above the milestone it opens, as on the sheet:
+// a red bar from construction week 1 to its due week while that week is still ahead, then
+// drawn plainly ("free") once reached, with a diamond in its due week toned by where the
+// money stands. From 768 px; phones get the stacked list in timeline-list.tsx.
 
-/** Instalments on the plan sit mid-week. */
+/** An instalment's diamond sits mid-week in its (expected) due week. */
 const MID_WEEK = 3;
 
 export function stageTitle(stage: TimelineStage): string {
@@ -29,10 +32,31 @@ export function stageState(stage: TimelineStage): "done" | "current" | "held" | 
   return stage.state;
 }
 
-/** The workflow stage an instalment sits in on the plan. */
-export function instalmentStage(i: TimelineInstalment): string {
+/** The workflow stage an instalment opens: its row sits just above that stage's. */
+export function instalmentOpens(i: TimelineInstalment): string {
   if (i.n === 0) return "sign-up";
-  return i.milestone === 0 ? "initiation" : `m${i.milestone}`;
+  return `m${i.unlocks ?? i.n}`;
+}
+
+/** "W20", or "P1" before construction: the expected due week, after any client changes. */
+export function dueWeekLabel(i: TimelineInstalment): string {
+  return `${i.clock === "pre" ? "P" : "W"}${i.expectedWeek}`;
+}
+
+/** For a screen reader: "Instalment 6, due week 20, 23 Nov, not reached yet". */
+export function instalmentWords(i: TimelineInstalment): string {
+  const week = i.clock === "pre" ? `pre-construction week ${i.expectedWeek}` : `week ${i.expectedWeek}`;
+  const ahead = instalmentAhead(i);
+  return `${i.label}, ${i.percent}%, due ${week}, ${formatDate(i.expectedDate)}, ${ahead ? "not reached yet" : i.status}`;
+}
+
+/**
+ * Red until the project reaches its due week. Never for the sign-up advance (before
+ * construction) or instalment 1 (due in construction week 1): Poetry's sheet draws
+ * instalment 1 free, and every chart follows that one rule.
+ */
+export function instalmentAhead(i: TimelineInstalment): boolean {
+  return !i.reached && i.clock === "construction" && i.week > 1;
 }
 
 export function StageMark({
@@ -79,8 +103,8 @@ export function addedLabel(stages: TimelineStage[], index: number): number {
   return Math.max(0, stage.extraDays - before);
 }
 
-export function Diamond({ tone }: { tone: TimelineInstalment["tone"] }) {
-  return <span className="wk-diamond" data-tone={tone} aria-hidden="true" />;
+export function Diamond({ tone, small }: { tone: TimelineInstalment["tone"]; small?: boolean }) {
+  return <span className="wk-diamond" data-tone={tone} data-size={small ? "sm" : undefined} aria-hidden="true" />;
 }
 
 /** "21 Jan", or "21 Jan 2027" when the year is not this one. */
@@ -131,8 +155,12 @@ export function WeekGantt({ timeline }: { timeline: TimelineView }) {
             Added days
           </span>
           <span className="flex items-center gap-1.5">
-            <Diamond tone="done" />
-            Instalment
+            <span className="wk-key" data-kind="due" />
+            Due ahead
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="wk-key" data-kind="free" />
+            Reached
           </span>
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-3 w-0.5 rounded bg-brick" />
@@ -201,6 +229,7 @@ export function WeekGantt({ timeline }: { timeline: TimelineView }) {
             const added = stage.extraDays > 0 && stage.expectedEnd > stage.plannedEnd;
             const label = addedLabel(stages, index);
             const newPhase = index > 0 && stages[index - 1].phase !== stage.phase;
+            const opening = instalments.filter((i) => instalmentOpens(i) === stage.id);
             const words =
               state === "done"
                 ? `done ${formatDate(stage.doneOn ?? stage.expectedEnd)}`
@@ -210,85 +239,91 @@ export function WeekGantt({ timeline }: { timeline: TimelineView }) {
                     ? "waiting on its instalment"
                     : `expected ${formatDate(stage.expectedStart)} to ${formatDate(stage.expectedEnd)}`;
             return (
-              <li
-                key={stage.id}
-                className={`glass-row wk-row py-1.5 ${state === "current" ? "bg-white/45" : ""} ${
-                  newPhase ? "mt-1.5" : ""
-                }`}
-              >
-                <span className="flex min-w-0 items-center gap-2.5" title={stage.name}>
-                  <StageMark stage={stage} lockedFirst={lockedFirst} />
-                  <span
-                    className={`truncate text-15 ${state === "upcoming" || state === "held" ? "text-ink-soft" : "text-ink"} ${
-                      state === "current" ? "font-semibold" : ""
-                    }`}
-                  >
-                    {stageTitle(stage)}
-                  </span>
-                  {label > 0 && (
-                    <span className="late-text flex-none text-13">
-                      +{label}d<span className="sr-only"> from your changes</span>
+              <Fragment key={stage.id}>
+                {/* Accounts & Finance's rows on the sheet: the instalment that opens this stage. */}
+                {opening.map((i, k) => {
+                  const ahead = instalmentAhead(i);
+                  return (
+                    <li key={`i${i.n}`} className={`wk-row wk-inst ${newPhase && k === 0 ? "mt-1.5" : ""}`}>
+                      <span className="flex min-w-0 items-center gap-2.5" title={`${i.label} · ${i.percent}%`}>
+                        <span className="w-[22px] flex-none" aria-hidden="true" />
+                        <span className={`truncate text-13 ${ahead ? "text-ink" : "text-ink-soft"}`} aria-hidden="true">
+                          {i.n === 0 ? "Sign-up" : i.label}
+                          <span className="figure text-ink-soft"> · {i.percent}%</span>
+                        </span>
+                        <span className="sr-only">{instalmentWords(i)}</span>
+                      </span>
+                      <div className="wk-lane" aria-hidden="true">
+                        {i.clock === "construction" && (
+                          <span className="wk-inst-bar" data-ahead={ahead} style={bar(timeline.constructionStart, i.dueEnd)} />
+                        )}
+                        <span
+                          className="wk-mark"
+                          style={{ left: `${at(addDays(i.dueStart, MID_WEEK))}%` }}
+                          title={`${i.label} · ${dueWeekLabel(i)} · ${i.status}`}
+                        >
+                          <Diamond tone={instalmentTone(i)} small />
+                        </span>
+                      </div>
+                      <span
+                        className="wk-dates figure text-right text-13 whitespace-nowrap text-ink-soft"
+                        aria-hidden="true"
+                      >
+                        {when(i.expectedDate)}
+                      </span>
+                    </li>
+                  );
+                })}
+                <li
+                  className={`glass-row wk-row py-1.5 ${state === "current" ? "bg-white/45" : ""} ${
+                    newPhase && opening.length === 0 ? "mt-1.5" : ""
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-2.5" title={stage.name}>
+                    <StageMark stage={stage} lockedFirst={lockedFirst} />
+                    <span
+                      className={`truncate text-15 ${state === "upcoming" || state === "held" ? "text-ink-soft" : "text-ink"} ${
+                        state === "current" ? "font-semibold" : ""
+                      }`}
+                    >
+                      {stageTitle(stage)}
                     </span>
-                  )}
-                  <span className="sr-only">
-                    , {stage.name}, {weekSpan(stage)}, {lockedFirst ? "opens when its instalment is received, " : ""}
-                    {words}
-                  </span>
-                </span>
-
-                <div className="wk-lane" aria-hidden="true">
-                  <span className="wk-bar" data-kind="planned" style={bar(stage.plannedStart, stage.plannedEnd)} />
-                  <span
-                    className="wk-bar"
-                    data-kind="expected"
-                    data-state={state}
-                    data-locked={stage.locked}
-                    style={bar(stage.expectedStart, added ? stage.plannedEnd : stage.expectedEnd)}
-                  >
-                    {state === "current" && (
-                      <span className="wk-fill" style={{ transform: `scaleX(${stage.percent / 100})` }} />
+                    {label > 0 && (
+                      <span className="late-text flex-none text-13">
+                        +{label}d<span className="sr-only"> from your changes</span>
+                      </span>
                     )}
+                    <span className="sr-only">
+                      , {stage.name}, {weekSpan(stage)}, {lockedFirst ? "opens when its instalment is received, " : ""}
+                      {words}
+                    </span>
                   </span>
-                  {added && (
-                    <span className="wk-bar" data-kind="added" style={bar(addDays(stage.plannedEnd, 1), stage.expectedEnd)} />
-                  )}
-                </div>
 
-                <span className="wk-dates figure text-right text-13 whitespace-nowrap text-ink">
-                  {when(stage.doneOn ?? stage.expectedEnd)}
-                </span>
-              </li>
+                  <div className="wk-lane" aria-hidden="true">
+                    <span className="wk-bar" data-kind="planned" style={bar(stage.plannedStart, stage.plannedEnd)} />
+                    <span
+                      className="wk-bar"
+                      data-kind="expected"
+                      data-state={state}
+                      data-locked={stage.locked}
+                      style={bar(stage.expectedStart, added ? stage.plannedEnd : stage.expectedEnd)}
+                    >
+                      {state === "current" && (
+                        <span className="wk-fill" style={{ transform: `scaleX(${stage.percent / 100})` }} />
+                      )}
+                    </span>
+                    {added && (
+                      <span className="wk-bar" data-kind="added" style={bar(addDays(stage.plannedEnd, 1), stage.expectedEnd)} />
+                    )}
+                  </div>
+
+                  <span className="wk-dates figure text-right text-13 whitespace-nowrap text-ink">
+                    {when(stage.doneOn ?? stage.expectedEnd)}
+                  </span>
+                </li>
+              </Fragment>
             );
           })}
-
-          {/* Accounts & Finance's row on the sheet: when each instalment falls due. */}
-          <li className="glass-row wk-row mt-1.5 py-1.5">
-            <span className="flex min-w-0 items-center gap-2.5">
-              <span className="grid size-[22px] flex-none place-items-center" aria-hidden="true">
-                <Diamond tone="done" />
-              </span>
-              <span className="truncate text-15 text-ink">Instalments</span>
-            </span>
-            <div className="wk-lane h-10">
-              {instalments.map((i) => (
-                <span
-                  key={i.n}
-                  className="wk-pin"
-                  style={{ left: `${at(addDays(i.expectedDate, MID_WEEK))}%` }}
-                  title={`${i.label} · ${i.clock === "pre" ? "P" : "W"}${i.week} · ${formatShortDate(i.expectedDate)} · ${i.status}`}
-                >
-                  <Diamond tone={instalmentTone(i)} />
-                  <span className={`figure text-13 ${i.state === "locked" ? "text-ink-soft" : "text-ink"}`} aria-hidden="true">
-                    {i.n === 0 ? "S" : i.n}
-                  </span>
-                  <span className="sr-only">
-                    {i.label}, week {i.week}, {formatDate(i.expectedDate)}, {i.status}
-                  </span>
-                </span>
-              ))}
-            </div>
-            <span className="wk-dates" />
-          </li>
         </ol>
       </div>
     </section>

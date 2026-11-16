@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Gantt, stageLabel, templateGantt, weeksWords } from "@/components/project/gantt";
+import { Gantt, GanttKey, stageLabel, templateGantt, weeksWords } from "@/components/project/gantt";
 import { StatusChip } from "@/components/register/status-chip";
 import { useFirm } from "@/lib/demo-store";
 import { ROLE_WORDS, TRACK_WORDS, WORKFLOW_TEMPLATE, type WorkflowTask } from "@/lib/workflow-template";
@@ -29,7 +29,15 @@ export function WorkflowTab() {
       </section>
 
       <Panel title="Weeks" strong>
-        <Gantt caption="Workflow by week" cols={chart.cols} rows={chart.rows} markers={chart.markers} />
+        <div className="grid gap-3">
+          <Gantt caption="Workflow by week" cols={chart.cols} rows={chart.rows} />
+          <GanttKey
+            items={[
+              { tone: "due", words: "Due ahead" },
+              { tone: "free", words: "Reached" },
+            ]}
+          />
+        </div>
       </Panel>
 
       <Panel title="Instalments" aside={<span className="glass-chip">+{Math.round(t.gstRate * 100)}% GST</span>}>

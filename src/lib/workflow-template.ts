@@ -124,7 +124,7 @@ export type WorkflowInstalment = {
 export type WorkflowTemplate = {
   id: string;
   name: string;
-  /** Sample project code from the tracker; see projectCode() in workflow-plan.ts. */
+  /** The tracker's example code: layout CFS, plot 501, customer initials NK. See projectCode() in workflow-plan.ts. */
   sampleCode: string;
   preWeeks: number;
   constructionWeeks: number;

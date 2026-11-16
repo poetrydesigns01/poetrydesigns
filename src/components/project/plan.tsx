@@ -72,7 +72,7 @@ function PlanChart({ projectId }: { projectId: ProjectId }) {
   const firm = useFirm();
   const timeline = firm.timeline(projectId);
   if (!timeline) return null;
-  const { cols, rows, markers, today } = projectGantt(timeline);
+  const { cols, rows, today } = projectGantt(timeline);
   const todayCol = today >= 0 ? cols[today] : undefined;
   return (
     <Panel
@@ -90,7 +90,7 @@ function PlanChart({ projectId }: { projectId: ProjectId }) {
       }
     >
       <div className="grid gap-3">
-        <Gantt caption="Programme by week" cols={cols} rows={rows} markers={markers} today={today} />
+        <Gantt caption="Programme by week" cols={cols} rows={rows} today={today} />
         <GanttKey
           items={[
             { tone: "done", words: "Done" },
@@ -98,6 +98,8 @@ function PlanChart({ projectId }: { projectId: ProjectId }) {
             { tone: "waiting", words: "Held for payment" },
             { tone: "locked", words: "To come" },
             { tone: "late", words: "Extra days" },
+            { tone: "due", words: "Due ahead" },
+            { tone: "free", words: "Reached" },
           ]}
         />
       </div>

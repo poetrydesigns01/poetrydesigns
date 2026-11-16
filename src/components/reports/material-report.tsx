@@ -7,6 +7,7 @@ import { PaperSheet } from "@/components/register/paper-sheet";
 import { SampleTag } from "@/components/register/sample-tag";
 import { useFirm } from "@/lib/demo-store";
 import { formatDate, formatStamp } from "@/lib/format";
+import { siteLine } from "@/lib/workflow-plan";
 
 // The material requirement report: one request on an A4 sheet, the way a vendor or the
 // office file would want it. It prints alone, without the screen around it.
@@ -35,7 +36,7 @@ export function MaterialReport({ no }: { no: string }) {
           <dt className="text-ink-soft">Project</dt>
           <dd className="font-semibold">{project?.name ?? request.projectName}</dd>
           <dt className="text-ink-soft">Address</dt>
-          <dd>{project?.address}</dd>
+          <dd>{project ? siteLine(project) : ""}</dd>
           <dt className="text-ink-soft">Project code</dt>
           <dd>
             {project?.code || "Not given yet"} <SampleTag />

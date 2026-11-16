@@ -6,10 +6,21 @@ import { TODAY } from "@/lib/demo-data";
 import { formatDate, formatShortDate } from "@/lib/format";
 import type { TimelineInstalment, TimelineStage, TimelineView } from "@/lib/portal";
 import { CheckIcon } from "./icons";
-import { addedLabel, Diamond, instalmentStage, instalmentTone, StageMark, weekSpan } from "./week-gantt";
+import {
+  addedLabel,
+  Diamond,
+  dueWeekLabel,
+  instalmentAhead,
+  instalmentOpens,
+  instalmentTone,
+  instalmentWords,
+  StageMark,
+  weekSpan,
+} from "./week-gantt";
 
 // The weekly plan stacked for a phone: one row per workflow stage with its weeks, the
-// instalments that fall in it as numbered diamonds, and its expected finish. What is
+// instalment that opens it (a brick pill with its due week until the project reaches that
+// week, plain after), and its expected finish. What is
 // already finished folds into one line each (before construction, milestones done) and
 // opens on tap, so the list stays short.
 
@@ -21,15 +32,25 @@ function Pins({ list }: { list: TimelineInstalment[] }) {
   if (list.length === 0) return null;
   return (
     <span className="inline-flex items-center gap-2">
-      {list.map((i) => (
-        <span key={i.n} className="inline-flex items-center gap-1" title={`${i.label} · ${i.status}`}>
-          <Diamond tone={instalmentTone(i)} />
-          <span className="figure text-ink">{i.n === 0 ? "S" : i.n}</span>
-          <span className="sr-only">
-            {i.label}, {formatDate(i.expectedDate)}, {i.status}
+      {list.map((i) => {
+        const short = i.n === 0 ? "Sign-up" : `Inst. ${i.n}`;
+        return instalmentAhead(i) ? (
+          <span key={i.n} className="wk-due-pill" title={`${i.label} · ${i.status}`}>
+            <span aria-hidden="true">
+              {short} · {dueWeekLabel(i)}
+            </span>
+            <span className="sr-only">{instalmentWords(i)}</span>
           </span>
-        </span>
-      ))}
+        ) : (
+          <span key={i.n} className="inline-flex items-center gap-1" title={`${i.label} · ${i.status}`}>
+            <Diamond tone={instalmentTone(i)} small />
+            <span className="text-ink" aria-hidden="true">
+              {short} · {dueWeekLabel(i)}
+            </span>
+            <span className="sr-only">{instalmentWords(i)}</span>
+          </span>
+        );
+      })}
     </span>
   );
 }
@@ -124,8 +145,9 @@ function Folded({
 
 export function TimelineList({ timeline }: { timeline: TimelineView }) {
   const { stages, instalments } = timeline;
-  const pinsFor = (id: string) => instalments.filter((i) => instalmentStage(i) === id);
+  const pinsFor = (id: string) => instalments.filter((i) => instalmentOpens(i) === id);
   const firstLocked = stages.find((s) => s.locked && s.state !== "done")?.id ?? null;
+  const anyAhead = instalments.some(instalmentAhead);
   const row = (stage: TimelineStage) => (
     <Row
       key={stage.id}
@@ -148,9 +170,17 @@ export function TimelineList({ timeline }: { timeline: TimelineView }) {
 
   return (
     <section className="glass-strong p-2" aria-labelledby="plan-list-title">
-      <h2 id="plan-list-title" className="display px-3 pt-2 pb-2 text-22 text-ink">
-        Weekly plan
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3 pt-2 pb-2">
+        <h2 id="plan-list-title" className="display text-22 text-ink">
+          Weekly plan
+        </h2>
+        {anyAhead && (
+          <p className="flex items-center gap-1.5 text-13 text-ink-soft" aria-hidden="true">
+            <span className="wk-key" data-kind="due" />
+            Due ahead
+          </p>
+        )}
+      </div>
       <ol className="grid gap-0.5">
         {preDone ? (
           <Folded title="Before construction" weeks={`P1–P${pre[pre.length - 1]?.toWeek ?? 8}`} count={pre.length}>

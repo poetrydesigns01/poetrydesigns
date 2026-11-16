@@ -547,11 +547,20 @@ export type MilestoneSeed = {
 
 export type ProjectSeed = {
   id: ProjectId;
-  /** CFS_501_NK shape: category code, running number, client initials. Empty until a workspace is opened. */
+  /**
+   * Poetry's project code: layout, plot number and the first client's initials, joined by
+   * "_" ("CFS_501_NK" is layout CFS, plot 501, Neeraj Kumar). See projectCode() in
+   * workflow-plan.ts. Empty until a workspace is opened.
+   */
   code: string;
+  /** The residential layout the plot is in, as a short upper-case code ("CFS"). */
+  layout: string;
+  /** The plot number in that layout: "501", "12A". */
+  plotNo: string;
   name: string;
   category: CategoryId;
   place: string;
+  /** Road, area and PIN only: the layout and plot no. are kept above, never repeated here. */
   address: string;
   maps: string;
   lat: number;
@@ -638,22 +647,32 @@ const iyerRows: MilestoneSeed[] = iyerMilestones.map((m) => ({
   paidOn: m.paidOn,
 }));
 
-/** Running numbers in the project codes, in signing order. Sample, to be confirmed. */
-const CODE_NUMBERS: Record<ProjectId, number> = {
-  fernandes: 501,
-  nair: 502,
-  bhat: 503,
-  iyer: 504,
-  dsouza: 505,
-  "iyer-cottage": 506,
-  sharma: 507,
-  kulkarni: 508,
+/**
+ * Where each plot is: its layout code and plot number. Sample layout codes, made up for the
+ * demo (only CFS comes from Poetry's workflow sheet); Iyer Residence and Fernandes Villa
+ * are plots in the same layout.
+ */
+const SITES: Record<ProjectId, { layout: string; plotNo: string }> = {
+  iyer: { layout: iyerProject.layout, plotNo: iyerProject.plotNo },
+  fernandes: { layout: "CFS", plotNo: "501" },
+  nair: { layout: "AVF", plotNo: "48" },
+  bhat: { layout: "JN4", plotNo: "18" },
+  dsouza: { layout: "GGL", plotNo: "12" },
+  "iyer-cottage": { layout: "NHF", plotNo: "112" },
+  sharma: { layout: "NDN", plotNo: "31A" },
+  kulkarni: { layout: "HGF", plotNo: "23" },
 };
+
+/** A seeded project's layout, plot number and code, the code from the first client's name. */
+function siteOf(id: ProjectId, client: string): { code: string; layout: string; plotNo: string } {
+  const site = SITES[id];
+  return { ...site, code: projectCode(site.layout, site.plotNo, client) };
+}
 
 export const projects: ProjectSeed[] = [
   {
     id: "iyer",
-    code: iyerProject.code,
+    ...siteOf("iyer", "Meera Iyer"),
     name: iyerProject.name,
     category: "city-villa",
     place: "Kanakapura Road",
@@ -692,7 +711,6 @@ export const projects: ProjectSeed[] = [
       constructionStart: "2026-07-13",
       generatedAt: "2026-05-25T12:10",
       generatedBy: "shalini",
-      codeNumber: CODE_NUMBERS.iyer,
       progress: {
         doneThrough: "m3",
         tasks: { "m4-ff-blocks": { percent: 60, startedOn: "2026-10-26" } },
@@ -701,11 +719,11 @@ export const projects: ProjectSeed[] = [
   },
   {
     id: "iyer-cottage",
-    code: projectCode("farmhouse", CODE_NUMBERS["iyer-cottage"], "Meera Iyer"),
+    ...siteOf("iyer-cottage", "Meera Iyer"),
     name: "Iyer Farm Cottage",
     category: "farmhouse",
     place: "Chikkaballapur",
-    address: "Survey 112, Nandi Hills Road, Chikkaballapur 562101",
+    address: "Nandi Hills Road, Chikkaballapur 562101",
     maps: mapsLink(13.428, 77.727),
     lat: 13.428,
     lng: 77.727,
@@ -732,17 +750,16 @@ export const projects: ProjectSeed[] = [
       preStart: "2026-09-28",
       generatedAt: "2026-10-02T12:30",
       generatedBy: "shalini",
-      codeNumber: CODE_NUMBERS["iyer-cottage"],
       progress: { doneThrough: "planning-design", tasks: { "fa-bom": { percent: 100, doneOn: "2026-11-06" } } },
     },
   },
   {
     id: "nair",
-    code: projectCode("farmhouse", CODE_NUMBERS.nair, "Anil Nair"),
+    ...siteOf("nair", "Anil Nair"),
     name: "Nair Farmhouse",
     category: "farmhouse",
     place: "Devanahalli",
-    address: "Survey 48/2, Avathi village, Devanahalli 562110",
+    address: "Avathi village, Devanahalli 562110",
     maps: mapsLink(13.246, 77.712),
     lat: 13.246,
     lng: 77.712,
@@ -787,7 +804,6 @@ export const projects: ProjectSeed[] = [
       constructionStart: "2026-03-16",
       generatedAt: "2026-01-26T12:30",
       generatedBy: "shalini",
-      codeNumber: CODE_NUMBERS.nair,
       progress: {
         doneThrough: "m7",
         tasks: { "m8-plastering": { percent: 75, startedOn: "2026-09-28" } },
@@ -796,11 +812,11 @@ export const projects: ProjectSeed[] = [
   },
   {
     id: "dsouza",
-    code: projectCode("city-villa", CODE_NUMBERS.dsouza, "Ryan D'Souza"),
+    ...siteOf("dsouza", "Ryan D'Souza"),
     name: "D'Souza Villa",
     category: "city-villa",
     place: "Sarjapur Road",
-    address: "Plot 12, Green Glen Layout, Sarjapur Road, Bengaluru 560035",
+    address: "Sarjapur Road, Bengaluru 560035",
     maps: mapsLink(12.901, 77.687),
     lat: 12.901,
     lng: 77.687,
@@ -838,17 +854,16 @@ export const projects: ProjectSeed[] = [
       preStart: "2026-07-13",
       generatedAt: "2026-07-13T12:30",
       generatedBy: "shalini",
-      codeNumber: CODE_NUMBERS.dsouza,
       progress: { doneThrough: "m1", tasks: { "m2-gf-blocks": { percent: 40, startedOn: "2026-11-02" } } },
     },
   },
   {
     id: "bhat",
-    code: projectCode("city-villa", CODE_NUMBERS.bhat, "Sunil Bhat"),
+    ...siteOf("bhat", "Sunil Bhat"),
     name: "Bhat Residence",
     category: "city-villa",
     place: "Jayanagar",
-    address: "No. 18, 4th Cross, Jayanagar 4th Block, Bengaluru 560011",
+    address: "4th Cross, Jayanagar 4th Block, Bengaluru 560011",
     maps: mapsLink(12.925, 77.584),
     lat: 12.925,
     lng: 77.584,
@@ -892,20 +907,19 @@ export const projects: ProjectSeed[] = [
       preStart: "2026-05-11",
       generatedAt: "2026-05-11T12:30",
       generatedBy: "shalini",
-      codeNumber: CODE_NUMBERS.bhat,
       progress: { doneThrough: "m4", tasks: { "m5-ff-slab": { percent: 50, startedOn: "2026-11-02" } } },
     },
   },
   {
     id: "fernandes",
-    code: projectCode("city-villa", CODE_NUMBERS.fernandes, "Neil Fernandes"),
+    ...siteOf("fernandes", "Neil Fernandes"),
     name: "Fernandes Villa",
     category: "city-villa",
-    place: "Whitefield",
-    address: "Plot 6, Palm Meadows Road, Whitefield, Bengaluru 560066",
-    maps: mapsLink(12.97, 77.75),
-    lat: 12.97,
-    lng: 77.75,
+    place: "Kanakapura Road",
+    address: "Kanakapura Road, Bengaluru 560062",
+    maps: mapsLink(12.8471, 77.5418),
+    lat: 12.8471,
+    lng: 77.5418,
     clients: ["Neil Fernandes"],
     clientEmail: "neil.fernandes@example.com",
     clientSignedInOn: "2025-07-15",
@@ -954,17 +968,16 @@ export const projects: ProjectSeed[] = [
       preStart: "2025-07-14",
       generatedAt: "2025-07-14T12:30",
       generatedBy: "shalini",
-      codeNumber: CODE_NUMBERS.fernandes,
       progress: { doneThrough: "handover", tasks: { "ho-noc": { percent: 100, doneOn: "2026-08-14" } } },
     },
   },
   {
     id: "sharma",
-    code: projectCode("cement-blocks", CODE_NUMBERS.sharma, "Rakesh Sharma"),
+    ...siteOf("sharma", "Rakesh Sharma"),
     name: "Sharma Villa",
     category: "cement-blocks",
     place: "Electronic City",
-    address: "Plot 31, Neeladri Nagar, Electronic City, Bengaluru 560100",
+    address: "Neeladri Nagar, Electronic City, Bengaluru 560100",
     maps: mapsLink(12.845, 77.66),
     lat: 12.845,
     lng: 77.66,
@@ -988,17 +1001,18 @@ export const projects: ProjectSeed[] = [
       preStart: "2026-11-02",
       generatedAt: "2026-11-07T11:30",
       generatedBy: "shalini",
-      codeNumber: CODE_NUMBERS.sharma,
       progress: { doneThrough: "sign-up", tasks: { "pd-soil-test": { percent: 30, startedOn: "2026-11-09" } } },
     },
   },
   {
     id: "kulkarni",
+    // No code until the workspace is opened; then it comes from the layout and plot BD entered.
     code: "",
+    ...SITES.kulkarni,
     name: "Kulkarni Eco Home",
     category: "eco",
     place: "Hesaraghatta",
-    address: "Survey 23, Hesaraghatta Main Road, Bengaluru 560088",
+    address: "Hesaraghatta Main Road, Bengaluru 560088",
     maps: mapsLink(13.139, 77.487),
     lat: 13.139,
     lng: 77.487,
@@ -1017,9 +1031,6 @@ export const projects: ProjectSeed[] = [
     billsBefore: {},
   },
 ];
-
-/** The code given to Kulkarni Eco Home when its workspace is opened. Format to be confirmed. */
-export const KULKARNI_CODE = projectCode("eco", CODE_NUMBERS.kulkarni, "Aditi Kulkarni");
 
 // ---- Money ----
 
@@ -2116,7 +2127,11 @@ export type DraftStep1 = {
   clients: string[];
   email: string;
   phone: string;
+  /** Road, area and PIN only, without the layout and plot no. */
   address: string;
+  /** The layout code ("CFS") and the plot number ("501"): with the first client's initials they make the project code. */
+  layout: string;
+  plotNo: string;
   maps: string;
   lat: number;
   lng: number;
@@ -2172,7 +2187,9 @@ export const seedDrafts: Draft[] = [
       clients: ["Aditi Kulkarni", "Mohan Kulkarni"],
       email: "aditi.kulkarni@example.com",
       phone: "+91 98450 07788",
-      address: "Survey 23, Hesaraghatta Main Road, Bengaluru 560088",
+      address: "Hesaraghatta Main Road, Bengaluru 560088",
+      layout: SITES.kulkarni.layout,
+      plotNo: SITES.kulkarni.plotNo,
       maps: mapsLink(13.139, 77.487),
       lat: 13.139,
       lng: 77.487,
