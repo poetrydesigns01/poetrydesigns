@@ -105,7 +105,12 @@ function VendorsTab() {
                 )}
                 {!gone && (
                   <div className="md:justify-self-end">
-                    <TwoStepDelete question={`Delete ${v.name}?`} what={vendorWhat(v.name)} target={{ kind: "vendor", vendorId: v.id }} />
+                    <TwoStepDelete
+                      quiet
+                      question={`Delete ${v.name}?`}
+                      what={vendorWhat(v.name)}
+                      target={{ kind: "vendor", vendorId: v.id }}
+                    />
                   </div>
                 )}
               </div>

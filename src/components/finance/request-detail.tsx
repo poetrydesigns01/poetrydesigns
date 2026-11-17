@@ -4,8 +4,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type ReactNode } from "react";
-import { GlassTable, Icon, Meter, Panel, StepTrack, WaitChip } from "@/components/admin/glass-kit";
+import { useRef, useState } from "react";
+import { GlassTable, Icon, Meter, Panel } from "@/components/admin/glass-kit";
 import { field } from "@/components/register/chips";
 import { DropZone } from "@/components/register/drop-zone";
 import { Field } from "@/components/register/field";
@@ -13,6 +13,7 @@ import { usePause } from "@/components/register/recording-pause";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
 import { MaterialReport } from "@/components/reports/material-report";
+import { FactRow, RequestSteps } from "@/components/site/site-kit";
 import { stampNow } from "@/lib/clock";
 import { TODAY } from "@/lib/demo-data";
 import { useDemo, useFirm, useViewer } from "@/lib/demo-store";
@@ -20,7 +21,7 @@ import type { PoView, RequestView } from "@/lib/firm";
 import type { PersonId, Vendor } from "@/lib/firm-data";
 import { datePart, daysBetween, formatShortDate, formatStampShort, inr } from "@/lib/format";
 import { MarkSeen, SeeAsLine } from "./mark-seen";
-import { REQUEST_STEPS, reachedOf, requestChip } from "./request-words";
+import { WaitingChip, requestChip } from "./request-words";
 import { numberFrom, perUnit, procuresFor, rateWords } from "./shared";
 import { WorkOrders } from "./work-orders";
 
@@ -341,49 +342,49 @@ export function RequestDetail({ no }: { no: string }) {
       <StaffBoard
         place="Requests"
         headline={request.no}
-        state={`${request.projectName} · Stage ${request.n}`}
+        state={`${request.projectName} · Milestone ${request.n}`}
         chip={false}
         back={back}
       />
 
       <div className="mt-6 grid gap-5 lg:grid-cols-12">
         <div className="grid content-start gap-5 lg:col-span-5">
-          <Panel title="Request" aside={requestChip(request)}>
+          <Panel title="Request" aside={requestChip(request, { late: false })}>
             <div className="px-1 pb-4">
-              <StepTrack steps={REQUEST_STEPS} reached={reachedOf(request)} late={request.late} />
+              <RequestSteps r={request} />
             </div>
-            <dl className="grid grid-cols-2 gap-2">
-              <Fact label="Project">
-                <Link href={`/staff/projects/${request.projectId}/materials`} className="link -my-3 inline-flex min-h-11 items-center">
+            <dl className="grid gap-0.5">
+              <FactRow label="Project">
+                <Link href={`/staff/projects/${request.projectId}/materials`} className="link -my-2 inline-flex min-h-11 items-center">
                   {request.projectName}
                 </Link>
-              </Fact>
-              <Fact label="Raised">{formatStampShort(request.sentAt || request.at)}</Fact>
-              <Fact label="Needed by">
-                <span className="grid">
-                  <span>{formatShortDate(request.neededBy)}</span>
-                  {open && (
-                    <span className={`text-13 ${request.late || left < 0 ? "late-text" : "text-ink-soft"}`}>
-                      {left < 0 ? `${-left} days late` : left === 0 ? "Today" : `in ${left} days`}
-                    </span>
-                  )}
-                </span>
-              </Fact>
-              <Fact label="Waiting">{open ? <WaitChip days={request.days} /> : "–"}</Fact>
-              <Fact label="Site engineer" wide>
-                <span className="flex flex-wrap items-center gap-x-3">
+              </FactRow>
+              <FactRow label="Milestone">{request.n}</FactRow>
+              <FactRow label="Raised">{formatStampShort(request.sentAt || request.at)}</FactRow>
+              <FactRow label="Needed by">
+                {formatShortDate(request.neededBy)}
+                {open && (
+                  <span className={`text-13 ${request.late || left < 0 ? "late-text" : "text-ink-soft"}`}>
+                    {" · "}
+                    {left < 0 ? `${-left} days late` : left === 0 ? "today" : `in ${left} days`}
+                  </span>
+                )}
+              </FactRow>
+              <FactRow label="Waiting">{open ? <WaitingChip r={request} /> : "–"}</FactRow>
+              <FactRow label="Raised by">
+                <span className="inline-flex flex-wrap items-center justify-end gap-x-3">
                   <span>{raiser?.name ?? request.by}</span>
                   {raiser?.phone && (
                     <a
                       href={`tel:${raiser.phone.replace(/\s/g, "")}`}
-                      className="link inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap"
+                      className="link -my-2 inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap"
                     >
                       <Icon name="phone" className="size-3.5" />
                       {raiser.phone}
                     </a>
                   )}
                 </span>
-              </Fact>
+              </FactRow>
             </dl>
           </Panel>
 
@@ -454,19 +455,36 @@ export function RequestDetail({ no }: { no: string }) {
                 rowKey={(po) => po.no}
                 columns={[
                   {
+                    // The PO, its vendor, then one line per item: the panel is too narrow for
+                    // the lines to hold a column of their own.
                     label: "PO",
                     cell: (po) => (
-                      <span className="grid">
-                        <span>{po.no}</span>
-                        <span className="text-13 font-normal text-ink-soft">{po.vendor}</span>
+                      <span className="grid gap-0.5">
+                        <span>
+                          <span className="whitespace-nowrap">{po.no}</span>
+                          <span className="font-normal text-ink-soft"> · {po.vendor}</span>
+                        </span>
+                        <ul className="grid gap-0.5 text-13 font-normal text-ink-soft">
+                          {po.lineWords.map((words) => (
+                            <li key={words}>{words}</li>
+                          ))}
+                        </ul>
                       </span>
                     ),
                   },
-                  { label: "Lines", cell: (po) => <span className="text-13">{po.lineWords.join("; ")}</span> },
-                  { label: "Before GST", align: "right", cell: (po) => <span className="figure">{inr(po.amount)}</span> },
-                  { label: "With GST", align: "right", cell: (po) => <span className="figure">{inr(po.total)}</span> },
+                  {
+                    label: "Before GST",
+                    align: "right",
+                    cell: (po) => <span className="figure whitespace-nowrap">{inr(po.amount)}</span>,
+                  },
+                  {
+                    label: "With GST",
+                    align: "right",
+                    cell: (po) => <span className="figure whitespace-nowrap">{inr(po.total)}</span>,
+                  },
                   {
                     label: "Bill",
+                    phone: false,
                     cell: (po) =>
                       po.billed ? <StatusChip tone="done">Billed</StatusChip> : <StatusChip tone="waiting">Not billed</StatusChip>,
                   },
@@ -495,14 +513,5 @@ export function RequestDetail({ no }: { no: string }) {
         </details>
       </div>
     </>
-  );
-}
-
-function Fact({ label, wide = false, children }: { label: string; wide?: boolean; children: ReactNode }) {
-  return (
-    <div className={`glass-inner min-w-0 px-3 py-2 ${wide ? "col-span-2" : ""}`}>
-      <dt className="lettering text-ink-soft">{label}</dt>
-      <dd className="min-w-0 text-15">{children}</dd>
-    </div>
   );
 }

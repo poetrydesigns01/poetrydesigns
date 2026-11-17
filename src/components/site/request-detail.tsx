@@ -8,57 +8,19 @@ import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
 import { MaterialReport } from "@/components/reports/material-report";
 import { useFirm, useViewer } from "@/lib/demo-store";
-import type { RequestView } from "@/lib/firm";
 import { formatShortDate, formatStampShort } from "@/lib/format";
 import { DeliveredButton } from "./rows";
-import { Icon, PanelHead, procurementDays, requestStatus, requestTitle, taskOfRequest } from "./site-kit";
+import { FactRow, Icon, PanelHead, RequestSteps, procurementDays, requestStatus, requestTitle, taskOfRequest } from "./site-kit";
 import "./site.css";
 
 // One request as the site engineer follows it: four steps with their dates, how long
 // procurement took, each line with its PO and the vendor's number, and the delivery mark.
 
-function Steps({ r }: { r: RequestView }) {
-  const firstPo = r.pos.map((po) => po.at).sort()[0];
-  const steps = [
-    { label: "Sent", at: r.queued ? undefined : r.sentAt || r.at },
-    { label: "Seen", at: r.seenAt ?? (firstPo ? firstPo : undefined) },
-    { label: "PO", at: firstPo },
-    { label: "Delivered", at: r.deliveredAt },
-  ];
-  const reached = steps.filter((s) => s.at).length;
-  return (
-    <ol className="grid grid-cols-4" aria-label="Progress">
-      {steps.map((s, i) => {
-        const done = Boolean(s.at);
-        return (
-          <li key={s.label} className="relative grid justify-items-center gap-1.5 text-center">
-            {i > 0 && (
-              <span
-                aria-hidden="true"
-                className={`absolute top-3.5 right-1/2 -left-1/2 h-0.5 ${i < reached ? "bg-kota" : "bg-ink/15"}`}
-              />
-            )}
-            <span
-              className={`relative grid size-7 place-items-center rounded-full border-2 ${
-                done ? "border-kota bg-kota text-paper" : "border-ink/20 bg-white/70 text-ink-soft"
-              }`}
-            >
-              {done ? <Icon name="check" className="size-4" /> : <span className="figure text-13">{i + 1}</span>}
-            </span>
-            <span className="text-13 font-semibold text-ink">{s.label}</span>
-            <span className="text-13 text-ink-soft">{s.at ? formatShortDate(s.at) : "—"}</span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 export function RequestDetail({ no }: { no: string }) {
   const firm = useFirm();
   const me = useViewer("site");
   const request = firm.requests.find((r) => r.no === no);
-  const back = { label: "My requests", href: "/staff/site/requests" };
+  const back = { label: "Back to requests", href: "/staff/site/requests" };
 
   if (!request) {
     return (
@@ -91,10 +53,10 @@ export function RequestDetail({ no }: { no: string }) {
               </div>
               <p className="text-15 text-ink">
                 {ordered ? "PO in " : "Waiting "}
-                <span className={`figure ${!ordered && days > 3 ? "late-text" : ""}`}>{days} d</span>
+                <span className={`font-semibold tabular-nums ${!ordered && days > 3 ? "late-text" : ""}`}>{days} d</span>
               </p>
             </div>
-            <Steps r={request} />
+            <RequestSteps r={request} />
             {canDeliver && <DeliveredButton request={request} person={me.id} primary />}
           </section>
 
@@ -110,7 +72,7 @@ export function RequestDetail({ no }: { no: string }) {
                       <span className="min-w-0 text-15 text-ink">
                         {(item?.name ?? line.material).replace(/\s*\(.*\)$/, "")}, {line.sub}
                       </span>
-                      <span className="figure shrink-0 text-15 text-ink">
+                      <span className="shrink-0 text-15 tabular-nums text-ink">
                         {line.qty.toLocaleString("en-IN")} {line.unit}
                       </span>
                     </div>
@@ -122,7 +84,7 @@ export function RequestDetail({ no }: { no: string }) {
                         const qty = po.lines.find((l) => l.lineId === line.id)?.qty ?? 0;
                         return (
                           <p key={po.no} className="flex flex-wrap items-center gap-x-2 text-13 text-ink-soft">
-                            <span className="figure text-ink">{po.no.replace("PO-2026-", "PO ")}</span>
+                            <span className="font-semibold tabular-nums text-ink">{po.no.replace("PO-2026-", "PO ")}</span>
                             <span>
                               {vendor?.name ?? po.vendor} · {qty.toLocaleString("en-IN")} {line.unit}
                             </span>
@@ -144,26 +106,20 @@ export function RequestDetail({ no }: { no: string }) {
 
         <section className="glass grid gap-1 p-2 sm:p-3" aria-label="Details">
           <dl className="grid gap-0.5">
-            {[
-              ["Site", request.projectName],
-              ["Task", task ? task.title : "—"],
-              ["Need", formatShortDate(request.neededBy)],
-              ["By", raiser?.name ?? request.by],
-              ["Raised", formatStampShort(request.at)],
-            ].map(([k, v]) => (
-              <div key={k} className="glass-row flex items-center justify-between gap-3 px-3 py-2.5">
-                <dt className="lettering text-ink-soft">{k}</dt>
-                <dd className="min-w-0 text-right text-15 text-ink">
-                  {k === "Task" && task ? (
-                    <Link href="/staff/site/tasks" className="link inline-flex min-h-11 items-center">
-                      {v}
-                    </Link>
-                  ) : (
-                    v
-                  )}
-                </dd>
-              </div>
-            ))}
+            <FactRow label="Project">{request.projectName}</FactRow>
+            <FactRow label="Milestone">{request.n}</FactRow>
+            <FactRow label="Task">
+              {task ? (
+                <Link href="/staff/site/tasks" className="link -my-2 inline-flex min-h-11 items-center">
+                  {task.title}
+                </Link>
+              ) : (
+                "—"
+              )}
+            </FactRow>
+            <FactRow label="Needed by">{formatShortDate(request.neededBy)}</FactRow>
+            <FactRow label="Raised by">{raiser?.name ?? request.by}</FactRow>
+            <FactRow label="Raised">{formatStampShort(request.at)}</FactRow>
           </dl>
           <details className="group px-1 pb-1">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-2 text-15 font-semibold text-ink hover:bg-white/50">

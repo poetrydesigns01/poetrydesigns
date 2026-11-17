@@ -52,8 +52,10 @@ export function RecordLog() {
     <>
       <StaffBoard place="Log" headline="The record" state="Read only, for everyone." chip={false} />
       <div className="mt-6 grid gap-5">
-        <section aria-label="Filters" className="glass grid gap-3 p-3 sm:p-4 lg:grid-cols-2">
-          <div>
+        {/* On a phone the filters are kept to three short lines: the two lists side by side,
+            then each switch on one line that scrolls sideways, so the entries start high. */}
+        <section aria-label="Filters" className="glass grid min-w-0 grid-cols-2 gap-3 p-3 sm:p-4">
+          <div className="min-w-0">
             <label htmlFor={`${ids}-project`} className="lettering block text-ink-soft">
               Project
             </label>
@@ -71,7 +73,7 @@ export function RecordLog() {
               ))}
             </select>
           </div>
-          <div>
+          <div className="min-w-0">
             <label htmlFor={`${ids}-person`} className="lettering block text-ink-soft">
               Person
             </label>
@@ -90,9 +92,9 @@ export function RecordLog() {
             </select>
           </div>
         </section>
-        <div className="flex flex-wrap gap-3">
-          <Segments<LogFilter> label="Action" value={kind} onChange={setKind} options={KINDS} />
-          <Segments<"week" | "month" | "all"> label="When" value={range} onChange={setRange} options={RANGES} />
+        <div className="-mt-2 flex min-w-0 flex-wrap gap-2 sm:mt-0 sm:gap-3">
+          <Segments<LogFilter> label="Action" value={kind} onChange={setKind} options={KINDS} scroll />
+          <Segments<"week" | "month" | "all"> label="When" value={range} onChange={setRange} options={RANGES} scroll />
         </div>
 
         <Panel title="Entries" aside={<Count n={shown.length} />} strong>

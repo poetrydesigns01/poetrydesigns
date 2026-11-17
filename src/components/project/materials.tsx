@@ -65,7 +65,7 @@ export function ProjectMaterials({ projectId }: { projectId: ProjectId }) {
         <StatCard label="Delivered" value={delivered} icon="check" />
       </StatRow>
 
-      <Panel title="Requests" aside={<Count n={open.length} tone={open.length > 0 ? "waiting" : undefined} />} strong>
+      <Panel title="Requests" aside={<Count n={requests.length} />} strong>
         <GlassTable<RequestView>
           caption="Material requests"
           rows={requests}

@@ -5,10 +5,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Count, GlassTable, Icon, inrShort, Panel, Segments, StatCard, StatRow } from "@/components/admin/glass-kit";
+import { Count, GlassTable, Icon, inrShort, Panel } from "@/components/admin/glass-kit";
 import { useScope } from "@/components/register/project-switch";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
+import { Segmented, StatStrip } from "@/components/site/site-kit";
 import { useFirm, useViewer } from "@/lib/demo-store";
 import type { BillView, PoView } from "@/lib/firm";
 import type { ProjectId } from "@/lib/firm-data";
@@ -23,8 +24,11 @@ import { hasFinance } from "./shared";
 // when its bill is entered. Bills that have reached the office wait at the top.
 
 function stageWords(n: number): string {
-  return n === 0 ? "Sign-up" : `Stage ${n}`;
+  return n === 0 ? "Sign-up" : `Milestone ${n}`;
 }
+
+/** Bills shown before "Show all": the latest few. */
+const LATEST = 8;
 
 export function MoneyOut() {
   const firm = useFirm();
@@ -40,6 +44,7 @@ export function MoneyOut() {
     .filter((po): po is PoView => !!po);
   const [chosen, setChosen] = useState<ProjectId | "all">("all");
   const [entering, setEntering] = useState(false);
+  const [allBills, setAllBills] = useState(false);
 
   const projects = firm.projects.filter(
     (p) =>
@@ -64,11 +69,14 @@ export function MoneyOut() {
       <StaffBoard place="Money out" headline={n === 0 ? "Every bill is entered" : `${n} ${n === 1 ? "bill" : "bills"} to enter`} />
 
       <div className="mt-6 grid gap-5">
-        <StatRow cols={3} label="Money out">
-          <StatCard label="Spent" value={inrShort(spent)} sub="Before GST" icon="rupee" />
-          <StatCard label="On order" value={inrShort(committed)} sub={`${onOrder.length} POs not billed`} icon="truck" />
-          <StatCard label="Bills to enter" value={n} icon="file" tone={n > 0 ? "late" : undefined} />
-        </StatRow>
+        <StatStrip
+          label="Money out"
+          items={[
+            { icon: "rupee", label: "Spent, before GST", value: inrShort(spent) },
+            { icon: "truck", label: `On order · ${onOrder.length} not billed`, value: inrShort(committed) },
+            { icon: "sheet", label: "Bills to enter", value: n, alert: n > 0 },
+          ]}
+        />
 
         {!finance && accountant && (accountant.id === "divya" || accountant.id === "prakash") && (
           <div className="glass px-4 py-2">
@@ -152,7 +160,7 @@ export function MoneyOut() {
         </Panel>
 
         {scope === "all" && projects.length > 1 && (
-          <Segments<ProjectId | "all">
+          <Segmented<ProjectId | "all">
             label="Project"
             value={chosen}
             onChange={setChosen}
@@ -167,18 +175,19 @@ export function MoneyOut() {
         >
           <GlassTable<BillView>
             caption="Bills, before GST"
-            rows={bills}
+            rows={allBills ? bills : bills.slice(0, LATEST)}
             rowKey={(b) => b.id}
             wide="lg"
             empty="No bills entered yet."
             chip={(b) => <span className="figure text-15">{inr(b.amount)}</span>}
-            lead={(b) => <BillName b={b} />}
+            lead={(b) => <BillName b={b} vendor />}
             columns={[
               { label: "Bill", cell: (b) => <BillName b={b} /> },
               ...(project === "all"
                 ? [
                     {
                       label: "Project",
+                      phone: false as const,
                       cell: (b: BillView) => (
                         <Link href={`/staff/projects/${b.projectId}/money`} className="link -my-3 inline-flex min-h-11 items-center font-normal">
                           {firm.project(b.projectId)?.name}
@@ -187,18 +196,40 @@ export function MoneyOut() {
                     },
                   ]
                 : []),
-              { label: "Stage", width: "w-24", cell: (b) => <span className="font-normal">{stageWords(b.n)}</span> },
-              { label: "Vendor", cell: (b) => <span className="font-normal">{b.earlier ? "Several" : b.vendor}</span> },
-              { label: "PO", width: "w-36", cell: (b) => <span className="text-13 font-normal">{b.poNo ?? "–"}</span> },
+              {
+                label: "Milestone",
+                width: "w-28",
+                phone: false,
+                cell: (b) => <span className="whitespace-nowrap font-normal">{stageWords(b.n)}</span>,
+              },
+              { label: "Vendor", phone: false, cell: (b) => <span className="font-normal">{b.earlier ? "Several" : b.vendor}</span> },
+              {
+                label: "PO",
+                width: "w-36",
+                phone: false,
+                cell: (b) => <span className="whitespace-nowrap text-13 font-normal">{b.poNo ?? "–"}</span>,
+              },
               {
                 label: "Before GST",
                 align: "right",
                 phone: false,
                 cell: (b) => <span className="figure">{inr(b.amount)}</span>,
               },
-              { label: "GST", align: "right", cell: (b) => <span className="figure font-normal">{inr(b.gst)}</span> },
+              { label: "GST", align: "right", phone: false, cell: (b) => <span className="figure font-normal">{inr(b.gst)}</span> },
             ]}
           />
+          {bills.length > LATEST && (
+            <div className="px-1 pt-3">
+              <button
+                type="button"
+                className="btn btn-glass min-h-11 px-4 text-15"
+                aria-expanded={allBills}
+                onClick={() => setAllBills((all) => !all)}
+              >
+                {allBills ? "Show latest" : `Show all (${bills.length})`}
+              </button>
+            </div>
+          )}
         </Panel>
 
         {onOrder.length > 0 && (
@@ -229,11 +260,15 @@ export function MoneyOut() {
   );
 }
 
-function BillName({ b }: { b: BillView }) {
+/** The bill number over its date; on a phone card the vendor joins the date. */
+function BillName({ b, vendor = false }: { b: BillView; vendor?: boolean }) {
   return (
     <span className="grid min-w-0">
       <span>{b.billNo}</span>
-      <span className="text-13 font-normal text-ink-soft">{b.earlier ? "Before the portal" : formatShortDate(b.on)}</span>
+      <span className="text-13 font-normal text-ink-soft">
+        {b.earlier ? "Before the portal" : formatShortDate(b.on)}
+        {vendor && ` · ${b.earlier ? "Several" : b.vendor}`}
+      </span>
     </span>
   );
 }

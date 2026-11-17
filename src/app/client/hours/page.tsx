@@ -5,6 +5,7 @@
 
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { CLIENT_PAGE, PageHead } from "@/components/client-home/page-frame";
 import { ClockIcon, PlusIcon } from "@/components/craft/glass-icons";
 import { h, HoursMeter } from "@/components/hours/hours-meter";
 import { useOnHidden, usePause } from "@/components/register/recording-pause";
@@ -70,15 +71,8 @@ export default function HoursPage() {
   ].filter((group) => group.list.length > 0);
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:py-10">
-      <header className="flex flex-wrap items-end justify-between gap-3 px-1">
-        <h1 className="display text-32 text-ink">Advisory hours</h1>
-        {left > 0 ? (
-          <StatusChip tone={left <= 2 ? "waiting" : "done"}>{h(left)} left</StatusChip>
-        ) : (
-          <StatusChip tone="late">All used</StatusChip>
-        )}
-      </header>
+    <div className={CLIENT_PAGE}>
+      <PageHead title="Advisory hours">{left <= 0 && <StatusChip tone="late">All used</StatusChip>}</PageHead>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <section aria-labelledby="hours-during" className="glass-dark grid content-start gap-4 p-5 sm:p-6">

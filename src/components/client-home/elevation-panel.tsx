@@ -108,9 +108,11 @@ export function ElevationPanel({
                 }`}
               >
                 {task.title}
-                <span className="figure font-normal">
-                  {task.waitingForClient ? " · your approval" : task.state === "done" ? "" : ` · ${task.percent}%`}
-                </span>
+                {task.waitingForClient ? (
+                  <span className="font-normal"> · your approval</span>
+                ) : task.state === "done" ? null : (
+                  <span className="font-normal tabular-nums"> · {task.percent}%</span>
+                )}
               </li>
             ))}
           </ul>

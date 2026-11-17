@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { Brand } from "@/components/brand";
 import { SignOutButton } from "@/components/sign-out";
 import { useDemo, useFirm, useProjection } from "@/lib/demo-store";
 import { countWord } from "@/lib/format";
@@ -208,9 +209,8 @@ export function ClientNav() {
     <>
       <header className="client-bar no-print">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:gap-6">
-          <Link href="/client" className="flex min-h-11 min-w-0 shrink-0 items-baseline gap-3">
-            <span className="display text-22 leading-none max-[359px]:text-17">Poetry Designs</span>
-            <span className="lettering truncate text-ink-soft max-sm:hidden">Iyer Residence</span>
+          <Link href="/client" className="flex min-h-11 min-w-0 items-center lg:shrink-0">
+            <Brand context="Iyer Residence" layout="adaptive" />
           </Link>
           <nav aria-label="Main" className="hidden min-w-0 flex-1 justify-center gap-1 lg:flex">
             {PLACES.map((place) => (

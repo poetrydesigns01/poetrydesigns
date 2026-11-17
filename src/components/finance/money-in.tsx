@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactElement, type ReactNode } from "react";
 import { inrShort } from "@/components/admin/glass-kit";
 import { Chip, ChipGroup, field } from "@/components/register/chips";
 import { Field } from "@/components/register/field";
@@ -11,6 +11,7 @@ import { useScope } from "@/components/register/project-switch";
 import { usePause } from "@/components/register/recording-pause";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
+import { CountPill, StatStrip } from "@/components/site/site-kit";
 import { TODAY } from "@/lib/demo-data";
 import { getDemoSnapshot, useDemo, useFirm, useViewer } from "@/lib/demo-store";
 import type { PersonId } from "@/lib/firm-data";
@@ -30,9 +31,9 @@ import { hasFinance, inScope, rupeesFrom } from "./shared";
 
 type Source = "bank" | "client";
 
-const ROW =
-  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-3 py-3 " +
-  "md:grid-cols-[minmax(0,1.3fr)_8.5rem_minmax(0,1fr)_10.5rem]";
+// Name and amount on the first line, the amount in a fixed column near the name; the
+// status and the row's one action on the second.
+const ROW = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-3";
 
 export function MoneyIn() {
   const firm = useFirm();
@@ -89,23 +90,28 @@ export function MoneyIn() {
     <>
       <StaffBoard place="Money in" headline={headline} state={state} />
 
-      <section aria-label="Totals" className="glass mt-6 grid grid-cols-2 gap-2 p-2 sm:p-3 lg:grid-cols-4">
-        <Stat
-          label="Overdue"
-          value={inrShort(overdue.total)}
-          sub={overdue.items.length}
-          tone={overdue.items.length > 0 ? "late" : undefined}
-        />
-        <Stat label="This week" value={inrShort(thisWeek.total)} sub={thisWeek.items.length} />
-        <Stat label={`Next ${ahead.length} weeks`} value={inrShort(aheadTotal)} sub={aheadCount} />
-        <Stat
-          label="To confirm"
-          value={inrShort(toConfirm.reduce((t, s) => t + s.outstanding, 0))}
-          sub={toConfirm.length}
-          tone={toConfirm.length > 0 ? "waiting" : undefined}
+      <div className="mt-6 grid gap-3">
+        <StatStrip
+          label="Totals"
+          items={[
+            {
+              icon: "alert",
+              label: `Overdue · ${overdue.items.length} due`,
+              value: inrShort(overdue.total),
+              alert: overdue.items.length > 0,
+            },
+            { icon: "calendar", label: `This week · ${thisWeek.items.length} due`, value: inrShort(thisWeek.total) },
+            { icon: "clock", label: `${ahead.length} weeks · ${aheadCount} due`, value: inrShort(aheadTotal) },
+            {
+              icon: "check",
+              label: `${toConfirm.length} to confirm`,
+              value: inrShort(toConfirm.reduce((t, s) => t + s.outstanding, 0)),
+              alert: toConfirm.length > 0,
+            },
+          ]}
         />
         {!finance && accountant && (accountant.id === "divya" || accountant.id === "prakash") && (
-          <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 px-2 pt-1 lg:col-span-4">
+          <div className="glass flex flex-wrap items-center justify-between gap-2 px-3 py-2">
             <StatusChip tone="locked">View only</StatusChip>
             {/* Only the accountant confirms money in: switch the demo viewer to them. */}
             <button
@@ -117,11 +123,12 @@ export function MoneyIn() {
             </button>
           </div>
         )}
-      </section>
+      </div>
 
       <div className="mt-6 grid gap-6">
         <WeekBoard overdue={overdue} lanes={lanes} later={later} />
 
+        <Queues>
         <Block id="confirm" title="Client says paid" count={toConfirm.length} empty="Nothing to confirm">
           {toConfirm.map((s) => (
             <StageRow
@@ -213,18 +220,19 @@ export function MoneyIn() {
                   <ProjectLink id={a.projectId} name={firm.project(a.projectId)?.name ?? a.projectId} className="flex items-center justify-self-start text-15 font-semibold max-md:min-h-11" />
                   <span className="text-13 text-ink-soft">{a.hours} hours</span>
                 </span>
-                <span className="figure text-right text-15">{inr(a.amount)}</span>
-                <span className="col-span-2 flex flex-wrap items-center gap-2 md:col-span-1">
+                <span className="figure min-w-24 text-right text-15">{inr(a.amount)}</span>
+                <span className="col-span-2 flex flex-wrap items-center gap-2">
                   <StatusChip tone="done">Received</StatusChip>
                   <span className="text-13 text-ink-soft">
                     {formatShortDate(a.receivedOn)} · before GST
                   </span>
                 </span>
-                <span className="hidden md:block" />
               </li>
             ))}
           </Block>
         )}
+
+        </Queues>
 
         <InstalmentTrack projects={trackProjects} />
       </div>
@@ -232,47 +240,53 @@ export function MoneyIn() {
   );
 }
 
-function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: number; tone?: "waiting" | "late" }) {
-  const colour = tone === "late" ? "font-semibold text-brick" : tone === "waiting" ? "text-brass-deep" : "text-ink";
-  return (
-    <div className="glass-inner grid min-w-0 gap-0.5 px-4 py-3">
-      <p className="lettering text-ink-soft">{label}</p>
-      <p className="flex flex-wrap items-baseline gap-x-2">
-        <span className={`figure text-22 ${colour}`}>{value}</span>
-        {sub !== undefined && <span className="figure text-13 text-ink-soft">{sub}</span>}
-      </p>
-    </div>
-  );
-}
-
 function rowId(s: PaymentStageView): string {
   return `pay:${s.projectId}:${s.n}`;
 }
 
-function Block({
-  id,
-  title,
-  count,
-  empty,
-  children,
-}: {
+/** The queues under the week board. Ones with rows stand two to a row from 1280 px; empty
+ *  ones say so in a single quiet line under them, instead of a panel each. */
+function Queues({ children }: { children: ReactNode }) {
+  const blocks = (Array.isArray(children) ? children : [children]).filter(
+    (c): c is ReactElement<BlockProps> => Boolean(c) && typeof c === "object" && "props" in c,
+  );
+  const full = blocks.filter((b) => b.props.count > 0);
+  const empty = blocks.filter((b) => b.props.count === 0);
+  return (
+    <>
+      {full.length > 0 && <div className="grid items-start gap-6 xl:grid-cols-2">{full}</div>}
+      {empty.length > 0 && (
+        <ul aria-label="Nothing waiting" className="glass flex flex-wrap gap-x-6 gap-y-1 px-4 py-3">
+          {empty.map((b) => (
+            <li key={b.props.id} className="flex items-baseline gap-2 text-15">
+              <span className="font-semibold text-ink">{b.props.title}</span>
+              <span className="text-ink-soft">{b.props.empty}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+type BlockProps = {
   id: string;
   title: string;
   count: number;
   empty?: string;
   children: ReactNode;
-}) {
+};
+
+function Block({ id, title, count, children }: BlockProps) {
   return (
-    <section className="glass p-2 sm:p-3" aria-labelledby={`${id}-heading`}>
-      <div className="flex items-center justify-between gap-3 px-3 pb-1 pt-2">
+    <section className="glass min-w-0 p-2 sm:p-3" aria-labelledby={`${id}-heading`}>
+      <div className="flex min-h-11 items-center gap-2 px-3 pb-1">
         <h2 id={`${id}-heading`} tabIndex={-1} className="text-17 font-semibold text-ink outline-none">
           {title}
         </h2>
-        <span className="glass-chip figure before:hidden">
-          {count}
-        </span>
+        <CountPill n={count} />
       </div>
-      {count === 0 ? <p className="px-3 pb-3 pt-1 text-15 text-ink-soft">{empty}</p> : <ul>{children}</ul>}
+      <ul>{children}</ul>
     </section>
   );
 }
@@ -301,10 +315,10 @@ function StageRow({
           {stage.instalmentLabel} · {weekShort(stage)}
         </span>
       </span>
-      <span className="figure text-right text-15 text-ink">{inr(amount ?? stage.outstanding)}</span>
-      <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:col-span-1">{meta}</span>
-      <span className="reg-action col-span-2 flex md:col-span-1 md:justify-end">{action}</span>
-      {panel && <div className="col-span-2 md:col-span-4">{panel}</div>}
+      <span className="figure min-w-24 text-right text-15 text-ink">{inr(amount ?? stage.outstanding)}</span>
+      <span className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 ${action ? "max-sm:col-span-2" : "col-span-2"}`}>{meta}</span>
+      {action && <span className="reg-action flex max-sm:col-span-2 sm:justify-end">{action}</span>}
+      {panel && <div className="col-span-2">{panel}</div>}
     </li>
   );
 }
@@ -314,7 +328,7 @@ function ConfirmToggle({ stage, name, panel, label }: { stage: PaymentStageView;
   return (
     <button
       type="button"
-      className="btn btn-glass min-h-11 w-full text-15 md:w-auto"
+      className="btn btn-glass min-h-11 w-full whitespace-nowrap text-15 sm:w-auto"
       aria-expanded={open}
       aria-label={`${open ? "Close" : label}, ${name} ${stage.instalmentLabel}`}
       onClick={(event) => panel.toggle(rowId(stage), event.currentTarget)}
@@ -331,7 +345,7 @@ function RaiseLetter({ stage, name, person }: { stage: PaymentStageView; name: s
   return (
     <button
       type="button"
-      className="btn btn-glass min-h-11 w-full text-15 md:w-auto"
+      className="btn btn-glass min-h-11 w-full whitespace-nowrap text-15 sm:w-auto"
       aria-disabled={pause.pending !== null}
       aria-label={`Raise letter, ${name} ${stage.instalmentLabel}`}
       onClick={(event) => {
@@ -423,7 +437,7 @@ function ConfirmReceipt({
     >
       {/* items-start and a plain wrapper keep each field at its own height, so an error line
           under one field grows the row below its input instead of dropping the other inputs. */}
-      <div className="grid items-start gap-4 sm:grid-cols-3">
+      <div className="grid items-start gap-4 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
         <div>
           <Field label="Amount with GST" error={errors.amount}>
             <input

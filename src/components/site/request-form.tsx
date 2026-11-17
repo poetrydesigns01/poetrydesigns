@@ -214,7 +214,7 @@ export function RequestForm({ prefill }: { prefill: Prefill }) {
                 return (
                   <li key={`${l.material}-${l.sub}-${i}`} className="glass-inner flex items-center justify-between gap-3 py-1 pr-1 pl-3">
                     <span className="min-w-0 text-15 text-ink">
-                      {c?.name ?? l.material}, {l.sub} · <span className="figure">{unitLabel(l.unit, l.qty)}</span>
+                      {c?.name ?? l.material}, {l.sub} · <span className="tabular-nums">{unitLabel(l.unit, l.qty)}</span>
                     </span>
                     <button
                       type="button"
@@ -336,24 +336,30 @@ export function RequestForm({ prefill }: { prefill: Prefill }) {
           )}
 
           <div className="grid gap-2">
-            <ChipGroup label="Needed on site">
-              {choices.map((day, i) => (
-                <Chip
-                  key={day}
-                  pressed={!isOther && neededBy === day}
-                  onClick={() => {
-                    setOther(false);
-                    setNeededBy(day);
-                  }}
-                >
-                  {shortWeekdayDate(day)}
-                  <span className="sr-only">, in {LEAD_CHOICES[i]} days</span>
+            {/* Two by two on a phone, so no date is left alone on a second line; one row from 640 px. */}
+            <div role="group" aria-labelledby={`${ids}-need`}>
+              <p id={`${ids}-need`} className="text-15 font-semibold">
+                Needed on site
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                {choices.map((day, i) => (
+                  <Chip
+                    key={day}
+                    pressed={!isOther && neededBy === day}
+                    onClick={() => {
+                      setOther(false);
+                      setNeededBy(day);
+                    }}
+                  >
+                    {shortWeekdayDate(day)}
+                    <span className="sr-only">, in {LEAD_CHOICES[i]} days</span>
+                  </Chip>
+                ))}
+                <Chip pressed={isOther} onClick={() => setOther(true)}>
+                  Other
                 </Chip>
-              ))}
-              <Chip pressed={isOther} onClick={() => setOther(true)}>
-                Other
-              </Chip>
-            </ChipGroup>
+              </div>
+            </div>
             {isOther && (
               <div className="sm:max-w-sm">
                 <label htmlFor={`${ids}-date`} className="sr-only">
@@ -371,9 +377,8 @@ export function RequestForm({ prefill }: { prefill: Prefill }) {
               </div>
             )}
             {lead.ok && (
-              <p className="flex flex-wrap items-center gap-2">
+              <p>
                 <StatusChip tone="done">{REQUEST_LEAD_DAYS}-day lead · OK</StatusChip>
-                <span className="figure text-13 text-ink-soft">{lead.days} d to site</span>
               </p>
             )}
             {!lead.ok && (

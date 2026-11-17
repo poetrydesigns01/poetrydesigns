@@ -8,11 +8,11 @@ import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
 import { useFirm } from "@/lib/demo-store";
 import { courses, performance, templateOf, type PerformanceRow } from "@/lib/firm-data";
-import { daysBetween, formatShortDate } from "@/lib/format";
+import { daysBetween, formatShortDate, listWords } from "@/lib/format";
 import { GlassTable, Initials, Meter, Panel, Segments, StatCard, StatRow } from "./glass-kit";
 
 // How the juniors are doing over the last 90 days: tasks, on time, late, revisions and days
-// taken, in one table; then each junior's recent tasks, late ones in brick.
+// taken, in one table; then the recent tasks of each junior who had any, late ones in brick.
 
 type Key = "tasks" | "onTimePercent" | "late" | "avgRevisions";
 
@@ -32,6 +32,11 @@ export function PerformancePage() {
   const late = performance.reduce((t, r) => t + r.late, 0);
   const revisions = tasks > 0 ? performance.reduce((t, r) => t + r.avgRevisions * r.tasks, 0) / tasks : 0;
   const name = (row: PerformanceRow) => firm.person(row.person)?.name ?? row.person;
+  const kinds = (row: PerformanceRow) => row.byCategory.map((c) => templateOf(c.category).name).join(" · ");
+  // A line every junior shares says nothing about any one of them, so it is left off then.
+  const kindsDiffer = new Set(performance.map(kinds)).size > 1;
+  const busy = rows.filter((row) => (courses[row.person] ?? []).length > 0);
+  const idle = rows.filter((row) => (courses[row.person] ?? []).length === 0);
 
   return (
     <>
@@ -65,9 +70,7 @@ export function PerformancePage() {
                     <Initials name={name(r)} />
                     <span className="grid">
                       <span>{name(r)}</span>
-                      <span className="text-13 font-normal text-ink-soft">
-                        {r.byCategory.map((c) => templateOf(c.category).name).join(" · ")}
-                      </span>
+                      {kindsDiffer && <span className="text-13 font-normal text-ink-soft">{kinds(r)}</span>}
                     </span>
                   </span>
                 ),
@@ -95,14 +98,16 @@ export function PerformancePage() {
           />
         </Panel>
 
-        <div className="grid gap-5 lg:grid-cols-2">
-          {rows.map((row) => {
-            const blocks = courses[row.person] ?? [];
-            return (
-              <Panel key={row.person} title={`${name(row)}, last 30 days`}>
-                {blocks.length === 0 ? (
-                  <p className="px-1 text-15 text-ink-soft">No tasks.</p>
-                ) : (
+        {/* Recent tasks, one panel per junior who had any; an odd last panel takes the row. */}
+        <section aria-labelledby="recent-tasks" className="grid gap-3">
+          <h2 id="recent-tasks" className="px-1 text-17 font-semibold text-ink">
+            Recent tasks, last 30 days
+          </h2>
+          <div className="grid gap-5 lg:grid-cols-2 lg:[&>*:last-child:nth-child(odd)]:col-span-2">
+            {busy.map((row) => {
+              const blocks = courses[row.person] ?? [];
+              return (
+                <Panel key={row.person} title={name(row)}>
                   <ul className="grid gap-1">
                     {blocks.map((b) => (
                       <li key={b.title} className="glass-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5">
@@ -121,11 +126,14 @@ export function PerformancePage() {
                       </li>
                     ))}
                   </ul>
-                )}
-              </Panel>
-            );
-          })}
-        </div>
+                </Panel>
+              );
+            })}
+          </div>
+          {idle.length > 0 && (
+            <p className="px-1 text-15 text-ink-soft">No tasks for {listWords(idle.map(name))}.</p>
+          )}
+        </section>
       </div>
     </>
   );

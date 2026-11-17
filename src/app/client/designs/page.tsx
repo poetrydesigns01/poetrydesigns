@@ -5,6 +5,7 @@
 
 import { DecisionLog, DesignGroups } from "@/components/designs/stage-table";
 import { useDesignStages } from "@/components/designs/items";
+import { CLIENT_PAGE, PageHead } from "@/components/client-home/page-frame";
 import { StatusChip } from "@/components/register/status-chip";
 
 // Designs in the order of Poetry's workflow: floor plan drafts 1 to 3 and the final draft,
@@ -19,15 +20,14 @@ export default function DesignsPage() {
   const waiting = items.filter((item) => item.status === "waiting").length;
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:gap-5 lg:py-10">
-      <header className="flex flex-wrap items-end justify-between gap-3 px-1">
-        <h1 className="display text-32 text-ink">Designs</h1>
+    <div className={CLIENT_PAGE}>
+      <PageHead title="Designs">
         {waiting > 0 ? (
           <StatusChip tone="waiting">{waiting} to review</StatusChip>
         ) : (
           <StatusChip tone="done">All decided</StatusChip>
         )}
-      </header>
+      </PageHead>
 
       <DesignGroups stages={stages} />
 

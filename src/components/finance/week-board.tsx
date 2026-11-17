@@ -27,7 +27,7 @@ export function WeekBoard({ overdue, lanes, later }: { overdue: WeekLane; lanes:
         </h2>
         {later > 0 && <span className="glass-chip">{later} later</span>}
       </header>
-      <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+      <ol className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         {all.map((lane) => (
           <Lane key={lane.id} lane={lane} />
         ))}
@@ -42,7 +42,9 @@ function Lane({ lane }: { lane: WeekLane }) {
   return (
     <li
       aria-label={`${lane.label}, ${lane.items.length}`}
-      className={`grid min-w-0 content-start gap-2 rounded-xl p-2 ${current ? "bg-white/45 ring-1 ring-laterite/40" : "bg-white/20"}`}
+      className={`grid min-w-0 content-start gap-2 rounded-xl ${lane.items.length > 0 ? "p-2" : "px-2 py-1.5"} ${
+        current ? "bg-white/45 ring-1 ring-laterite/40" : "bg-white/20"
+      }`}
     >
       <div className="flex items-baseline justify-between gap-2 px-1">
         <p className={`lettering ${late ? "font-semibold text-brick" : current ? "text-ink" : "text-ink-soft"}`}>
@@ -78,7 +80,7 @@ function Tile({ stage }: { stage: PaymentStageView }) {
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="figure text-13 text-ink-soft">
+        <span className="text-13 tabular-nums text-ink-soft">
           {instShort(stage)} · {weekShort(stage)}
         </span>
         <StatusChip tone={stage.tone}>{stage.status}</StatusChip>
@@ -156,7 +158,7 @@ export function InstalmentTrack({ projects }: { projects: ProjectId[] }) {
             >
               <span className="flex min-w-0 items-baseline gap-x-2 md:grid md:pl-2">
                 <ProjectLink id={project!.id} name={project!.name} className="truncate text-15 font-semibold" />
-                <span className="figure truncate text-13 text-ink-soft">{project!.code}</span>
+                <span className="truncate text-13 tabular-nums text-ink-soft">{project!.code}</span>
               </span>
               <ol className={cols} aria-label={`${project!.name} instalments`}>
                 {heads.map((h) => {

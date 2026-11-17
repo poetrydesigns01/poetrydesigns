@@ -4,7 +4,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useScope } from "@/components/register/project-switch";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
@@ -22,7 +22,7 @@ import { healthOf, portfolio } from "./portfolio";
 // its code, the milestone in hand, the next instalment's week, margin and cash, a loss in
 // brick. Each row opens the project's programme.
 
-type Sort = "listed" | "margin" | "cash";
+type Sort = "listed" | "margin" | "cash"; // "listed" is A to Z by name
 
 /** A short label for an exception, by its kind. */
 function exceptionWords(item: TurnItem): { words: string; tone: Tone } {
@@ -55,7 +55,7 @@ function letterTitle(name: string, s: PaymentStageView): string {
 }
 
 function sorted(rows: ProjectView[], sort: Sort) {
-  if (sort === "listed") return rows;
+  if (sort === "listed") return [...rows].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   const key = (p: ProjectView) => (sort === "margin" ? (p.marginPercent ?? Number.POSITIVE_INFINITY) : p.cash);
   return [...rows].sort((a, b) => key(a) - key(b));
 }
@@ -178,21 +178,24 @@ export function AdminToday() {
           </Panel>
         </div>
 
-        <div className="order-3 flex flex-wrap items-center justify-between gap-3 sm:order-none">
-          <h2 className="px-1 text-17 font-semibold text-ink">Projects</h2>
-          <Segments<Sort>
-            label="Sort projects"
-            value={sort}
-            onChange={setSort}
-            options={[
-              { id: "listed", label: "Listed" },
-              { id: "margin", label: "Margin" },
-              { id: "cash", label: "Cash" },
-            ]}
+        {/* One section pattern on the page: the title, and its sort, inside the panel. */}
+        <div className="order-3 sm:order-none">
+          <ProjectTable
+            projects={sorted(live, sort)}
+            firm={firm}
+            aside={
+              <Segments<Sort>
+                label="Sort projects"
+                value={sort}
+                onChange={setSort}
+                options={[
+                  { id: "listed", label: "A to Z" },
+                  { id: "margin", label: "Margin" },
+                  { id: "cash", label: "Cash" },
+                ]}
+              />
+            }
           />
-        </div>
-        <div className="order-4 sm:order-none">
-          <ProjectTable projects={sorted(live, sort)} firm={firm} />
         </div>
       </div>
     </>
@@ -213,9 +216,9 @@ function Queue({ label, n, sub, icon }: { label: string; n: number; sub?: string
 }
 
 /** Every project: code, milestone in hand, next instalment's week, margin and cash, a loss in brick. */
-export function ProjectTable({ projects, firm }: { projects: ProjectView[]; firm: Firm }) {
+export function ProjectTable({ projects, firm, aside }: { projects: ProjectView[]; firm: Firm; aside?: ReactNode }) {
   return (
-    <section aria-label="Projects" className="glass-strong p-3 sm:p-5">
+    <Panel title="Projects" aside={aside} strong>
       <GlassTable<ProjectView>
         caption="Projects"
         rows={projects}
@@ -290,7 +293,7 @@ export function ProjectTable({ projects, firm }: { projects: ProjectView[]; firm
           },
         ]}
       />
-    </section>
+    </Panel>
   );
 }
 

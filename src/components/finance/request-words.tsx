@@ -2,7 +2,7 @@
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
 import { StatusChip } from "@/components/register/status-chip";
-import type { RequestView } from "@/lib/firm";
+import { ageWords, type RequestView } from "@/lib/firm";
 import { datePart, daysBetween } from "@/lib/format";
 import type { Tone } from "@/lib/portal";
 
@@ -22,12 +22,35 @@ export function requestWords(r: RequestView): { words: string; tone: Tone } {
   return WORDS[r.status];
 }
 
-export function requestChip(r: RequestView) {
+/** Late for the site: the date it is needed has come and it is not yet ordered in full. */
+export function lateForSite(r: RequestView): boolean {
+  return r.late && r.status !== "Delivered" && r.status !== "PO uploaded";
+}
+
+/**
+ * The status chip. Where a waiting chip stands beside it, pass `late: false`: the waiting
+ * chip then says "late", and the row keeps one chip per fact instead of two stacked.
+ */
+export function requestChip(r: RequestView, { late = true }: { late?: boolean } = {}) {
   const { words, tone } = WORDS[r.status];
+  if (!late) return <StatusChip tone={tone}>{words}</StatusChip>;
   return (
     <span className="flex flex-wrap justify-end gap-1.5 md:justify-start">
       <StatusChip tone={tone}>{words}</StatusChip>
-      {r.late && r.status !== "Delivered" && r.status !== "PO uploaded" && <StatusChip tone="late">Late</StatusChip>}
+      {lateForSite(r) && <StatusChip tone="late">Late</StatusChip>}
+    </span>
+  );
+}
+
+/** How long a request has waited, as a chip: kota under 2 days, brass from 2, brick from 4
+ *  or once it is late for the site, when it says so. */
+export function WaitingChip({ r }: { r: RequestView }) {
+  const late = lateForSite(r);
+  const tone = late || r.days >= 4 ? "chip-late" : r.days >= 2 ? "chip-waiting" : "chip-done";
+  return (
+    <span className={`glass-chip whitespace-nowrap tabular-nums ${tone}`}>
+      {ageWords(r.days)}
+      {late ? " · late" : ""}
     </span>
   );
 }

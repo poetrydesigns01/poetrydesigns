@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { ChangeRow, CHANGE_GRID, type RowMode } from "@/components/changes/change-row";
 import { ContractHero } from "@/components/changes/contract-hero";
+import { CLIENT_PAGE, PageHead } from "@/components/client-home/page-frame";
 import { StatusChip } from "@/components/register/status-chip";
 import { useDemo, useProjection } from "@/lib/demo-store";
 
@@ -23,15 +24,14 @@ export default function ChangesPage() {
   const rows = [...pending, ...decided];
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:py-10">
-      <header className="flex flex-wrap items-end justify-between gap-3 px-1">
-        <h1 className="display text-32 text-ink">Changes</h1>
+    <div className={CLIENT_PAGE}>
+      <PageHead title="Changes">
         {pending.length > 0 ? (
           <StatusChip tone="waiting">{pending.length} to decide</StatusChip>
         ) : (
           <StatusChip tone="done">All decided</StatusChip>
         )}
-      </header>
+      </PageHead>
 
       <ContractHero />
 

@@ -6,13 +6,13 @@
 import type { ReactNode } from "react";
 import type { PaymentStageView } from "@/lib/portal";
 
-// Small parts the project record's tabs share: a labelled fact in a glass tile, and the
+// Small parts the project record's tabs share: a labelled fact on a hairline, and the
 // payment stages as a strip of eleven cells (sign-up and the ten stages), each coloured by
 // where it stands, with its number under it and its status said to a screen reader.
 
 export function Fact({ label, wide = false, children }: { label: string; wide?: boolean; children: ReactNode }) {
   return (
-    <div className={`glass-inner min-w-0 px-3 py-2.5 ${wide ? "col-span-2" : ""}`}>
+    <div className={`min-w-0 border-b border-ink/10 py-2.5 ${wide ? "col-span-2" : ""}`}>
       <dt className="lettering text-ink-soft">{label}</dt>
       <dd className="min-w-0 break-words text-15">{children}</dd>
     </div>
@@ -59,19 +59,19 @@ export function currentStage(stages: PaymentStageView[]): PaymentStageView | und
   return stages.find((s) => !s.locked && s.state !== "paid") ?? stages[stages.length - 1];
 }
 
+const ODD_LAST = "[&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1";
+
 const STAT_COLS = {
-  3: "sm:grid-cols-3",
-  4: "lg:grid-cols-4",
-  5: "sm:grid-cols-3 xl:grid-cols-5",
+  3: `${ODD_LAST} sm:grid-cols-3`,
+  4: `${ODD_LAST} lg:grid-cols-4`,
+  // Three over two on a six-column grid from 640 px, so the second row has no hole.
+  5: "max-sm:[&>*:last-child]:col-span-2 sm:grid-cols-6 sm:max-xl:[&>*]:col-span-2 sm:max-xl:[&>*:nth-child(n+4)]:col-span-3 xl:grid-cols-5",
 } as const;
 
 /** A row of stat cards. Two to a row on a phone; an odd last card takes the whole row there. */
 export function Stats({ cols, label, children }: { cols: 3 | 4 | 5; label: string; children: ReactNode }) {
   return (
-    <section
-      aria-label={label}
-      className={`grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 ${STAT_COLS[cols]}`}
-    >
+    <section aria-label={label} className={`grid grid-cols-2 gap-3 ${STAT_COLS[cols]}`}>
       {children}
     </section>
   );

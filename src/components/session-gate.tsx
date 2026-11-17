@@ -5,6 +5,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
+import { Brand } from "@/components/brand";
 import { useDemo, useStoreReady } from "@/lib/demo-store";
 import { ArrivalVeil } from "./arrival-veil";
 
@@ -37,7 +38,9 @@ export function SessionGate({ children }: { children: ReactNode }) {
           name stand in, so the first paint is the portal's own and not an empty page. */}
       {!open && (
         <div aria-hidden="true" className="on-dark fixed inset-0 z-40 bg-rosewood text-lime">
-          <p className="display px-4 pt-6 text-22 leading-none sm:px-8">Poetry Designs</p>
+          <p className="flex px-4 pt-6 sm:px-8">
+            <Brand />
+          </p>
         </div>
       )}
       <ArrivalVeil />

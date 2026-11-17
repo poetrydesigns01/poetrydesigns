@@ -3,6 +3,7 @@
  */
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { SamplePhoto } from "@/components/instruments/sample-photo";
 import { StatusChip } from "@/components/register/status-chip";
@@ -35,6 +36,9 @@ const PATHS = {
   send: "M3.5 10 16.5 3.8 13 16.5l-3.3-5.2z M9.7 11.3 16.5 3.8",
   pencil: "M4 16l.9-3.6 8.6-8.6 2.7 2.7-8.6 8.6z M11.8 5.5l2.7 2.7",
   user: "M10 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M4 17a6 6 0 0 1 12 0",
+  alert: "M10 3.2 17.6 16.6H2.4z M10 8.2v3.8 M10 14.3v.01",
+  rupee: "M6 4h8 M6 7.5h8 M6 4h2.5a3.5 3.5 0 0 1 0 7H6l6 6",
+  chart: "M3 17h14 M5.5 14V9 M10 14V5 M14.5 14v-6",
 } as const;
 
 export type IconName = keyof typeof PATHS;
@@ -134,58 +138,88 @@ export function PanelHead({
       <h2 id={id} className="flex items-center gap-2 text-17 font-semibold text-ink">
         {icon && <Icon name={icon} className="size-5 text-laterite" />}
         {title}
-        {count !== undefined && <span className="figure text-15 text-ink-soft">{count}</span>}
+        {count !== undefined && <CountPill n={count} />}
       </h2>
       {children}
     </div>
   );
 }
 
-/** One number with its label, for a strip of stats. */
-export function Stat({ label, value, alert = false }: { label: string; value: number | string; alert?: boolean }) {
+/** A small filled count beside a heading, so it never reads as part of the title. */
+export function CountPill({ n }: { n: number }) {
   return (
-    <div className="glass-inner grid content-between gap-1 px-3 py-2.5">
-      <p className="lettering text-ink-soft">{label}</p>
-      <p className={`figure text-22 ${alert ? "late-text" : "text-ink"}`}>{value}</p>
-    </div>
+    <span className="inline-grid h-6 min-w-6 place-items-center rounded-full bg-ink/10 px-2 text-13 font-semibold tabular-nums text-ink">
+      {n}
+    </span>
   );
 }
 
-export type StatItem = { icon: IconName; label: string; value: number | string; alert?: boolean };
+export type StatItem = {
+  icon: IconName;
+  label: string;
+  value: number | string;
+  alert?: boolean;
+  /** Opens the list the number counts. */
+  href?: string;
+};
 
 /** A few numbers in one glass panel: an icon, the number, two words. Two by two on a phone. */
 const STRIP_COLS: Record<number, string> = {
   3: "sm:grid-cols-3",
   4: "sm:grid-cols-4",
-  5: "sm:grid-cols-3 lg:grid-cols-5",
+  5: "md:grid-cols-5",
 };
+
+/** A number or an amount is set as a figure; a word ("Yesterday", "None") as plain text. */
+function isWord(value: number | string): boolean {
+  return typeof value === "string" && /^[A-Za-z]/.test(value);
+}
 
 export function StatStrip({ label, items }: { label: string; items: StatItem[] }) {
   return (
     <section aria-label={label} className={`glass grid grid-cols-2 gap-1 p-1.5 ${STRIP_COLS[items.length] ?? "sm:grid-cols-4"}`}>
-      {items.map((s, i) => (
-        <div
-          key={s.label}
-          className={`flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2.5 sm:px-3 ${
-            items.length % 2 === 1 && i === items.length - 1 ? "max-sm:col-span-2" : ""
-          }`}
-        >
-          <span
-            className={`grid size-9 shrink-0 place-items-center rounded-full ${s.alert ? "bg-brick/10 text-brick" : "bg-ink/5 text-laterite"}`}
-          >
-            <Icon name={s.icon} className="size-4.5" />
-          </span>
-          <span className="grid min-w-0 gap-0.5">
-            <span className={`figure text-22 leading-none ${s.alert ? "late-text" : "text-ink"}`}>{s.value}</span>
-            <span className="truncate text-13 text-ink-soft">{s.label}</span>
-          </span>
-        </div>
-      ))}
+      {items.map((s, i) => {
+        const odd = items.length % 2 === 1 && i === items.length - 1;
+        const span = odd ? (items.length === 5 ? "max-md:col-span-2" : "max-sm:col-span-2") : "";
+        const body = (
+          <>
+            <span
+              className={`grid size-9 shrink-0 place-items-center rounded-full ${s.alert ? "bg-brick/10 text-brick" : "bg-ink/5 text-laterite"} ${
+                // Five in one row on a tablet leave no room for the icon beside the words.
+                items.length === 5 ? "md:max-lg:hidden" : ""
+              }`}
+            >
+              <Icon name={s.icon} className="size-4.5" />
+            </span>
+            <span className="grid min-w-0 gap-0.5">
+              <span
+                className={`flex min-h-6 items-center leading-none ${isWord(s.value) ? "text-17 font-semibold" : "figure text-22"} ${
+                  s.alert ? "late-text" : "text-ink"
+                }`}
+              >
+                {s.value}
+              </span>
+              <span className="truncate text-13 text-ink-soft">{s.label}</span>
+            </span>
+          </>
+        );
+        const box = `flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2.5 sm:px-3 ${span}`;
+        return s.href ? (
+          <Link key={s.label} href={s.href} className={`${box} transition-colors duration-150 hover:bg-white/50`}>
+            {body}
+          </Link>
+        ) : (
+          <div key={s.label} className={box}>
+            {body}
+          </div>
+        );
+      })}
     </section>
   );
 }
 
-/** A row of filter buttons with counts, one pressed. Wraps on a narrow phone. */
+/** A row of filter buttons with counts, one pressed. On a phone it stays one row and scrolls
+ *  sideways, fading at the right edge; from 640 px the glass bar is only as wide as its buttons. */
 export function Segmented<T extends string>({
   label,
   options,
@@ -200,8 +234,11 @@ export function Segmented<T extends string>({
   /** A quiet status at the right end of the bar. */
   end?: ReactNode;
 }) {
+  const row =
+    "flex min-w-0 snap-x gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden " +
+    "max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-1.5rem),transparent)] sm:flex-wrap sm:overflow-visible";
   const group = (
-    <div role="group" aria-label={label} className={end ? "flex flex-wrap gap-1" : "glass flex flex-wrap gap-1 p-1.5"}>
+    <div role="group" aria-label={label} className={end ? row : `glass w-full max-w-full p-1.5 sm:w-fit ${row}`}>
       {options.map((o) => {
         const on = value === o.id;
         return (
@@ -210,22 +247,78 @@ export function Segmented<T extends string>({
             type="button"
             aria-pressed={on}
             onClick={() => onChange(o.id)}
-            className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-15 font-semibold transition-colors ${
+            className={`flex min-h-11 shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 text-15 font-semibold transition-colors ${
               on ? "bg-rosewood text-lime" : "text-ink hover:bg-white/50"
             }`}
           >
             {o.label}
-            {o.count !== undefined && <span className={`figure text-13 ${on ? "text-lime/75" : "text-ink-soft"}`}>{o.count}</span>}
+            {o.count !== undefined && (
+              <span className={`text-13 font-medium tabular-nums ${on ? "text-lime/75" : "text-ink-soft"}`}>{o.count}</span>
+            )}
           </button>
         );
       })}
+      {/* Room under the fade, so the last button scrolls clear of it. */}
+      <span aria-hidden="true" className="w-4 shrink-0 sm:hidden" />
     </div>
   );
   if (!end) return group;
   return (
-    <div className="glass flex flex-wrap items-center justify-between gap-x-3 gap-y-1 p-1.5">
+    <div className="glass flex w-full max-w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 p-1.5 sm:w-fit">
       {group}
       <div className="flex flex-wrap items-center gap-2 px-2 py-1">{end}</div>
+    </div>
+  );
+}
+
+// ---- Requests: where one stands ----
+
+/** The four steps every request passes, the same words for the site and procurement. */
+export const REQUEST_STEP_WORDS = ["Sent", "Seen", "PO sent", "Delivered"] as const;
+
+/** A request's four steps with their dates: a tick on each one reached. */
+export function RequestSteps({ r }: { r: RequestView }) {
+  const firstPo = r.pos.map((po) => po.at).sort()[0];
+  const dates = [r.queued ? undefined : r.sentAt || r.at, r.seenAt ?? firstPo, firstPo, r.deliveredAt];
+  const reached = dates.filter(Boolean).length;
+  return (
+    <ol className="grid grid-cols-4" aria-label="Progress">
+      {REQUEST_STEP_WORDS.map((label, i) => {
+        const at = dates[i];
+        const done = Boolean(at);
+        return (
+          <li key={label} className="relative grid justify-items-center gap-1.5 text-center">
+            {i > 0 && (
+              <span
+                aria-hidden="true"
+                className={`absolute top-3.5 right-1/2 -left-1/2 h-0.5 ${i < reached ? "bg-kota" : "bg-ink/15"}`}
+              />
+            )}
+            <span
+              className={`relative grid size-7 place-items-center rounded-full border-2 ${
+                done ? "border-kota bg-kota text-paper" : "border-ink/20 bg-white/70 text-ink-soft"
+              }`}
+            >
+              {done ? <Icon name="check" className="size-4" /> : <span className="text-13 font-semibold tabular-nums">{i + 1}</span>}
+            </span>
+            <span className="text-13 font-semibold text-ink">
+              {label}
+              <span className="sr-only">{done ? ", done" : ", to come"}</span>
+            </span>
+            <span className="text-13 text-ink-soft">{at ? formatShortDate(at) : "—"}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** One fact in a details list: a quiet label at the left, its value at the right. */
+export function FactRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="glass-row flex min-h-11 items-center justify-between gap-3 px-3 py-2">
+      <dt className="shrink-0 text-13 text-ink-soft">{label}</dt>
+      <dd className="min-w-0 text-right text-15 text-ink">{children}</dd>
     </div>
   );
 }

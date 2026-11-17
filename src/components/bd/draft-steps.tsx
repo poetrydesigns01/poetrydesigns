@@ -170,22 +170,33 @@ function NumberInput({
   unit,
   step = 1,
   id,
+  wide = false,
+  rupees = false,
 }: {
   value: number;
   onChange: (n: number) => void;
   unit?: string;
   step?: number;
   id?: string;
+  /** Fill the column, as the fields beside it do, instead of a short box. */
+  wide?: boolean;
+  /** An amount in rupees: a ₹ inside the field, so it reads as money like the figures around it. */
+  rupees?: boolean;
 }) {
   return (
-    <span className="flex items-center gap-2">
+    <span className="relative flex items-center gap-2">
+      {rupees && (
+        <span aria-hidden="true" className="pointer-events-none absolute left-3 text-17 text-ink-soft">
+          ₹
+        </span>
+      )}
       <input
         id={id}
         type="number"
         inputMode="decimal"
         min={0}
         step={step}
-        className={`${field} max-w-44`}
+        className={`${field}${wide ? " w-full" : " max-w-44"}${rupees ? " pl-8!" : ""}`}
         value={value}
         onChange={(event) => onChange(Math.max(0, Number(event.target.value) || 0))}
       />
@@ -615,11 +626,12 @@ export function StepAgreement({ draft, locked, onSaved, primary }: StepProps) {
         chosen={files}
         onChoose={setFiles}
       />
-      <div className="grid gap-5 sm:grid-cols-2">
+      {/* The same three columns as the sign-up row below, so the fields share their edges. */}
+      <div className="grid gap-5 sm:grid-cols-3">
         <Field label="Signed on">
           <input type="date" className={field} value={signedOn} max={TODAY} onChange={(e) => setSignedOn(e.target.value)} />
         </Field>
-        <div>
+        <div className="sm:col-span-2">
           <p className="text-15 font-semibold">Contract value</p>
           {result ? (
             <>
@@ -635,7 +647,7 @@ export function StepAgreement({ draft, locked, onSaved, primary }: StepProps) {
       <fieldset className="grid min-w-0 gap-5 sm:grid-cols-3">
         <legend className="mb-3 text-15 font-semibold">Sign-up received</legend>
         <Field label="Amount with GST">
-          <NumberInput value={signUpAmount} onChange={setSignUpAmount} step={1000} />
+          <NumberInput value={signUpAmount} onChange={setSignUpAmount} step={1000} wide rupees />
         </Field>
         <Field label="Received on">
           <input type="date" className={field} value={signUpOn} max={TODAY} onChange={(e) => setSignUpOn(e.target.value)} />

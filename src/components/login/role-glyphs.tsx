@@ -2,17 +2,29 @@
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
 import type { ReactNode } from "react";
-import { PegGlyph } from "@/components/instruments/glyphs";
 import type { LoginRole } from "./site-model";
 
-// One small drawing for each person on the site, in the current colour. The homeowner's
-// peg is the only brass on the board: it stands for her word.
+// One small drawing for each person on the site, all in the current colour, so the row reads
+// as one set. The chosen tile shows itself through its fill and its tick, not its drawing.
 
 function Frame({ children }: { children: ReactNode }) {
   return (
     <svg viewBox="0 0 16 16" className="role-glyph" aria-hidden="true" focusable="false">
       {children}
     </svg>
+  );
+}
+
+/** The homeowner's peg: her word, pinned on the drawing. */
+function PegLineGlyph() {
+  return (
+    <Frame>
+      <path className="rg-line" d="M3 14.5h10" />
+      <g className="rg-move">
+        <circle className="rg-line" cx="8" cy="5" r="3.2" />
+        <path className="rg-solid" d="M8 8.2v6.3" />
+      </g>
+    </Frame>
   );
 }
 
@@ -77,11 +89,7 @@ function TrenchGlyph() {
 export function RoleGlyph({ role }: { role: LoginRole }) {
   switch (role) {
     case "client":
-      return (
-        <span className="role-glyph role-glyph-peg rg-move" aria-hidden="true">
-          <PegGlyph size={16} />
-        </span>
-      );
+      return <PegLineGlyph />;
     case "bd":
       return <PlotGlyph />;
     case "architect":

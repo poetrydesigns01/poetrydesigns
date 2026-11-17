@@ -4,9 +4,9 @@
 "use client";
 
 import { useState } from "react";
-import { Segments, StatCard, StatRow } from "@/components/admin/glass-kit";
 import { useScope } from "@/components/register/project-switch";
 import { StaffBoard } from "@/components/register/staff-board";
+import { Segmented, StatStrip } from "@/components/site/site-kit";
 import { TODAY } from "@/lib/demo-data";
 import { useFirm, useViewer } from "@/lib/demo-store";
 import { WEEK } from "@/lib/firm-data";
@@ -51,19 +51,21 @@ export function RequestInbox() {
       <StaffBoard place="Requests" headline={open.length === 0 ? "Every request has a PO" : `${open.length} waiting on a PO`} />
 
       <div className="mt-6 grid gap-5">
-        <StatRow cols={4} label="Procurement at a glance">
-          <StatCard label="Waiting on PO" value={open.length} icon="box" />
-          <StatCard label="Not seen" value={fresh} icon="clock" tone={fresh > 0 ? "late" : undefined} />
-          <StatCard label="Late for site" value={late} icon="alert" tone={late > 0 ? "late" : undefined} />
-          <StatCard
-            label="Days to PO"
-            value={answered.length > 0 ? average.toFixed(1) : "–"}
-            sub={`Average of ${answered.length}`}
-            icon="chart"
-          />
-        </StatRow>
+        <StatStrip
+          label="Procurement at a glance"
+          items={[
+            { icon: "box", label: "Waiting on PO", value: open.length },
+            { icon: "clock", label: "Not seen", value: fresh, alert: fresh > 0 },
+            { icon: "alert", label: "Late for site", value: late, alert: late > 0 },
+            {
+              icon: "chart",
+              label: "Avg days to PO",
+              value: answered.length > 0 ? average.toFixed(1) : "–",
+            },
+          ]}
+        />
 
-        <Segments<View>
+        <Segmented<View>
           label="Show"
           value={view}
           onChange={setView}

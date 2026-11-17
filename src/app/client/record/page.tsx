@@ -3,6 +3,7 @@
  */
 "use client";
 
+import { CLIENT_PAGE, PageHead } from "@/components/client-home/page-frame";
 import { AgreementPages } from "@/components/record/agreement-pages";
 import { DecisionLog } from "@/components/record/decision-log";
 import { useFirm, useProjection } from "@/lib/demo-store";
@@ -23,10 +24,8 @@ export default function RecordPage() {
   const history = project.valueHistory;
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:py-10">
-      <header className="px-1">
-        <h1 className="display text-32 text-ink">Agreement and record</h1>
-      </header>
+    <div className={CLIENT_PAGE}>
+      <PageHead title="Agreement and record" />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
         <section aria-labelledby="record-value" className="glass-dark grid content-start gap-4 p-5 sm:p-6">

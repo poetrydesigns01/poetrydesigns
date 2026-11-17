@@ -413,15 +413,15 @@ function Track({ p, me, focus }: { p: ProjectView; me: ArchitectView; focus: str
 
   return (
     <div className="grid gap-4">
-      <section className="glass-dark grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end" aria-label="Design track">
+      <section className="glass-strong grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end" aria-label="Design track">
         <div className="grid min-w-0 gap-1">
-          <p className="lettering text-lime/75">
+          <p className="lettering text-ink-soft">
             {p.code} · {weekNowLabel(plan)}
           </p>
           {next ? (
             <>
-              <p className="display text-22 text-lime sm:text-32">{next.title}</p>
-              <p className="flex flex-wrap items-center gap-2 text-15 text-lime/75">
+              <p className="display text-22 text-ink">{next.title}</p>
+              <p className="flex flex-wrap items-center gap-2 text-15 text-ink-soft">
                 <span>
                   {[`v${(next.version ?? 0) + 1}`, next.milestone ? `Milestone ${next.milestone}` : next.stageLabel, next.neededBy ? `by ${day(next.neededBy)}` : null]
                     .filter(Boolean)
@@ -431,7 +431,7 @@ function Track({ p, me, focus }: { p: ProjectView; me: ArchitectView; focus: str
               </p>
             </>
           ) : (
-            <p className="display flex items-center gap-2 text-22 text-lime sm:text-32">
+            <p className="display flex items-center gap-2 text-22 text-ink">
               {withClient.length > 0 ? (
                 <>
                   <IconEye /> With the client
@@ -444,15 +444,15 @@ function Track({ p, me, focus }: { p: ProjectView; me: ArchitectView; focus: str
             </p>
           )}
         </div>
-        <dl className="grid grid-cols-3 gap-2 text-lime lg:min-w-[22rem]">
+        <dl className="grid grid-cols-3 gap-2 text-ink lg:min-w-[22rem]">
           <div className="glass-inner p-2.5">
-            <dt className="lettering text-lime/75">Done</dt>
+            <dt className="lettering text-ink-soft">Done</dt>
             <dd className="figure text-22">
               {approved}/{designTasks.length}
             </dd>
           </div>
           <div className="glass-inner p-2.5">
-            <dt className="lettering text-lime/75">Client</dt>
+            <dt className="lettering text-ink-soft">Client</dt>
             <dd className="figure flex items-center gap-1.5 text-22">
               {withClient.length}
               {withClient.length > 0 && (
@@ -463,10 +463,10 @@ function Track({ p, me, focus }: { p: ProjectView; me: ArchitectView; focus: str
             </dd>
           </div>
           <div className="glass-inner p-2.5">
-            <dt className="lettering text-lime/75">Site waits</dt>
+            <dt className="lettering text-ink-soft">Site waits</dt>
             <dd className="figure flex items-center gap-1.5 text-22">
               {drawings.length}
-              {drawingsLate > 0 && <span className="text-13 text-brass-light">{drawingsLate} late</span>}
+              {drawingsLate > 0 && <span className="late-text text-13">{drawingsLate} late</span>}
             </dd>
           </div>
         </dl>
@@ -500,31 +500,37 @@ function Track({ p, me, focus }: { p: ProjectView; me: ArchitectView; focus: str
                   aria-expanded={isOpen}
                   aria-controls={panelId}
                   onClick={() => toggleStage(s.id)}
-                  className="flex min-h-12 w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2 text-left hover:bg-white/45"
+                  className={`flex min-h-12 w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2 text-left hover:bg-white/45 ${COLS} xl:items-center`}
                 >
-                  <svg
-                    viewBox="0 0 16 16"
-                    width={16}
-                    height={16}
-                    aria-hidden="true"
-                    className={`shrink-0 text-ink-soft transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="m6 3.5 4.5 4.5L6 12.5" />
-                  </svg>
-                  <span className="min-w-0 flex-[1_1_10rem]">
-                    <span className="block truncate text-15 font-semibold text-ink">{s.name}</span>
-                    {s.milestone !== null && <span className="block truncate text-13 text-ink-soft">{s.short}</span>}
+                  {/* From 1280 px the summary stands on the task columns: weeks under Weeks, the
+                      count across Ver. and Viewed, the chip under Status. */}
+                  <span className="flex min-w-0 flex-[1_1_10rem] items-center gap-3">
+                    <svg
+                      viewBox="0 0 16 16"
+                      width={16}
+                      height={16}
+                      aria-hidden="true"
+                      className={`shrink-0 text-ink-soft transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m6 3.5 4.5 4.5L6 12.5" />
+                    </svg>
+                    <span className="min-w-0">
+                      <span className="block truncate text-15 font-semibold text-ink">{s.name}</span>
+                      {s.milestone !== null && <span className="block truncate text-13 text-ink-soft">{s.short}</span>}
+                    </span>
                   </span>
                   <span className="figure text-13 text-ink-soft">{weeksLabel(s.clock, s.fromWeek, s.toWeek)}</span>
-                  <span className="figure text-15 text-ink">
+                  <span className="figure text-15 text-ink xl:col-span-2">
                     {sum.count}/{tasks.length}
                   </span>
-                  <StatusChip tone={sum.chip.tone}>{sum.chip.words}</StatusChip>
+                  <span>
+                    <StatusChip tone={sum.chip.tone}>{sum.chip.words}</StatusChip>
+                  </span>
                 </button>
                 {isOpen && (
                   <ul id={panelId} className="grid grid-cols-1 gap-1">
@@ -578,9 +584,9 @@ export function ArchitectDesigns() {
   const firm = useFirm();
   const demo = useDemo();
   const me = useArchitect();
-  const projects = projectsFor("architect", me.id, firm).filter(
-    (p) => (me.scope === "all" || p.id === me.scope) && firm.plan(p.id) !== null,
-  );
+  // The tabs under the board are this page's one picker, so the board has no project switch
+  // and the tabs list every project; the switch's choice elsewhere only sets the first tab.
+  const projects = projectsFor("architect", me.id, firm).filter((p) => firm.plan(p.id) !== null);
 
   // A row asked for from the desk ("iyer:m4-door-frames"), kept for this visit.
   const asked = demo.focusRow && demo.focusRow.href === DESIGNS_HREF ? demo.focusRow.id : null;
@@ -591,12 +597,15 @@ export function ArchitectDesigns() {
     if (asked) setFocusRow(null);
   }, [asked, setFocusRow]);
 
-  const current = projects.find((p) => p.id === picked) ?? busiest(firm, projects, me.id);
+  const current =
+    projects.find((p) => p.id === picked) ??
+    projects.find((p) => p.id === me.scope) ??
+    busiest(firm, projects, me.id);
   const focusItem = focus && current && focus.startsWith(`${current.id}:`) ? focus.slice(current.id.length + 1) : null;
 
   return (
     <>
-      <StaffBoard place="Designs" headline={current ? current.name : "Design track"} />
+      <StaffBoard place="Designs" headline={current ? current.name : "Design track"} chip={false} />
       <div className="mt-6 grid gap-4 lg:mt-8">
         {projects.length > 1 && (
           <nav aria-label="Projects" className="glass flex gap-1.5 overflow-x-auto p-1.5">

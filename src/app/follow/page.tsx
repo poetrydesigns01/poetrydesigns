@@ -4,6 +4,7 @@
 "use client";
 
 import Link from "next/link";
+import { Brand } from "@/components/brand";
 import { ChalkTick } from "@/components/staff/chalk-tick";
 import { ACCOUNTS } from "@/lib/demo-accounts";
 import { useDemo, useFirm, type DemoState, type FirmEvent } from "@/lib/demo-store";
@@ -245,8 +246,8 @@ export default function Follow() {
     <main className="flex flex-1 flex-col bg-lime">
       <header className="on-dark bg-rosewood text-lime">
         <div className="mx-auto w-full max-w-5xl px-4 pb-10 pt-6 sm:px-8 sm:pt-10">
-          <Link href="/" className="display inline-flex min-h-11 items-center text-22 leading-none">
-            Poetry Designs
+          <Link href="/" className="inline-flex min-h-11 items-center">
+            <Brand />
           </Link>
           <h1 className="display mt-8 text-32 sm:mt-12">Follow one thing through the portal</h1>
           <p className="mt-3 max-w-[52ch] text-15 text-lime/80">

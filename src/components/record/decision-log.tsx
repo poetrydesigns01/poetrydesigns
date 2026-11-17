@@ -159,7 +159,7 @@ export function DecisionLog({ entries }: { entries: LogEntry[] }) {
             return (
               <li
                 key={entry.id}
-                className="glass-row grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-3 py-2.5 md:grid-cols-[2.25rem_minmax(0,1fr)_auto_8.5rem_7.5rem]"
+                className="glass-row grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-3 py-2.5 md:grid-cols-[2.25rem_minmax(0,1fr)_7rem_8.5rem_7.5rem]"
               >
                 <span className="sr-only">
                   {stageWords(entry.action)} {entry.detail ? `“${entry.detail}” ` : ""}By {by}, {time ? `${date}, ${time}` : date}.
@@ -196,7 +196,7 @@ export function DecisionLog({ entries }: { entries: LogEntry[] }) {
                   <span className="md:justify-self-start">
                     {row.verb && <StatusChip tone={row.tone}>{row.verb}</StatusChip>}
                   </span>
-                  <span className="flex flex-wrap items-baseline gap-x-2 md:justify-self-end">
+                  <span className="flex flex-wrap items-baseline gap-x-2 tabular-nums md:grid md:justify-items-end md:justify-self-end md:text-right">
                     {row.amount && <span className="figure text-15">{row.amount}</span>}
                     {row.days ? <span className="late-text text-13">+{row.days} days</span> : null}
                   </span>

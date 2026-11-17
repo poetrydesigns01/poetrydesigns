@@ -115,14 +115,14 @@ export function DemandLetter({ n }: { n: number }) {
         </dl>
 
         <p>
-          Please pay Poetry Constructions by bank transfer
+          Please pay Poetry Designs by bank transfer
           {stage.dueDate ? ` by ${formatDate(stage.dueDate)}` : ""}, quoting <span className="whitespace-nowrap">{stage.letterNo}</span>.
         </p>
 
         <footer className="grid gap-6 border-t border-ink/15 pt-5 sm:grid-cols-2">
           <div>
             <p className="display text-22">{signatory?.name ?? "Vikram Desai"}</p>
-            <p className="text-ink-soft">Project Head, Poetry Constructions</p>
+            <p className="text-ink-soft">Project Head, Poetry Designs</p>
           </div>
           <div className="grid content-start gap-1 sm:text-right">
             {stage.clientPaidAt && <Proof label="Payment made" at={stage.clientPaidAt} extra={stage.clientRef} />}

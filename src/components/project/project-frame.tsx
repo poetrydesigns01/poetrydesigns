@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { stageChip } from "@/components/admin/admin-data";
 import { Icon, Meter } from "@/components/admin/glass-kit";
+import { Brand } from "@/components/brand";
 import { ProjectMark } from "@/components/instruments/project-mark";
 import { PersonMenu } from "@/components/register/person-menu";
 import { PLACES, useStaffRole } from "@/components/register/staff-shell";
@@ -71,13 +72,17 @@ export function ProjectFrame({ projectId, children }: { projectId: ProjectId; ch
 
   return (
     <>
-      <header className="glass mt-3 grid gap-3 p-4 sm:p-5 lg:mt-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-end lg:gap-6">
-        {/* A phone has no rail: the wordmark and the person menu head the page. */}
-        <div className="-mt-1 flex min-h-12 items-center justify-between gap-2 border-b border-ink/10 pb-2 lg:col-span-2 lg:hidden">
-          <p className="display shrink-0 text-22 leading-none text-ink">Poetry Designs</p>
-          <PersonMenu role={role} variant="button" />
-        </div>
+      {/* A phone has no rail: the wordmark and the person menu head the page, on the same
+          rosewood strip that opens every other staff page, so moving from Today to a
+          project keeps one header. */}
+      <div className="glass glass-dark on-dark relative z-20 mt-3 flex items-center justify-between gap-2 px-4 pt-3 pb-2 lg:hidden">
+        <p className="flex min-w-0">
+          <Brand />
+        </p>
+        <PersonMenu role={role} variant="button" spread />
+      </div>
 
+      <header className="glass mt-2 grid gap-3 p-4 sm:mt-3 sm:p-5 lg:mt-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-end lg:gap-6">
         <div className="grid min-w-0 gap-2">
           <Link href={home.href} className="link inline-flex min-h-11 items-center gap-1.5 self-start text-15 text-ink-soft">
             <Icon name="arrow" className="size-4 rotate-180" />
@@ -85,7 +90,17 @@ export function ProjectFrame({ projectId, children }: { projectId: ProjectId; ch
           </Link>
           <div className="flex items-center gap-3">
             <ProjectMark projectId={p.id} tone="light" className="w-12 shrink-0 sm:w-14" />
-            <h1 className="display min-w-0 text-balance text-22 text-ink lg:text-32">{p.name}</h1>
+            <h1 className="display min-w-0 flex-1 text-balance text-22 text-ink lg:text-32">{p.name}</h1>
+            {/* On a phone the map is one round button beside the name, not a line of its own. */}
+            <a
+              href={p.maps}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`${p.name} on the map`}
+              className="glass-inner grid size-11 shrink-0 place-items-center rounded-full text-ink transition-colors duration-150 hover:bg-white/70 sm:hidden"
+            >
+              <Icon name="pin" className="size-5" />
+            </a>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {p.code && <span className="glass-chip">{p.code}</span>}
@@ -97,7 +112,7 @@ export function ProjectFrame({ projectId, children }: { projectId: ProjectId; ch
               href={p.maps}
               target="_blank"
               rel="noreferrer"
-              className="link inline-flex min-h-11 items-center gap-1 px-1 text-13 text-ink-soft"
+              className="link hidden min-h-11 items-center gap-1 px-1 text-13 text-ink-soft sm:inline-flex"
             >
               <Icon name="pin" className="size-3.5" />
               Map

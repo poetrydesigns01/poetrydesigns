@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { PROJECT, progressOf } from "@/components/client-home/data";
 import { ArrowIcon } from "@/components/client-home/icons";
+import { CLIENT_PAGE, PageHead } from "@/components/client-home/page-frame";
 import { TimelineList } from "@/components/client-home/timeline-list";
 import { WeekGantt } from "@/components/client-home/week-gantt";
 import "@/components/client-home/home.css";
@@ -24,8 +25,8 @@ export default function TimelinePage() {
 
   if (!timeline) {
     return (
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:py-10">
-        <h1 className="display text-32 text-ink">Timeline</h1>
+      <div className={CLIENT_PAGE}>
+        <PageHead title="Timeline" />
         <p className="glass p-5 text-17 text-ink">Dates coming soon</p>
       </div>
     );
@@ -34,40 +35,47 @@ export default function TimelinePage() {
   const progress = progressOf(timeline, site);
   const pendingDays = timeline.pending.reduce((total, c) => total + c.days, 0);
   const approved = [...timeline.inPlan, ...timeline.changes];
+  const onPlan = timeline.handoverPlanned === timeline.handoverExpected;
+  const added = timeline.extraDays > 0;
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-4 px-4 py-6 sm:px-6 lg:gap-5 lg:py-8">
-      <header className="flex flex-wrap items-end justify-between gap-3 px-1">
-        <div>
-          <p className="lettering text-ink">{timeline.code}</p>
-          <h1 className="display text-32 text-ink">Timeline</h1>
-        </div>
-        <span className="flex flex-wrap items-center gap-2">
-          {progress.held && <span className="glass-chip chip-waiting">Waiting on payment</span>}
-          {progress.week > 0 && (
-            <span className="glass-chip chip-progress">
-              Week {progress.week} of {progress.weeks}
-            </span>
-          )}
-        </span>
-      </header>
+    <div className={CLIENT_PAGE}>
+      <PageHead title="Timeline">
+        {progress.held && <span className="glass-chip chip-waiting">Waiting on payment</span>}
+        {progress.week > 0 && (
+          <span className="glass-chip chip-progress">
+            Week {progress.week} of {progress.weeks}
+          </span>
+        )}
+      </PageHead>
 
-      <section className="glass-strong grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 sm:p-3" aria-label="Handover">
-        <div className="glass-inner grid gap-1 p-3 sm:p-4">
-          <p className="lettering text-ink-soft">Planned handover</p>
-          <p className="figure text-17 text-ink min-[360px]:text-22">{formatDate(timeline.handoverPlanned)}</p>
-        </div>
-        <div className="glass-inner grid gap-1 p-3 sm:p-4">
-          <p className="lettering text-ink-soft">Expected handover</p>
-          <p className="figure text-17 text-ink min-[360px]:text-22">{formatDate(timeline.handoverExpected)}</p>
-        </div>
-        <div className="glass-inner col-span-2 grid gap-1 p-3 sm:col-span-1 sm:p-4">
-          <p className="lettering text-ink-soft">Added by your changes</p>
-          <p className={`figure text-32 ${timeline.extraDays > 0 ? "late-text" : "text-ink"}`}>
-            {timeline.extraDays > 0 ? `+${dayCount(timeline.extraDays)}` : "None"}
-          </p>
-        </div>
-      </section>
+      {onPlan ? (
+        <section className="glass-strong flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-4" aria-label="Handover">
+          <p className="lettering text-ink-soft">Handover</p>
+          <p className="figure text-22 text-ink">{formatDate(timeline.handoverExpected)}</p>
+          <StatusChip tone="done">On plan</StatusChip>
+        </section>
+      ) : (
+        <section
+          className={`glass-strong grid grid-cols-2 gap-2 p-2 sm:p-3 ${added ? "sm:grid-cols-3" : ""}`}
+          aria-label="Handover"
+        >
+          <div className="glass-inner grid gap-1 p-3 sm:p-4">
+            <p className="lettering text-ink-soft">Planned handover</p>
+            <p className="figure text-17 text-ink min-[360px]:text-22">{formatDate(timeline.handoverPlanned)}</p>
+          </div>
+          <div className="glass-inner grid gap-1 p-3 sm:p-4">
+            <p className="lettering text-ink-soft">Expected handover</p>
+            <p className="figure text-17 text-ink min-[360px]:text-22">{formatDate(timeline.handoverExpected)}</p>
+          </div>
+          {added && (
+            <div className="glass-inner col-span-2 grid gap-1 p-3 sm:col-span-1 sm:p-4">
+              <p className="lettering text-ink-soft">Added by your changes</p>
+              <p className="figure late-text text-22">+{dayCount(timeline.extraDays)}</p>
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="hidden md:block">
         <WeekGantt timeline={timeline} />

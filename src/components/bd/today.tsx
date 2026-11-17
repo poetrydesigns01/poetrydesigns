@@ -26,6 +26,7 @@ import type { TurnItem } from "@/lib/firm";
 import { TODAY } from "@/lib/demo-data";
 import { addDays, hours } from "@/lib/format";
 import type { Tone } from "@/lib/portal";
+import { STEP_NAMES, type StepNo } from "./draft-steps";
 import { draftName, phaseChip, pipeline, THIS_MONTH } from "./bd-words";
 import { BdTaskRow, bdTasksOf } from "./plan-panel";
 
@@ -85,18 +86,21 @@ export function BdToday() {
   const row = (item: TurnItem) => {
     const cls = rowBtn;
     let sub: ReactNode = null;
-    let chip: { tone: Tone; words: string } = {
+    let chip: { tone: Tone; words: string } | null = {
       tone: "waiting",
       words: item.margin,
     };
     let action: ReactNode = null;
     if (item.id.startsWith("draft:")) {
       const d = drafts.find((x) => `draft:${x.id}` === item.id);
-      sub = d ? <StepDots done={d.stepsDone} label={`${d.stepsDone} of 4 steps`} /> : null;
-      chip = {
-        tone: "progress",
-        words: d ? `${d.stepsDone}/4 steps` : "Draft",
-      };
+      // The dots already say how far it is, so the row names the next step and has no chip.
+      sub = d ? (
+        <span className="flex items-center gap-2 text-13 text-ink-soft">
+          <StepDots done={d.stepsDone} label={`${d.stepsDone} of 4 steps`} />
+          {d.nextStep ? `Next: ${STEP_NAMES[d.nextStep as StepNo]}` : "Ready to open"}
+        </span>
+      ) : null;
+      chip = null;
       action = (
         <Link href={item.href} className={cls}>
           Continue <IconArrow />
@@ -125,9 +129,10 @@ export function BdToday() {
     }
     const title = item.id.startsWith("draft:") ? (drafts.find((x) => `draft:${x.id}` === item.id) ?? null) : null;
     return (
-      <li key={item.id} className="glass-row flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
-        <div className="grid min-w-0 flex-[1_1_12rem] gap-1">
-          <p className="truncate text-15 font-semibold text-ink">
+      // One layout for every row: the words and the chip at the left, the action at the right.
+      <li key={item.id} className="glass-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5">
+        <div className="grid min-w-0 justify-items-start gap-1">
+          <p className="max-w-full truncate text-15 font-semibold text-ink">
             {title
               ? draftName(title)
               : item.id.startsWith("invite:")
@@ -135,8 +140,8 @@ export function BdToday() {
                 : (asked.find((x) => x.id === item.id)?.by ?? item.title)}
           </p>
           {sub}
+          {chip && <StatusChip tone={chip.tone}>{chip.words}</StatusChip>}
         </div>
-        <StatusChip tone={chip.tone}>{chip.words}</StatusChip>
         {action}
       </li>
     );

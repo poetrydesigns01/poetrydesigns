@@ -73,17 +73,17 @@ export function PaySummary({ stages }: { stages: PaymentStageView[] }) {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="glass-inner p-3 sm:p-4">
+        <div className="glass-inner grid content-between gap-2 p-3 sm:p-4">
           <p className="lettering text-lime/75">Paid</p>
           <p className="figure text-22">{inr(paid)}</p>
         </div>
         {showOutstanding ? (
-          <div className="glass-inner p-3 sm:p-4">
+          <div className="glass-inner grid content-between gap-2 p-3 sm:p-4">
             <p className="lettering text-lime/75">Outstanding</p>
             <p className="figure text-22">{inr(outstanding)}</p>
           </div>
         ) : (
-          <div className="glass-inner p-3 sm:p-4">
+          <div className="glass-inner grid content-between gap-2 p-3 sm:p-4">
             <p className="lettering text-lime/75">Instalments</p>
             <p className="figure text-22">
               {paidCount}/{stages.length}

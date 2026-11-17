@@ -25,7 +25,7 @@ function Row({ r }: { r: RequestView }) {
   const ordered = r.pos.length > 0;
   return (
     <li className="glass-row">
-      <Link href={`/staff/site/requests/${r.no}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_8rem_7rem_auto]">
+      <Link href={`/staff/site/requests/${r.no}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_8rem_8rem_9.5rem]">
         <span className="grid min-w-0 gap-0.5">
           <span className="truncate text-15 font-semibold text-ink">{requestTitle(r, firm)}</span>
           <span className="truncate text-13 text-ink-soft">
@@ -40,11 +40,11 @@ function Row({ r }: { r: RequestView }) {
             "Not sent"
           ) : ordered ? (
             <>
-              PO in <span className="figure text-ink">{days} d</span>
+              PO in <span className="font-semibold tabular-nums text-ink">{days} d</span>
             </>
           ) : (
             <span className={days > 3 ? "late-text" : "text-ink"}>
-              <span className="figure">{days} d</span> waiting
+              <span className="font-semibold tabular-nums">{days} d</span> waiting
             </span>
           )}
         </span>

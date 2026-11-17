@@ -24,7 +24,7 @@ export type RowMode = "approve" | "ask" | null;
 
 /** The grid every row and the head share, from 1024 px. */
 export const CHANGE_GRID =
-  "lg:grid-cols-[minmax(0,1fr)_8.5rem_6.5rem_7.5rem_16.5rem] lg:items-center lg:gap-x-4";
+  "lg:grid-cols-[minmax(0,1fr)_8rem_6.5rem_7.5rem_18.5rem] lg:items-center lg:gap-x-4";
 
 /** "7 Nov, 4:10 pm"; a plain date stays a date. */
 export function changeStamp(at: string): string {

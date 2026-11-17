@@ -4,14 +4,15 @@
 "use client";
 
 import Link from "next/link";
-import { Icon, WaitChip } from "@/components/admin/glass-kit";
+import { Icon } from "@/components/admin/glass-kit";
+import { requestTitle } from "@/components/site/site-kit";
 import { TODAY } from "@/lib/demo-data";
 import { useFirm } from "@/lib/demo-store";
 import type { Firm, RequestView } from "@/lib/firm";
 import type { PersonId, ProjectId } from "@/lib/firm-data";
 import { daysBetween, formatShortDate } from "@/lib/format";
 import { MarkSeen } from "./mark-seen";
-import { requestChip, responseDays } from "./request-words";
+import { WaitingChip, requestChip, responseDays } from "./request-words";
 import { requestTask, type RequestTask } from "./request-task";
 import { ProjectLink } from "./rows";
 import { procuresFor } from "./shared";
@@ -25,7 +26,7 @@ type ProjectGroup = { projectId: ProjectId; name: string; code: string; groups: 
 
 const ROW =
   "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-3 py-2.5 " +
-  "md:grid-cols-[minmax(0,1fr)_7rem_7.5rem_9.5rem_8rem]";
+  "md:grid-cols-[minmax(0,1fr)_6.5rem_9rem_9rem_8rem]";
 
 export function groupRequests(rows: RequestView[], firm: Firm): ProjectGroup[] {
   const projects = new Map<ProjectId, ProjectGroup>();
@@ -78,30 +79,26 @@ export function RequestGroups({ rows, person, empty }: { rows: RequestView[]; pe
     <div className="grid gap-4">
       {projects.map((p) => {
         const speed = speedOf(p.projectId, firm);
-        const count = p.groups.reduce((t, g) => t + g.rows.length, 0);
         return (
           <section key={p.projectId} aria-label={p.name} className="glass-strong min-w-0 p-3 sm:p-5">
             <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-1 pb-2">
               <span className="grid min-w-0">
                 <ProjectLink id={p.projectId} name={p.name} className="justify-self-start text-17 font-semibold" />
-                {p.code && <span className="figure text-13 text-ink-soft">{p.code}</span>}
+                {p.code && <span className="text-13 tabular-nums text-ink-soft">{p.code}</span>}
               </span>
-              <span className="flex flex-wrap items-center gap-2">
-                {speed && (
-                  <span
-                    className={`glass-chip figure ${speed.days >= 4 ? "chip-late" : speed.days >= 2 ? "chip-waiting" : "chip-done"}`}
-                    title={`Average of ${speed.n}`}
-                  >
-                    {speed.days.toFixed(1)} days to PO
-                  </span>
-                )}
-                <span className="glass-chip figure before:hidden">{count}</span>
-              </span>
+              {speed && (
+                <span
+                  className={`glass-chip tabular-nums ${speed.days >= 4 ? "chip-late" : speed.days >= 2 ? "chip-waiting" : "chip-done"}`}
+                  title={`Average of ${speed.n}`}
+                >
+                  {speed.days.toFixed(1)} days to PO
+                </span>
+              )}
             </header>
 
             <div
               aria-hidden="true"
-              className="lettering hidden gap-x-3 px-3 pb-1 text-ink-soft md:grid md:grid-cols-[minmax(0,1fr)_7rem_7.5rem_9.5rem_8rem]"
+              className="lettering hidden gap-x-3 px-3 pb-1 text-ink-soft md:grid md:grid-cols-[minmax(0,1fr)_6.5rem_9rem_9rem_8rem]"
             >
               <span>Request</span>
               <span>Needed by</span>
@@ -114,7 +111,9 @@ export function RequestGroups({ rows, person, empty }: { rows: RequestView[]; pe
               {p.groups.map((g) => (
                 <div key={g.task.key} className="grid gap-0.5">
                   <h3 className="flex min-w-0 items-center gap-2 border-t border-ink/10 px-1 pb-0.5 pt-2.5">
-                    {g.task.milestone > 0 && <span className="glass-chip chip-progress figure before:hidden">M{g.task.milestone}</span>}
+                    {g.task.milestone > 0 && (
+                      <span className="shrink-0 text-13 text-ink-soft">Milestone {g.task.milestone} ·</span>
+                    )}
                     <span className="min-w-0 truncate text-15 font-semibold text-ink">{g.task.name}</span>
                   </h3>
                   <ul className="grid gap-0.5">
@@ -141,15 +140,17 @@ function RequestRow({ r, person }: { r: RequestView; person: PersonId }) {
   return (
     <li className={`glass-row ${ROW}`}>
       <span className="grid min-w-0">
-        <Link href={`/staff/finance/requests/${r.no}`} className="link -my-2 inline-flex min-h-11 items-center justify-self-start whitespace-nowrap text-15 font-semibold">
-          {r.no}
+        <Link
+          href={`/staff/finance/requests/${r.no}`}
+          className="link -my-2 flex min-h-11 min-w-0 items-center justify-self-start text-15 font-semibold"
+        >
+          <span className="truncate">{requestTitle(r, firm)}</span>
         </Link>
-        <span className="truncate text-13 text-ink-soft">
-          {r.lineWords[0]}
-          {more}
+        <span className="truncate text-13 text-ink-soft" title={`${r.lineWords[0]}${more}`}>
+          {r.no}
         </span>
       </span>
-      <span className="md:hidden">{requestChip(r)}</span>
+      <span className="md:hidden">{requestChip(r, { late: false })}</span>
 
       <span className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 md:contents">
         <span className="grid text-15">
@@ -163,7 +164,7 @@ function RequestRow({ r, person }: { r: RequestView; person: PersonId }) {
         </span>
         <span>
           {open ? (
-            <WaitChip days={r.days} />
+            <WaitingChip r={r} />
           ) : answered !== null ? (
             <span className={`glass-chip ${answered >= 4 ? "chip-late" : answered >= 2 ? "chip-waiting" : "chip-done"}`}>
               PO in {answered === 0 ? "a day" : `${answered} ${answered === 1 ? "day" : "days"}`}
@@ -172,7 +173,7 @@ function RequestRow({ r, person }: { r: RequestView; person: PersonId }) {
             <span className="text-13 text-ink-soft">–</span>
           )}
         </span>
-        <span className="hidden md:block">{requestChip(r)}</span>
+        <span className="hidden md:block">{requestChip(r, { late: false })}</span>
       </span>
 
       {r.status === "New" && procuresFor(person, firm.project(r.projectId)) ? (

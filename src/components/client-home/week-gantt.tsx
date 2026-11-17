@@ -131,9 +131,15 @@ export function WeekGantt({ timeline }: { timeline: TimelineView }) {
     { id: "construction", label: "Construction", from: timeline.constructionStart, to: lastBuild.end },
     { id: "close-out", label: "Handover", from: addDays(lastBuild.end, 1), to: weeks[weeks.length - 1].end },
   ];
-  const labelled = weeks.filter((w) => (w.clock === "pre" ? w.week === 1 : w.week === 1 || w.week % 4 === 0));
   const today = at(TODAY);
   const current = weeks.find((w) => w.current);
+  const currentAt = current ? weeks.indexOf(current) : -1;
+  // A week label within two weeks of today would sit under today's pill: the pill names it.
+  const labelled = weeks.filter(
+    (w, i) =>
+      (w.clock === "pre" ? w.week === 1 : w.week === 1 || w.week % 4 === 0) &&
+      (currentAt < 0 || Math.abs(i - currentAt) > 2),
+  );
 
   return (
     <section className="glass-strong p-2 sm:p-3" aria-labelledby="plan-title">
@@ -282,7 +288,7 @@ export function WeekGantt({ timeline }: { timeline: TimelineView }) {
                   <span className="flex min-w-0 items-center gap-2.5" title={stage.name}>
                     <StageMark stage={stage} lockedFirst={lockedFirst} />
                     <span
-                      className={`truncate text-15 ${state === "upcoming" || state === "held" ? "text-ink-soft" : "text-ink"} ${
+                      className={`line-clamp-2 min-w-0 text-15 leading-snug ${state === "upcoming" || state === "held" ? "text-ink-soft" : "text-ink"} ${
                         state === "current" ? "font-semibold" : ""
                       }`}
                     >

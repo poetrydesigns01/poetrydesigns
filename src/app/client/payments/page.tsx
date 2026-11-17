@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import { CLIENT_PAGE, PageHead } from "@/components/client-home/page-frame";
 import { PaySummary } from "@/components/payments/pay-summary";
 import { SplitCard } from "@/components/payments/split-card";
 import { StageTable } from "@/components/payments/stage-table";
@@ -21,19 +22,9 @@ export default function PaymentsPage() {
   const stages = firm.payments("iyer");
   const [spoken, setSpoken] = useState("");
 
-  const due = stages.filter((s) => s.canMarkPaid).length;
-  const waiting = stages.filter((s) => s.state === "client-paid").length;
-
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:py-10">
-      <header className="flex flex-wrap items-end justify-between gap-3 px-1">
-        <h1 className="display text-32 text-ink">Payments</h1>
-        {due > 0 ? (
-          <span className="glass-chip chip-waiting">{due} due</span>
-        ) : waiting > 0 ? null : (
-          <span className="glass-chip chip-done">Up to date</span>
-        )}
-      </header>
+    <div className={CLIENT_PAGE}>
+      <PageHead title="Payments" />
 
       <PaySummary stages={stages} />
       <SplitCard />

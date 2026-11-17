@@ -127,7 +127,8 @@ function instalmentRow(
   return {
     id: `instalment-${i.n}`,
     label: `${i.n === 0 ? "Sign-up" : i.label} · ${i.percent}%`,
-    short: i.n === 0 ? "Sign-up" : `Inst. ${i.n}`,
+    // The percent stays on a phone too, so the row never reads as the stage row beside it.
+    short: `${i.n === 0 ? "Sign-up" : `Inst. ${i.n}`} ${i.percent}%`,
     slim: true,
     bars: i.clock === "construction" ? [{ from: start, to: Math.max(start, due), tone: ahead ? "due" : "free" }] : [],
     pin: { col: due, ...pin },
@@ -323,7 +324,7 @@ export function Gantt({
   return (
     <div ref={scroller} className="overflow-x-auto overscroll-x-contain [scrollbar-width:thin]" role="group" aria-label={caption}>
       <div
-        className="relative grid [--gantt-label:8rem] sm:[--gantt-label:12rem]"
+        className="relative grid [--gantt-label:8rem] sm:[--gantt-label:12rem] lg:[--gantt-label:16rem]"
         style={{
           gridTemplateColumns: `var(--gantt-label) repeat(${n}, minmax(0.75rem, 1fr))`,
           gridTemplateRows: `1.75rem ${heights}`,

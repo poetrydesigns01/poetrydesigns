@@ -174,8 +174,8 @@ function TurnRow({ item, person }: { item: TurnItem; person: PersonId }) {
 
   return (
     <li className="glass-row">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2.5">
-        <div className="grid min-w-0 flex-1 basis-48 gap-1">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5">
+        <div className="grid min-w-0 gap-1">
           <p className="text-15 font-semibold text-ink">{item.title}</p>
           <p className="flex flex-wrap items-center gap-2 text-13 text-ink-soft">
             <StatusChip tone={item.overdue ? "late" : "waiting"}>{item.margin}</StatusChip>

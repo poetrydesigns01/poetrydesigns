@@ -8,11 +8,11 @@ import { dayWords, stageChip } from "@/components/admin/admin-data";
 import { Icon, Initials, inrShort, Panel, StatCard } from "@/components/admin/glass-kit";
 import { StatusChip } from "@/components/register/status-chip";
 import { useFirm } from "@/lib/demo-store";
-import { templateOf, type PersonId, type ProjectId } from "@/lib/firm-data";
+import type { PersonId, ProjectId } from "@/lib/firm-data";
 import { inr, listWords } from "@/lib/format";
 import { currentStage, Fact, StageStrip, Stats } from "./record-kit";
 
-// The project at a glance: four figures, the contract and the team as tiles and rows, the
+// The project at a glance: three figures, the contract as a list of facts, the team as rows, the
 // hand-off note, and the payment stages as one strip with the stage that matters now.
 
 type Member = { id: PersonId; role: string };
@@ -96,11 +96,11 @@ export function ProjectOverview({ projectId }: { projectId: ProjectId }) {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel title="Contract">
-          <dl className="grid grid-cols-2 gap-2">
+          {/* Category and code are in the header above, so they are not said twice. */}
+          <dl className="grid grid-cols-2 gap-x-6 px-1 [&>div:last-child]:border-b-0">
             <Fact label="Clients" wide>
               {listWords(p.clients)}
             </Fact>
-            <Fact label="Category">{templateOf(p.category).name}</Fact>
             <Fact label="Signed">{p.signedOn ? dayWords(p.signedOn) : "–"}</Fact>
             <Fact label="Built-up">
               <span className="figure">{p.builtUpArea.toLocaleString("en-IN")}</span> sq ft
@@ -110,9 +110,6 @@ export function ProjectOverview({ projectId }: { projectId: ProjectId }) {
             </Fact>
             <Fact label="Perimeter">
               <span className="figure">{p.plotPerimeter}</span> ft
-            </Fact>
-            <Fact label="Code">
-              <span className="figure">{p.code || "–"}</span>
             </Fact>
             <Fact label="Address" wide>
               <span className="block">

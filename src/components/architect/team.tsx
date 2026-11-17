@@ -229,21 +229,16 @@ export function ArchitectTeam() {
                         >
                           <span className="truncate">{p.name}</span>
                         </Link>
-                        <span className="flex flex-wrap gap-1.5">
-                          {p.team.architects.length === 0 ? (
-                            <StatusChip tone="locked">None</StatusChip>
-                          ) : (
-                            p.team.architects.map((id) => (
-                              <span key={id} className="glass-chip">
-                                {firm.person(id)?.first ?? id}
-                              </span>
-                            ))
-                          )}
+                        {/* The team as plain names: a pill with a dot reads as a status. */}
+                        <span className="text-15 text-ink-soft">
+                          {p.team.architects.length === 0
+                            ? "No juniors"
+                            : p.team.architects.map((id) => firm.person(id)?.first ?? id).join(" · ")}
                         </span>
                         {free.length > 0 && (
                           <button
                             type="button"
-                            className={`${rowBtn} size-11 p-0`}
+                            className={`${rowBtn} gap-1.5`}
                             aria-expanded={open}
                             aria-label={open ? `Close, ${p.name}` : `Add a junior to ${p.name}`}
                             onClick={() => {
@@ -257,6 +252,7 @@ export function ArchitectTeam() {
                             }}
                           >
                             <IconPlus className={open ? "rotate-45" : ""} />
+                            {open ? "Close" : "Add"}
                           </button>
                         )}
                       </div>

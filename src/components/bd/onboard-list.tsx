@@ -43,7 +43,6 @@ export function OnboardList() {
                       </span>
                     </span>
                     <StepDots done={d.stepsDone} label={`${d.stepsDone} of 4 steps`} />
-                    <StatusChip tone={d.nextStep ? "progress" : "done"}>{`${d.stepsDone}/4`}</StatusChip>
                     <IconArrow className="text-ink-soft" />
                   </Link>
                 </li>

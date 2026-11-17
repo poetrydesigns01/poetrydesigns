@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { useEffect, useEffectEvent, useState } from "react";
+import { CLIENT_PAGE } from "@/components/client-home/page-frame";
 import { DecisionProof, DecisionStep, useDecision } from "@/components/designs/decision";
 import { DesignSheet } from "@/components/designs/design-sheet";
 import { CheckIcon, ChevronLeftIcon, EyeIcon, LockIcon, PencilIcon, UploadIcon } from "@/components/designs/icons";
@@ -152,7 +153,7 @@ export function DesignViewer({ id }: { id: string }) {
   const Icon = stage ? STAGE_ICON[stage.stage] : null;
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:gap-5 lg:py-10">
+    <div className={CLIENT_PAGE}>
       <header className="flex items-center gap-3">
         <Link
           href="/client/designs"

@@ -12,6 +12,7 @@ import type { CategoryId, Template } from "@/lib/firm-data";
 import { datePart, formatShortDate, formatTime, inr } from "@/lib/format";
 import { milestoneStage } from "@/lib/workflow-template";
 import { templateChangeWords, templatesOf, type TemplateView } from "./admin-data";
+import { Icon } from "./glass-kit";
 
 // A category template: the rate per sq ft (the one thing the admin edits here), the sign-up
 // share, the ten instalments at the agreed split with the milestone each opens (names and
@@ -174,31 +175,46 @@ function TemplateEditor({ view, chooser }: { view: TemplateView; chooser: ReactN
         </span>
       </div>
 
+      {/* Two fields of one build: a label over a box of one height, so both columns line up. */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor={`${ids}-rate`} className="block text-15 font-semibold">
             Rate per sq ft, before GST
           </label>
-          <span className="mt-1.5 flex items-center gap-2">
-            <span className="text-17">₹</span>
+          <span className="relative mt-1.5 block">
+            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-17 text-ink-soft">
+              ₹
+            </span>
+            {/* Grouped as the firm writes rupees, 2,600; only digits are kept. */}
             <input
               id={`${ids}-rate`}
-              type="number"
+              type="text"
               inputMode="numeric"
-              min={0}
-              step={50}
-              className={field}
-              value={draft.ratePerSqFt}
+              autoComplete="off"
+              className={`${field} figure pl-7`}
+              value={draft.ratePerSqFt.toLocaleString("en-IN")}
               onChange={(e) => {
                 setError("");
-                setDraft({ ...draft, ratePerSqFt: Math.max(0, Math.round(Number(e.target.value) || 0)) });
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 7);
+                setDraft({ ...draft, ratePerSqFt: Number(digits) || 0 });
               }}
             />
           </span>
         </div>
-        <div className="glass-inner self-end px-3 py-2">
-          <p className="lettering text-ink-soft">Sign-up</p>
-          <p className="figure text-17">{draft.signUpPercent}%</p>
+        <div>
+          <p id={`${ids}-signup`} className="text-15 font-semibold">
+            Sign-up
+          </p>
+          <p
+            role="textbox"
+            aria-readonly="true"
+            aria-labelledby={`${ids}-signup`}
+            className="glass-field mt-1.5 flex min-h-12 items-center px-3 text-17 text-ink"
+          >
+            <span className="figure">{draft.signUpPercent}%</span>
+            {/* Fixed by the workflow: the lock says it is read, not typed. */}
+            <Icon name="lock" className="ml-auto size-4 text-ink-soft" />
+          </p>
         </div>
       </div>
 

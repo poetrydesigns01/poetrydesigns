@@ -235,18 +235,53 @@ export function ArchitectDesk() {
     }
     return (
       <li key={n.id} className="glass-row px-3 py-2.5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="min-w-0 flex-[1_1_14rem]">
-            <p className="truncate text-15 font-semibold text-ink">{n.title}</p>
-            {n.project && <p className="truncate text-13 text-ink-soft">{n.project}</p>}
+        {/* One layout for every row: the words and the chip at the left, the action at the right. */}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
+          <div className="grid min-w-0 justify-items-start gap-1">
+            <p className="max-w-full truncate text-15 font-semibold text-ink">{n.title}</p>
+            {n.project && <p className="max-w-full truncate text-13 text-ink-soft">{n.project}</p>}
+            <StatusChip tone={n.chip.tone}>{n.chip.words}</StatusChip>
           </div>
-          <StatusChip tone={n.chip.tone}>{n.chip.words}</StatusChip>
           {action}
         </div>
         {n.review && open === n.id && <ReviewPanel task={n.review} by={me.id} onDone={() => setOpen(null)} />}
       </li>
     );
   };
+
+  // From 1200 px the changes close the left column, so both columns end near one line.
+  const changesPanel =
+    changes.length > 0 ? (
+      <Panel
+        title="Changes recommended"
+        aside={
+          <>
+            {timeline && timeline.extraDays > 0 && <span className="late-text text-15">+{timeline.extraDays} days</span>}
+            {me.senior && recommendAt && (
+              <Link href={`/staff/projects/${recommendAt.id}/programme#changes`} className={rowBtn}>
+                Recommend <IconArrow />
+              </Link>
+            )}
+          </>
+        }
+      >
+        <ul className="grid grid-cols-1 gap-1">
+          {changes.slice(0, 5).map((r) => (
+            <li key={r.id} className="glass-row flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
+              <div className="min-w-0 flex-[1_1_12rem]">
+                <p className="truncate text-15 text-ink">{r.item}</p>
+                <p className="text-13 text-ink-soft">
+                  {r.id} · {name(r.projectId)}
+                </p>
+              </div>
+              <span className="figure text-15 text-ink">{inrDelta(r.amount)}</span>
+              {r.days > 0 && <span className="late-text text-15">+{dayCount(r.days)}</span>}
+              <StatusChip tone={changeTone(r.status)}>{r.statusWords}</StatusChip>
+            </li>
+          ))}
+        </ul>
+      </Panel>
+    ) : null;
 
   return (
     <>
@@ -323,18 +358,20 @@ export function ArchitectDesk() {
                         <Link
                           href={DESIGNS_HREF}
                           onClick={() => demo.setFocusRow({ href: DESIGNS_HREF, id: `${t.projectId}:${t.templateId}` })}
-                          className="glass-row flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5"
+                          className="glass-row grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5"
                         >
-                          <span className="min-w-0 flex-[1_1_12rem]">
+                          <span className="grid min-w-0 gap-1">
                             <span className="block truncate text-15 font-semibold text-ink">{item?.title ?? t.name}</span>
                             <span className="block truncate text-13 text-ink-soft">
                               {[name(t.projectId), weeksLabel(t.clock, t.fromWeek, t.toWeek), who].filter(Boolean).join(" · ")}
                             </span>
+                            <span className="flex items-center gap-2">
+                              <StatusChip tone={chip.tone}>{chip.words}</StatusChip>
+                              {item?.status === "waiting" && (
+                                <IconEye label={item.viewed ? "Viewed" : "Not viewed"} className={item.viewed ? "text-kota" : "text-ink-soft"} />
+                              )}
+                            </span>
                           </span>
-                          {item?.status === "waiting" && (
-                            <IconEye label={item.viewed ? "Viewed" : "Not viewed"} className={item.viewed ? "text-kota" : "text-ink-soft"} />
-                          )}
-                          <StatusChip tone={chip.tone}>{chip.words}</StatusChip>
                           {upload ? <IconUpload className="text-ink-soft" /> : <IconArrow className="text-ink-soft" />}
                         </Link>
                       </li>
@@ -343,6 +380,7 @@ export function ArchitectDesk() {
                 </ul>
               )}
             </Panel>
+            {changesPanel && <div className="hidden min-[1200px]:block">{changesPanel}</div>}
           </div>
 
           <div className="grid min-w-0 gap-4">
@@ -414,37 +452,8 @@ export function ArchitectDesk() {
           </div>
         </div>
 
-        {changes.length > 0 && (
-          <Panel
-            title="Changes recommended"
-            aside={
-              <>
-                {timeline && timeline.extraDays > 0 && <span className="late-text text-15">+{timeline.extraDays} days</span>}
-                {me.senior && recommendAt && (
-                  <Link href={`/staff/projects/${recommendAt.id}/programme#changes`} className={rowBtn}>
-                    Recommend <IconArrow />
-                  </Link>
-                )}
-              </>
-            }
-          >
-            <ul className="grid grid-cols-1 gap-1">
-              {changes.slice(0, 5).map((r) => (
-                <li key={r.id} className="glass-row flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
-                  <div className="min-w-0 flex-[1_1_12rem]">
-                    <p className="truncate text-15 text-ink">{r.item}</p>
-                    <p className="text-13 text-ink-soft">
-                      {r.id} · {name(r.projectId)}
-                    </p>
-                  </div>
-                  <span className="figure text-15 text-ink">{inrDelta(r.amount)}</span>
-                  {r.days > 0 && <span className="late-text text-15">+{dayCount(r.days)}</span>}
-                  <StatusChip tone={changeTone(r.status)}>{r.statusWords}</StatusChip>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        )}
+        {/* Below 1200 px the desk is one column and the changes close it, full width. */}
+        {changesPanel && <div className="min-[1200px]:hidden">{changesPanel}</div>}
       </div>
     </>
   );

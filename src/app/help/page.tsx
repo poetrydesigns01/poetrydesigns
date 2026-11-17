@@ -2,6 +2,7 @@
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
 import Link from "next/link";
+import { Brand } from "@/components/brand";
 import { GUIDE_ROLES, GUIDES } from "@/components/guides/guide-data";
 import { countWord } from "@/lib/format";
 
@@ -12,8 +13,8 @@ export default function GuidesPage() {
     <main className="flex flex-1 flex-col bg-lime">
       <header className="on-dark bg-rosewood text-lime">
         <div className="mx-auto w-full max-w-3xl px-4 pb-8 pt-5 sm:px-8 sm:pb-12 sm:pt-8">
-          <Link href="/" className="display inline-flex min-h-11 items-center text-22 leading-none">
-            Poetry Designs
+          <Link href="/" className="inline-flex min-h-11 items-center">
+            <Brand />
           </Link>
           <h1 className="display mt-6 text-32 sm:mt-10">Guides</h1>
           <p className="mt-3 max-w-[48ch] text-17 text-lime/80">
@@ -29,19 +30,16 @@ export default function GuidesPage() {
               const guide = GUIDES[role];
               return (
                 <li key={role}>
+                  {/* The hover rule hangs in the gutter, so the titles keep the header's left edge. */}
                   <Link
                     href={`/help/${role}`}
-                    className="group grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-l-[3px] border-transparent py-1 pl-4 hover:border-rosewood focus-visible:border-rosewood"
+                    className="group -ml-[19px] block min-h-16 border-l-[3px] border-transparent py-1 pl-4 hover:border-rosewood focus-visible:border-rosewood"
                   >
-                    <span className="min-w-0">
-                      <span className="block text-22 font-semibold leading-snug underline decoration-ink/30 decoration-1 underline-offset-[0.2em] group-hover:decoration-ink">
-                        {guide.title}
-                      </span>
-                      <span className="mt-0.5 block text-15 text-ink-soft">{guide.who}</span>
+                    <span className="block text-22 font-semibold leading-snug underline decoration-ink/30 decoration-1 underline-offset-[0.2em] group-hover:decoration-ink">
+                      {guide.title}
                     </span>
-                    <span className="lettering whitespace-nowrap text-ink-soft">
-                      {countWord(guide.steps.length, true)} steps
-                    </span>
+                    <span className="mt-0.5 block text-15 text-ink-soft">{guide.who}</span>
+                    <span className="mt-0.5 block text-13 text-ink-soft">{countWord(guide.steps.length, true)} steps</span>
                   </Link>
                 </li>
               );

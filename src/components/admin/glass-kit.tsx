@@ -47,7 +47,8 @@ export type IconName =
   | "hammer"
   | "chart"
   | "pin"
-  | "phone";
+  | "phone"
+  | "pencil";
 
 const PATHS: Record<IconName, string> = {
   box: "M3 7.5 10 4l7 3.5v7L10 18l-7-3.5zM3 7.5l7 3.5 7-3.5M10 11v7",
@@ -65,6 +66,7 @@ const PATHS: Record<IconName, string> = {
   chart: "M3 17h14M5.5 14V9M10 14V5M14.5 14v-6",
   pin: "M10 18s-5.5-5-5.5-9a5.5 5.5 0 0 1 11 0c0 4-5.5 9-5.5 9zM10 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
   phone: "M5 3h3l1.5 4-2 1.2a9 9 0 0 0 4.3 4.3L13 10.5l4 1.5v3a2 2 0 0 1-2 2A12 12 0 0 1 3 5a2 2 0 0 1 2-2z",
+  pencil: "M12.5 4.5l3 3L7 16H4v-3zM10.5 6.5l3 3",
 };
 
 export function Icon({ name, className = "size-4" }: { name: IconName; className?: string }) {
@@ -129,8 +131,14 @@ const STAT_COLS = {
   2: "grid-cols-2",
   3: "grid-cols-2 sm:grid-cols-3",
   4: "grid-cols-2 lg:grid-cols-4",
-  5: "grid-cols-2 sm:grid-cols-3 xl:grid-cols-5",
+  // Five never leave a hole: on a phone the fifth takes the whole row; from 640 px a
+  // six-column grid holds three over two; from 1280 px all five stand in one row.
+  5: "grid-cols-2 max-sm:[&>*:last-child]:col-span-2 sm:grid-cols-6 sm:max-xl:[&>*]:col-span-2 sm:max-xl:[&>*:nth-child(n+4)]:col-span-3 xl:grid-cols-5",
 } as const;
+
+/** The quiet trigger at the end of a row that opens its editor: never louder than the row. */
+export const ROW_ACTION =
+  "inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 text-15 text-ink-soft transition-colors duration-150 hover:bg-white/60 hover:text-ink aria-expanded:bg-white/60 aria-expanded:text-ink";
 
 /** A row of stat cards. */
 export function StatRow({ cols = 4, label, children }: { cols?: 2 | 3 | 4 | 5; label: string; children: ReactNode }) {
@@ -197,14 +205,25 @@ export function Segments<T extends string>({
   value,
   options,
   onChange,
+  scroll = false,
 }: {
   label: string;
   value: T;
   options: { id: T; label: string; count?: number }[];
   onChange: (id: T) => void;
+  /** On a phone keep one line that scrolls sideways, rather than wrapping. */
+  scroll?: boolean;
 }) {
   return (
-    <div role="group" aria-label={label} className="glass flex max-w-full flex-wrap gap-1 rounded-3xl p-1">
+    <div
+      role="group"
+      aria-label={label}
+      className={`glass flex max-w-full gap-1 rounded-3xl p-1 ${
+        scroll
+          ? "max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:rounded-full max-sm:[scrollbar-width:none] sm:flex-wrap max-sm:[&::-webkit-scrollbar]:hidden max-sm:[&>button]:shrink-0"
+          : "flex-wrap"
+      }`}
+    >
       {options.map((o) => {
         const on = o.id === value;
         return (
@@ -258,6 +277,7 @@ export function GlassTable<T>({
   empty,
   wide = "md",
   rowClass,
+  fixed = false,
 }: {
   caption: string;
   rows: T[];
@@ -273,6 +293,8 @@ export function GlassTable<T>({
   wide?: keyof typeof WIDE;
   /** Extra classes on a row, such as a struck-out look. */
   rowClass?: (row: T) => string;
+  /** Fixed column widths, so tables stacked one above another share one grid. */
+  fixed?: boolean;
 }) {
   if (rows.length === 0) return empty ? <Empty>{empty}</Empty> : null;
   const [first, ...rest] = columns;
@@ -280,7 +302,7 @@ export function GlassTable<T>({
   return (
     <>
       <div className={WIDE[wide].table}>
-        <table className="w-full border-separate border-spacing-0 text-15">
+        <table className={`w-full border-separate border-spacing-0 text-15 ${fixed ? "table-fixed" : ""}`}>
           <caption className="sr-only">{caption}</caption>
           <thead>
             <tr>

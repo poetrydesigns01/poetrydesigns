@@ -14,7 +14,7 @@ import { useDemo, useFirm, type NewEvent } from "@/lib/demo-store";
 import type { Person, PersonId, ProjectId, StaffRole } from "@/lib/firm-data";
 import { listWords } from "@/lib/format";
 import { peopleOf, ROLE_GROUP, ROLE_TEAM, roleChangeWords, STAFF_ROLES, type PersonView } from "./admin-data";
-import { Count, Initials, Panel, Segments } from "./glass-kit";
+import { Count, Icon, Initials, Panel, ROW_ACTION, Segments } from "./glass-kit";
 
 // Everyone who uses the portal, filtered by role. Each staff row has one action, "Change":
 // role, senior or junior, finance access, a project or team, Project Head, deactivation.
@@ -85,6 +85,7 @@ export function PeoplePage() {
           label="Role"
           value={role}
           onChange={setRole}
+          scroll
           options={[
             { id: "all", label: "All", count: people.length },
             ...roles.map((r) => ({ id: r, label: ROLE_SHORT[r], count: people.filter((p) => p.role === r).length })),
@@ -117,7 +118,9 @@ function PersonRow({ person }: { person: PersonView }) {
 
   return (
     <li className={`glass-row grid gap-3 px-3 py-3 ${person.active ? "" : "opacity-70"}`} data-row-id={rowId}>
-      <div className="grid items-center gap-3 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_auto]">
+      {/* On a phone the change button sits at the top right of the name, the chips under
+          both; from 768 px name, chips and button stand in one line. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_auto]">
         <div className="flex min-w-0 items-center gap-3">
           <Initials name={person.name} />
           <span className="grid min-w-0">
@@ -125,7 +128,19 @@ function PersonRow({ person }: { person: PersonView }) {
             <span className="truncate text-13 text-ink-soft">{person.title}</span>
           </span>
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        {staff && (
+          <button
+            type="button"
+            className={`${ROW_ACTION} justify-self-end md:order-last`}
+            aria-expanded={open}
+            aria-label={open ? `Close changes for ${person.name}` : `Change ${person.name}`}
+            onClick={() => (open ? close() : setOpen(true))}
+          >
+            <Icon name="pencil" />
+            {open ? "Close" : "Change"}
+          </button>
+        )}
+        <div className="col-span-2 flex flex-wrap gap-1.5 empty:hidden md:col-span-1">
           {!person.active && <StatusChip tone="locked">Deactivated</StatusChip>}
           {staff && <span className="glass-chip">{person.senior ? "Senior" : "Junior"}</span>}
           {person.access.includes("finance") && <StatusChip tone="done">Finance access</StatusChip>}
@@ -145,16 +160,6 @@ function PersonRow({ person }: { person: PersonView }) {
           )}
           {person.onboarded > 0 && <span className="glass-chip">{person.onboarded} onboarded</span>}
         </div>
-        {staff && (
-          <button
-            type="button"
-            className="btn btn-glass min-h-11 justify-self-start px-4 text-15 md:justify-self-end"
-            aria-expanded={open}
-            onClick={() => (open ? close() : setOpen(true))}
-          >
-            {open ? "Close" : "Change"}
-          </button>
-        )}
       </div>
       {open && staff && <PersonChanges person={person} rowId={rowId} pause={pause} onDone={() => setOpen(false)} />}
     </li>

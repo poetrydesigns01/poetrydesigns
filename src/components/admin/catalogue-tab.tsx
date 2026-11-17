@@ -10,7 +10,7 @@ import { useDemo, useFirm } from "@/lib/demo-store";
 import type { CatalogueEdit, CatalogueUnit, PersonId } from "@/lib/firm-data";
 import { formatStampShort } from "@/lib/format";
 import { StatusChip } from "@/components/register/status-chip";
-import { Count, Panel } from "./glass-kit";
+import { Count, Icon, Panel, ROW_ACTION } from "./glass-kit";
 import { catalogueRowsOf, catalogueWords, cleanValue, UNITS, type CatalogueRow } from "./admin-data";
 import { StruckNote, TwoStepDelete } from "./two-step-delete";
 
@@ -82,10 +82,12 @@ function CatalogueItemRow({ row, names }: { row: CatalogueRow; names: string[] }
         </div>
         <button
           type="button"
-          className="btn btn-glass min-h-11 justify-self-start px-4 text-15 md:justify-self-end"
+          className={`${ROW_ACTION} justify-self-start md:justify-self-end`}
           aria-expanded={open}
+          aria-label={open ? `Close changes for ${row.name}` : `Change ${row.name}`}
           onClick={() => setOpen(!open)}
         >
+          <Icon name="pencil" />
           {open ? "Close" : "Change"}
         </button>
       </div>

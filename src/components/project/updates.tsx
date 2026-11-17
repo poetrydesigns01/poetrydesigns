@@ -20,7 +20,8 @@ export function ProjectUpdates({ projectId }: { projectId: ProjectId }) {
   if (!p || p.phase === "draft") return null;
 
   return (
-    <div className="w-full max-w-4xl">
+    // As wide as the header and tabs above; the bubbles hold their own measure.
+    <div className="w-full">
       <Chat projectId={projectId} viewer={viewerIdOf(role, demo.viewers)} title="Team and client" fill="staff" />
     </div>
   );

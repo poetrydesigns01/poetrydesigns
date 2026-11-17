@@ -89,14 +89,15 @@ export function Stat({
 const STAT_COLS = {
   2: "[&>*:last-child:nth-child(odd)]:col-span-2",
   3: "sm:grid-cols-3 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2",
-  4: "lg:grid-cols-4 max-lg:[&>*:last-child:nth-child(odd)]:col-span-2",
+  4: "md:grid-cols-4",
   5: "lg:grid-cols-5 max-lg:[&>*:last-child:nth-child(odd)]:col-span-2",
 } as const;
 
 /**
  * A row of stat tiles in one glass panel: two to a row on a phone, `cols` on wider screens
- * (four by default, from 1024 px; three from 640 px). Other roles import this so every
- * dashboard reads the same way.
+ * (three from 640 px, four from 768 px, so a tablet does not open on a block of near-empty
+ * tiles; five from 1024 px, as money figures need the width). Other roles import this so
+ * every dashboard reads the same way.
  */
 export function Stats({ label, cols = 4, children }: { label: string; cols?: keyof typeof STAT_COLS; children: ReactNode }) {
   return (

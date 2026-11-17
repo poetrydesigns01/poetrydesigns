@@ -9,8 +9,9 @@ import { useDemo, useFirm, type DemoState } from "@/lib/demo-store";
 import type { Firm, ProjectView } from "@/lib/firm";
 import type { PersonId, ProjectId, StaffRole } from "@/lib/firm-data";
 
-// The project chip in the board. It filters the registers, the counts and the board picture
-// to one project, or shows them all. A site engineer always looks at one site at a time.
+// The project chip in the board, just the project's name; the list it opens shows each
+// project's strip. It filters the registers, the counts and the board picture to one
+// project, or shows them all. A site engineer always looks at one site at a time.
 
 /** The person a role is being viewed as. BD is always Rohan and admin always Shalini. */
 export function viewerIdOf(role: StaffRole, viewers: DemoState["viewers"]): PersonId {
@@ -99,15 +100,11 @@ export function ProjectSwitch({ role }: { role: StaffRole }) {
         className="btn btn-quiet min-h-11 min-w-0 max-w-full cursor-pointer list-none gap-3 px-3 text-15 font-semibold max-[399px]:px-2! max-[359px]:px-1.5! max-[389px]:text-15! lg:min-h-12 lg:px-4 [&::-webkit-details-marker]:hidden"
         aria-label={`Projects: ${label}. Change`}
       >
-        {current && (
-          <span aria-hidden="true" className="hidden sm:block">
-            <ProgrammeStrip cells={current.strip} size={40} tone="dark" label={current.stageWords} />
-          </span>
-        )}
         <span className="min-w-0 truncate lg:hidden">{short}</span>
         <span className="hidden min-w-0 truncate lg:inline">{label}</span>
       </summary>
-      <div className="glass-pop absolute right-0 top-full z-40 mt-2 w-[min(22rem,calc(100vw-32px))] p-1.5 text-ink">
+      {/* On a phone the list opens under the board's whole first row, on its edges. */}
+      <div className="glass-pop absolute top-full z-40 mt-2 p-1.5 text-ink max-lg:inset-x-0 lg:right-0 lg:w-[min(22rem,calc(100vw-32px))]">
         <p className="lettering px-2.5 pb-1 pt-1.5 text-ink-soft">Projects</p>
         <ul className="grid">
           {role !== "site" && (

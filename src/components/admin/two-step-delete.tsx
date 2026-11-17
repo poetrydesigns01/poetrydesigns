@@ -8,6 +8,7 @@ import { field } from "@/components/register/chips";
 import { usePause } from "@/components/register/recording-pause";
 import { useDemo } from "@/lib/demo-store";
 import type { DeletedTarget } from "@/lib/firm-data";
+import { ROW_ACTION } from "./glass-kit";
 
 // Only the admin deletes, and never in one step: "Delete" asks for a reason, the second
 // "Delete" waits five seconds, then the line is struck with who and why, and logged.
@@ -17,6 +18,7 @@ export function TwoStepDelete({
   what,
   target,
   label = "Delete",
+  quiet = false,
 }: {
   /** "Delete AAC blocks 4 inch?" */
   question: string;
@@ -25,6 +27,8 @@ export function TwoStepDelete({
   /** The line struck, for the firm to apply: a catalogue line, a vendor or a bill. */
   target: DeletedTarget;
   label?: string;
+  /** A quiet trigger at the end of a row, rather than a glass button. */
+  quiet?: boolean;
 }) {
   const demo = useDemo();
   const pause = usePause();
@@ -66,7 +70,7 @@ export function TwoStepDelete({
       <button
         ref={startRef}
         type="button"
-        className="btn btn-glass min-h-11 px-4 text-15"
+        className={quiet ? `${ROW_ACTION} hover:text-brick` : "btn btn-glass min-h-11 px-4 text-15"}
         onClick={() => {
           setAsking(true);
           // The question replaces the button, so focus moves to its reason.

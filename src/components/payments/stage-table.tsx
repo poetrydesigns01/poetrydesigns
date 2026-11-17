@@ -74,7 +74,7 @@ export function StageTable({
         <span />
         <span className="lettering text-ink-soft">Instalment</span>
         <span className="lettering hidden text-ink-soft lg:block">Due</span>
-        <span className="lettering text-right text-ink-soft">With GST</span>
+        <span className="lettering text-right text-ink-soft md:pr-4">With GST</span>
         <span className="lettering text-ink-soft">Demand letter</span>
         <span className="lettering text-ink-soft">Payment</span>
       </div>
@@ -97,7 +97,7 @@ export function StageTable({
               </span>
             </span>
             <span className="hidden lg:block" aria-hidden="true" />
-            <span className="figure flex items-center justify-end gap-2 text-15 text-ink">
+            <span className="figure flex items-center justify-end gap-2 text-15 text-ink md:pr-4">
               {inr(received)}
               <span className="md:hidden">
                 <Chevron open={showPaid} />
@@ -179,7 +179,7 @@ function StageRow({
 
       <span className="figure hidden text-15 text-ink lg:block">{dueWords(stage)}</span>
 
-      <span className={`figure text-right text-15 ${stage.locked ? "text-ink-soft" : "text-ink"}`}>{inr(stage.total)}</span>
+      <span className={`figure text-right text-15 md:pr-4 ${stage.locked ? "text-ink-soft" : "text-ink"}`}>{inr(stage.total)}</span>
 
       {stage.locked ? (
         <span className="col-span-3 flex items-center gap-2 text-13 text-ink-soft min-[480px]:max-md:pl-12 md:col-span-2">

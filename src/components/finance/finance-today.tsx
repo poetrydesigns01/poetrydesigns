@@ -4,11 +4,11 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { Count, GlassTable, Icon, inrShort, Panel, StatCard, StatRow, WaitChip } from "@/components/admin/glass-kit";
+import { GlassTable, Icon, inrShort, Panel } from "@/components/admin/glass-kit";
 import { useScope } from "@/components/register/project-switch";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
+import { StatStrip, requestTitle, type StatItem } from "@/components/site/site-kit";
 import { useFirm, useViewer } from "@/lib/demo-store";
 import type { PoView, RequestView } from "@/lib/firm";
 import { formatShortDate, inr } from "@/lib/format";
@@ -16,7 +16,7 @@ import type { PaymentStageView } from "@/lib/portal";
 import { instShort, weekLanes, weekShort } from "./instalment-weeks";
 import { MarkSeen } from "./mark-seen";
 import { requestTask, taskWords } from "./request-task";
-import { requestChip } from "./request-words";
+import { WaitingChip, requestChip } from "./request-words";
 import { hasFinance, inScope, procuresAny, procuresFor } from "./shared";
 
 // Procurement and finance, Today: the queues at a glance. Prakash's day is requests,
@@ -77,33 +77,36 @@ export function FinanceToday() {
         rowKey={(r) => r.no}
         wide="md"
         empty="Every request has its PO."
-        chip={(r) => requestChip(r)}
+        chip={(r) => requestChip(r, { late: false })}
         columns={[
           {
             label: "Request",
             cell: (r) => (
               <span className="grid min-w-0">
-                <Link href={`/staff/finance/requests/${r.no}`} className="link -my-3 inline-flex min-h-11 items-center whitespace-nowrap">
-                  {r.no}
+                <Link href={`/staff/finance/requests/${r.no}`} className="link -my-3 flex min-h-11 min-w-0 items-center">
+                  <span className="truncate">{requestTitle(r, firm)}</span>
                 </Link>
-                <span className="max-w-72 truncate text-13 font-normal text-ink-soft" title={r.lineWords[0]}>
-                  {r.projectName} · {taskWords(requestTask(r, firm))}
+                <span className="max-w-80 truncate text-13 font-normal text-ink-soft" title={r.lineWords[0]}>
+                  {r.no} · {r.projectName} · {taskWords(requestTask(r, firm))}
                 </span>
               </span>
             ),
           },
-          { label: "Waiting", width: "w-28", cell: (r) => <WaitChip days={r.days} /> },
-          { label: "Status", width: "w-40", phone: false, cell: (r) => requestChip(r) },
+          { label: "Waiting", width: "w-36", cell: (r) => <WaitingChip r={r} /> },
+          { label: "Status", width: "w-40", phone: false, cell: (r) => requestChip(r, { late: false }) },
           {
             label: "Action",
             align: "right",
-            width: "w-36",
+            width: "w-40",
             phone: false,
             cell: (r) =>
               r.status === "New" && procuresFor(me.id, firm.project(r.projectId)) ? (
-                <MarkSeen no={r.no} person={me.id} className="min-h-11 whitespace-nowrap px-4 text-15" />
+                <MarkSeen no={r.no} person={me.id} className="min-h-11 min-w-32 justify-center whitespace-nowrap px-4 text-15" />
               ) : (
-                <Link href={`/staff/finance/requests/${r.no}`} className="btn btn-glass min-h-11 whitespace-nowrap px-4 text-15">
+                <Link
+                  href={`/staff/finance/requests/${r.no}`}
+                  className="btn btn-glass min-h-11 min-w-32 justify-center whitespace-nowrap px-4 text-15"
+                >
                   Open
                 </Link>
               ),
@@ -151,7 +154,7 @@ export function FinanceToday() {
             // As narrow as its figure and chip, so the stage takes the rest.
             width: "w-1",
             cell: (s) => (
-              <span className="grid justify-items-end gap-1">
+              <span className="grid gap-1 md:justify-items-end">
                 <span className="figure whitespace-nowrap">{inr(s.outstanding)}</span>
                 <span className="hidden whitespace-nowrap md:inline-flex">
                   <StatusChip tone={s.tone}>{s.status}</StatusChip>
@@ -197,21 +200,26 @@ export function FinanceToday() {
     </Panel>
   );
 
-  const stats: ReactNode = buyer ? (
-    <StatRow cols={4} label="Today at a glance">
-      <StatCard label="New requests" value={fresh.length} icon="box" href="/staff/finance/requests" tone={fresh.length > 0 ? "late" : undefined} />
-      <StatCard label="Waiting on PO" value={open.length} icon="clock" href="/staff/finance/requests" />
-      <StatCard label="Late for site" value={late.length} icon="alert" tone={late.length > 0 ? "late" : undefined} />
-      <StatCard label="Crews to book" value={crews.length} icon="hammer" href="/staff/finance/requests" />
-    </StatRow>
-  ) : (
-    <StatRow cols={4} label="Today at a glance">
-      <StatCard label="To confirm" value={toConfirm.length} icon="check" href="/staff/finance/money" tone={toConfirm.length > 0 ? "late" : undefined} />
-      <StatCard label="Letters to raise" value={toRaise.length} icon="file" href="/staff/finance/money" tone={toRaise.length > 0 ? "late" : undefined} />
-      <StatCard label="Due this week" value={inrShort(thisWeek.total)} sub={`${thisWeek.items.length} ${thisWeek.items.length === 1 ? "instalment" : "instalments"}`} icon="rupee" href="/staff/finance/money" />
-      <StatCard label="Bills to enter" value={billsWaiting.length} icon="file" href="/staff/finance/costs" />
-    </StatRow>
-  );
+  const stats: StatItem[] = buyer
+    ? [
+        { icon: "box", label: "New requests", value: fresh.length, alert: fresh.length > 0, href: "/staff/finance/requests" },
+        { icon: "clock", label: "Waiting on PO", value: open.length, href: "/staff/finance/requests" },
+        { icon: "alert", label: "Late for site", value: late.length, alert: late.length > 0 },
+        { icon: "crew", label: "Crews to book", value: crews.length, href: "/staff/finance/requests" },
+      ]
+    : [
+        { icon: "check", label: "To confirm", value: toConfirm.length, alert: toConfirm.length > 0, href: "/staff/finance/money" },
+        { icon: "sheet", label: "Letters to raise", value: toRaise.length, alert: toRaise.length > 0, href: "/staff/finance/money" },
+        {
+          icon: "rupee",
+          label: `This week · ${thisWeek.items.length} due`,
+          value: inrShort(thisWeek.total),
+          href: "/staff/finance/money",
+        },
+        { icon: "sheet", label: "Bills to enter", value: billsWaiting.length, href: "/staff/finance/costs" },
+        // The accountant does not buy: the requests queue is one number that opens the list.
+        { icon: "box", label: "Waiting on PO", value: open.length, href: "/staff/finance/requests" },
+      ];
 
   return (
     <>
@@ -230,30 +238,12 @@ export function FinanceToday() {
         }
       />
       <div className="mt-6 grid gap-5">
-        {stats}
-        {buyer ? (
-          <>
-            {requestsPanel}
-            <div className="grid gap-5 xl:grid-cols-2">
-              {moneyPanel}
-              {billsPanel}
-            </div>
-          </>
-        ) : (
-          <>
-            {moneyPanel}
-            <div className="grid gap-5 xl:grid-cols-2">
-              {billsPanel}
-              <Panel title="Requests" aside={<Count n={open.length} />}>
-                <p className="px-1 text-15 text-ink-soft">
-                  <Link href="/staff/finance/requests" className="link inline-flex min-h-11 items-center">
-                    {open.length} waiting on a PO
-                  </Link>
-                </p>
-              </Panel>
-            </div>
-          </>
-        )}
+        <StatStrip label="Today at a glance" items={stats} />
+        {buyer && requestsPanel}
+        <div className="grid items-start gap-5 xl:grid-cols-2">
+          {moneyPanel}
+          {billsPanel}
+        </div>
       </div>
     </>
   );

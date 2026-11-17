@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { Brand } from "@/components/brand";
 import { Settle } from "@/components/settle";
 import { SignOutButton } from "@/components/sign-out";
 import { useDemo, useFirm } from "@/lib/demo-store";
@@ -29,15 +30,6 @@ const ROOT: Record<StaffRole, string> = {
   site: "/staff/site",
   finance: "/staff/finance",
   admin: "/staff/admin",
-};
-
-/** The role's place name, under the wordmark. */
-export const PLACE_NAME: Record<StaffRole, string> = {
-  bd: "Business development",
-  architect: "Studio",
-  site: "Site",
-  finance: "Office",
-  admin: "Admin",
 };
 
 /** The places in each role's rail, in order. `leads` places show to seniors only. */
@@ -103,11 +95,21 @@ export function useStaffRole(): StaffRole {
   return fromShell ?? roleOfPath(pathname) ?? lastRole;
 }
 
-/** The active place: a list place the path lies under, else Today for the role's own routes. */
+/** Pages that belong to a list place without lying under it, such as a draft's estimate. */
+const ALIASES: { prefix: string; href: string }[] = [{ prefix: "/staff/bd/estimate", href: "/staff/bd/onboard" }];
+
+/**
+ * The active place: a list place the path lies under (or is an alias of), else Today for the
+ * role's own routes. A shared project record lights the role's Projects place, or its first.
+ */
 function activeHref(pathname: string, role: StaffRole, places: Place[]): string | null {
+  const alias = ALIASES.find((a) => under(pathname, a.prefix));
+  if (alias && places.some((place) => place.href === alias.href)) return alias.href;
   const list = places.slice(1).find((place) => under(pathname, place.href));
   if (list) return list.href;
-  return under(pathname, ROOT[role]) ? ROOT[role] : null;
+  if (under(pathname, ROOT[role])) return ROOT[role];
+  if (under(pathname, "/staff/projects")) return (places.find((place) => place.label === "Projects") ?? places[0])?.href ?? null;
+  return null;
 }
 
 /** "Requests, four waiting" for the screen reader; the ring shows the figure. */
@@ -220,7 +222,7 @@ export function StaffShell({ children }: { children: ReactNode }) {
   const personId = viewerIdOf(role, demo.viewers);
   const person = firm.person(personId);
   const places = PLACES[role].filter((place) => !place.leads || person?.senior);
-  const active = own ? activeHref(pathname, role, places) : null;
+  const active = activeHref(pathname, role, places);
   const scope = scopeFor(role, personId, demo.scope, firm);
   const turns = firm.turns(personId, scope);
 
@@ -244,11 +246,12 @@ export function StaffShell({ children }: { children: ReactNode }) {
             data-site={role === "site" ? "" : undefined}
           >
             <aside className="staff-rail">
-              <div className="px-6">
-                <p className="display text-22 leading-none">Poetry Designs</p>
-                <p className="lettering mt-1.5 text-ink-soft">{PLACE_NAME[role]}</p>
-              </div>
-              <div className="mt-5 px-2.5">
+              {/* One left edge, 24 px in, for the mark, the avatar, the places and the foot.
+                  The role is said once, under the person's name. */}
+              <p className="flex px-6">
+                <Brand size="rail" />
+              </p>
+              <div className="mt-6 px-2.5">
                 <PersonMenu role={role} variant="rail" />
               </div>
               <nav aria-label="Places" className="mt-4">
@@ -306,7 +309,9 @@ export function StaffShell({ children }: { children: ReactNode }) {
                   <Count n={countOf(place, places.indexOf(place))} ring="tab-count" />
                 </Link>
               ))}
-              {more.length > 0 || places.length < 4 ? <MoreSheet places={more} role={role} active={active} /> : null}
+              {/* The guide and signing out are in the person menu at the top of the board, so a
+                  "More" tab is only spent on places that did not fit. */}
+              {more.length > 0 ? <MoreSheet places={more} role={role} active={active} /> : null}
             </nav>
 
             <PauseBar />

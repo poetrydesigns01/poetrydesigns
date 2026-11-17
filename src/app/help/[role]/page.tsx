@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { Brand } from "@/components/brand";
 import { SignInOrOut } from "@/components/sign-out";
 import { GUIDE_ROLES, GUIDES, isGuideRole, type Guide } from "@/components/guides/guide-data";
 import { OpenStep } from "@/components/guides/open-step";
@@ -36,10 +37,15 @@ function GuideSteps({ guide }: { guide: Guide }) {
     <>
       <header className="on-dark bg-rosewood text-lime">
         <div className="mx-auto w-full max-w-3xl px-4 pb-8 pt-5 sm:px-8 sm:pb-12 sm:pt-8">
-          <Link href="/help" className="link inline-flex min-h-11 items-center text-15 text-lime/80 hover:text-lime">
-            All guides
-          </Link>
-          <h1 className="display mt-4 text-32 sm:mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
+            <Link href="/" className="inline-flex min-h-11 items-center">
+              <Brand />
+            </Link>
+            <Link href="/help" className="link inline-flex min-h-11 items-center text-15 text-lime/80 hover:text-lime">
+              All guides
+            </Link>
+          </div>
+          <h1 className="display mt-6 text-32 sm:mt-10">
             {guide.title}, in {countWord(guide.steps.length)} steps
           </h1>
           <p className="mt-3 max-w-[48ch] text-17 text-lime/80">{guide.who}</p>

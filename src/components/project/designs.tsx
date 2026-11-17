@@ -81,11 +81,14 @@ export function ProjectDesigns({ projectId }: { projectId: ProjectId }) {
                 caption={s.label}
                 rows={s.items}
                 rowKey={(item) => item.id}
-                wide="lg"
+                // Five tables stand one above another: fixed widths give them one column grid.
+                // Below 1280 px there is no room for it, so the rows stay cards.
+                wide="xl"
+                fixed
                 chip={(item) => <StatusChip tone={item.tone}>{item.statusWords}</StatusChip>}
                 columns={[
                   { label: "Item", cell: (item) => <ItemName item={item} /> },
-                  { label: "By", cell: (item) => <span className="font-normal">{item.preparedByName}</span> },
+                  { label: "By", width: "w-36", cell: (item) => <span className="font-normal">{item.preparedByName}</span> },
                   {
                     label: "Version",
                     width: "w-20",
@@ -105,7 +108,7 @@ export function ProjectDesigns({ projectId }: { projectId: ProjectId }) {
                   },
                   {
                     label: "Status",
-                    width: "w-44",
+                    width: "w-40",
                     phone: false,
                     cell: (item) => <StatusChip tone={item.tone}>{item.statusWords}</StatusChip>,
                   },

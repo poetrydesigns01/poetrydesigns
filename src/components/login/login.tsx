@@ -17,6 +17,7 @@ import {
   type PointerEvent,
 } from "react";
 import { ARRIVED_KEY } from "@/components/arrival-veil";
+import { Brand } from "@/components/brand";
 import { SignOutButton } from "@/components/sign-out";
 import { ACCOUNTS, accountForId, findAccount, type DemoAccount } from "@/lib/demo-accounts";
 import { useDemo } from "@/lib/demo-store";
@@ -189,9 +190,11 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
   };
 
   // ---- Success: the house is topped out and the door opens on their screen ----
-  const openLight = (rect: DOMRect) => {
+  const openLight = (door: DOMRect) => {
     const light = lightRef.current;
     if (!light) return;
+    // On a short phone the window is not shown: the light opens from the middle instead.
+    const rect = door.width > 0 ? door : new DOMRect(window.innerWidth / 2 - 20, window.innerHeight / 2 - 30, 40, 60);
     Object.assign(light.style, {
       left: `${rect.left}px`,
       top: `${rect.top}px`,
@@ -451,14 +454,16 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
       </p>
 
       <div className="lg-scene">
-        <div className="lg-head lg-exit">
-          <p className="display text-22 lg-wordmark">Poetry Designs</p>
-          <p className="display display-xl lg-hero">From concept to reality.</p>
-        </div>
-        <div className="lg-window-slot">
-          <div className="lg-window">
-            <SiteStage ref={stage} role={role} preview={preview} phase={phase} reduced={reduced} />
-            <div className="lg-ground" aria-hidden="true" />
+        <p className="lg-wordmark lg-exit">
+          <Brand size="hero" />
+        </p>
+        <div className="lg-view">
+          <p className="display lg-tagline lg-exit">From concept to reality.</p>
+          <div className="lg-window-slot">
+            <div className="lg-window">
+              <SiteStage ref={stage} role={role} preview={preview} phase={phase} reduced={reduced} />
+              <div className="lg-ground" aria-hidden="true" />
+            </div>
           </div>
         </div>
       </div>
@@ -492,10 +497,12 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
             refs={refs}
             on={stableOn}
           />
+          <p className="lg-card-foot">
+            <Link href="/follow" className="lg-follow text-13">
+              Follow one payment from site to bank
+            </Link>
+          </p>
         </div>
-        <Link href="/follow" className="lg-follow lg-exit link text-15">
-          Follow one payment from site to bank
-        </Link>
       </div>
 
       <div ref={lightRef} className="lg-light" aria-hidden="true" />

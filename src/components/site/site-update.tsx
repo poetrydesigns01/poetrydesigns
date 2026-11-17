@@ -35,16 +35,16 @@ function Ticks({ tick }: { tick: Tick }) {
   );
 }
 
-function Bubble({ post, mine }: { post: ChatPost; mine: boolean }) {
+function Bubble({ post, mine, className = "" }: { post: ChatPost; mine: boolean; className?: string }) {
   if (post.side === "system") {
     return (
-      <li className="justify-self-center rounded-full bg-white/60 px-3 py-1 text-center text-13 text-ink">
+      <li className={`justify-self-center rounded-full bg-white/60 px-3 py-1 text-center text-13 text-ink ${className}`}>
         {post.text} · {formatTime(post.at)}
       </li>
     );
   }
   return (
-    <li className={`site-bubble grid gap-1.5 ${mine ? "site-bubble-mine" : "site-bubble-theirs"}`}>
+    <li className={`site-bubble grid gap-1.5 ${mine ? "site-bubble-mine" : "site-bubble-theirs"} ${className}`}>
       {!mine && <p className="text-13 font-semibold text-laterite">{post.name}</p>}
       {post.photos.length > 0 && (
         <div className={`grid gap-1 ${post.photos.length > 1 ? "grid-cols-2" : ""}`}>
@@ -80,10 +80,14 @@ export function SiteUpdate() {
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState<PhotoKind[]>([]);
   const [error, setError] = useState(false);
+  // On a phone the thread opens on its last few messages; earlier ones on request.
+  const [earlier, setEarlier] = useState(false);
 
   const chat = firm.chat(projectId);
   const recent = chat.slice(-8);
   const lastId = recent[recent.length - 1]?.id;
+  // Messages folded away on a phone until "Show earlier".
+  const hidden = Math.max(0, recent.length - 3);
 
   // The thread is on screen: the other side's posts count as read.
   const { readThread } = demo;
@@ -147,7 +151,7 @@ export function SiteUpdate() {
                 <Icon name="camera" className="size-5 text-laterite" />
                 Photos
               </span>
-              <span className="figure text-15 text-ink-soft">{photos.length} chosen</span>
+              <span className="text-15 font-normal tabular-nums text-ink-soft">{photos.length} chosen</span>
             </p>
             <div className="grid grid-cols-3 gap-2 lg:grid-cols-6 xl:grid-cols-3">
               {choices.map((kind) => (
@@ -191,27 +195,48 @@ export function SiteUpdate() {
           </button>
         </form>
 
-        <section className="glass grid gap-2 p-2 sm:p-3" aria-labelledby={`${ids}-chat`}>
+        {/* From 1280 px the thread stays in view beside the form, as tall as the screen under the board allows,
+            and scrolls inside itself. The reversed column starts it at the newest message. */}
+        <section
+          className="glass grid gap-2 p-2 sm:p-3 xl:sticky xl:top-4 xl:max-h-[calc(100svh-15rem)] xl:grid-rows-[auto_minmax(0,1fr)]"
+          aria-labelledby={`${ids}-chat`}
+        >
           <PanelHead id={`${ids}-chat`} title={`${project.name} chat`} />
           {recent.length === 0 ? (
             <p className="px-2 pb-2 text-15 text-ink-soft">No messages</p>
           ) : (
-            <ul className="grid gap-2 px-1 pb-1" aria-live="polite">
-              {recent.map((post, i) => {
-                const day = datePart(post.at);
-                const newDay = i === 0 || datePart(recent[i - 1].at) !== day;
-                return (
-                  <Fragment key={post.id}>
-                    {newDay && (
-                      <li className="justify-self-center px-2 py-0.5 text-13 font-semibold text-ink-soft">
-                        {day === TODAY ? "Today" : formatShortDate(day)}
-                      </li>
-                    )}
-                    <Bubble post={post} mine={post.by === me.id} />
-                  </Fragment>
-                );
-              })}
-            </ul>
+            <div className="flex min-h-0 flex-col-reverse xl:overflow-y-auto xl:overscroll-contain">
+              <ul className="grid gap-2 px-1 pb-1" aria-live="polite">
+                {hidden > 0 && !earlier && (
+                  <li className="justify-self-center xl:hidden">
+                    <button type="button" className="btn btn-glass btn-sm" onClick={() => setEarlier(true)}>
+                      Show earlier ({hidden})
+                    </button>
+                  </li>
+                )}
+                {recent.map((post, i) => {
+                  const day = datePart(post.at);
+                  const newDay = i === 0 || datePart(recent[i - 1].at) !== day;
+                  const folded = !earlier && i < hidden;
+                  // The first message shown on a phone keeps its day, even mid-day.
+                  const phoneDay = !earlier && i === hidden && !newDay;
+                  return (
+                    <Fragment key={post.id}>
+                      {(newDay || phoneDay) && (
+                        <li
+                          className={`justify-self-center px-2 py-0.5 text-13 font-semibold text-ink-soft ${
+                            folded ? "max-xl:hidden" : phoneDay ? "xl:hidden" : ""
+                          }`}
+                        >
+                          {day === TODAY ? "Today" : formatShortDate(day)}
+                        </li>
+                      )}
+                      <Bubble post={post} mine={post.by === me.id} className={folded ? "max-xl:hidden" : ""} />
+                    </Fragment>
+                  );
+                })}
+              </ul>
+            </div>
           )}
         </section>
       </div>

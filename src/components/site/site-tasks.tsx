@@ -141,7 +141,7 @@ function Group({
   const id = useId();
   return (
     <section className="glass-strong p-1.5 sm:p-2" aria-labelledby={id}>
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 pt-2 pb-1.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 pt-2 pb-1.5">
         <h2 id={id} className="flex min-w-0 items-center gap-2 text-17 font-semibold text-ink">
           {m.locked && <Icon name="lock" className="size-4.5 shrink-0 text-brass-deep" />}
           <span className="truncate">

@@ -74,7 +74,7 @@ function Row({
         <StageMark stage={stage} lockedFirst={lockedFirst} />
         <span className="grid min-w-0">
           <span
-            className={`truncate text-15 ${state === "upcoming" || state === "held" ? "text-ink-soft" : "text-ink"} ${
+            className={`line-clamp-2 text-15 leading-snug ${state === "upcoming" || state === "held" ? "text-ink-soft" : "text-ink"} ${
               state === "current" ? "font-semibold" : ""
             }`}
           >

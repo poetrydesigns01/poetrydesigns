@@ -7,9 +7,10 @@ import { useRef, useState } from "react";
 import { field } from "@/components/register/chips";
 import { Field } from "@/components/register/field";
 import { usePause } from "@/components/register/recording-pause";
-import { Count, GlassTable, Icon, Panel, Segments } from "@/components/admin/glass-kit";
+import { Count, GlassTable, Icon, Panel } from "@/components/admin/glass-kit";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
+import { Segmented } from "@/components/site/site-kit";
 import { TODAY } from "@/lib/demo-data";
 import { getDemoSnapshot, useDemo, useFirm, useViewer } from "@/lib/demo-store";
 import { vendors as seedVendors, type CatalogueItem, type PersonId, type Vendor } from "@/lib/firm-data";
@@ -174,8 +175,8 @@ export function VendorBook() {
       <StaffBoard place="Vendors" headline={`${live.length} vendors`} chip={false} />
 
       <div ref={anchorRef} tabIndex={-1} className="mt-6 grid gap-5 outline-none">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <Segments<string>
+        <div className="grid items-start gap-3 sm:flex sm:justify-between">
+          <Segmented<string>
             label="Material"
             value={material}
             onChange={setMaterial}
@@ -183,7 +184,7 @@ export function VendorBook() {
           />
           <button
             type="button"
-            className="btn btn-glass min-h-12 gap-2"
+            className="btn btn-glass min-h-12 shrink-0 gap-2 justify-self-start"
             aria-expanded={adding}
             onClick={() => setAdding((a) => !a)}
           >
@@ -224,15 +225,21 @@ export function VendorBook() {
               },
               {
                 label: item ? "Last rate" : "Sells",
+                bare: true,
                 cell: (v) => (
-                  <ul className="grid gap-0.5">
+                  <ul className="grid gap-0.5 text-15 font-normal">
                     {ratesOf(v).map((r) => (
-                      <li key={`${r.material}-${r.sub}`} className="flex flex-wrap items-baseline gap-x-1.5">
-                        <span className="text-ink-soft">{item ? r.sub : `${nameOf(r.material)}, ${r.sub}`}</span>
-                        <span className={`figure ${cheapest.get(r.sub) === r.rate ? "font-semibold text-kota" : ""}`}>
-                          {rateWords(r.rate)}
+                      <li
+                        key={`${r.material}-${r.sub}`}
+                        className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4"
+                      >
+                        <span className="min-w-0 text-ink-soft">{item ? r.sub : `${nameOf(r.material)}, ${r.sub}`}</span>
+                        <span className="whitespace-nowrap text-right">
+                          <span className={`figure ${cheapest.get(r.sub) === r.rate ? "font-semibold text-kota" : ""}`}>
+                            {rateWords(r.rate)}
+                          </span>
+                          <span className="text-13 text-ink-soft"> {perUnit(r.unit)}</span>
                         </span>
-                        <span className="text-13 text-ink-soft">{perUnit(r.unit)}</span>
                       </li>
                     ))}
                   </ul>

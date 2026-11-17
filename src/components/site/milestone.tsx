@@ -240,12 +240,12 @@ export function AwaitedPanel({ projectId }: { projectId: ProjectId }) {
       ) : (
         <ul className="grid gap-1">
           {items.map((a) => (
-            <li key={a.key} className="glass-row flex items-center justify-between gap-3 px-3 py-2.5">
+            <li key={a.key} className="glass-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5">
               <span className="flex min-w-0 items-center gap-2.5">
                 <Icon name={a.icon} className="size-4.5 shrink-0 text-laterite" />
                 <span className="grid min-w-0 gap-0.5">
-                  <span className="truncate text-15 text-ink">
-                    {a.sheet && <span className="figure">{a.sheet} </span>}
+                  <span className="line-clamp-2 text-15 text-ink" title={a.sheet ? `${a.sheet} ${a.title}` : a.title}>
+                    {a.sheet && <span className="font-semibold tabular-nums">{a.sheet} </span>}
                     {a.title}
                   </span>
                   <span className="text-13 text-ink-soft">

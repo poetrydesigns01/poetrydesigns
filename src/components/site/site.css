@@ -4,10 +4,18 @@
 /* The site engineer's screens: read on a phone outdoors, often one-handed. Glass panels on
    the shell's backdrop; every control is at least 44 px tall. */
 
+/* One track that cannot grow past the screen: a long row inside truncates instead of
+   widening the page. The board at the top gets the same rule here, so its phone row
+   (brand, project switch, avatar) shrinks the switch rather than pushing the page sideways. */
 .site-screen {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding-top: 0;
+}
+
+.site-screen > .board {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (min-width: 1024px) {
