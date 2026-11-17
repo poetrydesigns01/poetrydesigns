@@ -86,6 +86,8 @@ export const SignInBoard = memo(function SignInBoard({
   passwordError,
   caps,
   showPassword,
+  checking,
+  reachError,
   success,
   signedIn,
   refs: {
@@ -106,6 +108,10 @@ export const SignInBoard = memo(function SignInBoard({
   passwordError: string | null;
   caps: boolean;
   showPassword: boolean;
+  /** The server is checking the password. */
+  checking: boolean;
+  /** The server could not be reached; nothing typed is wrong. */
+  reachError: string | null;
   success: boolean;
   /** Set at success: who is signing in, for the button and the stamp. */
   signedIn: DemoAccount | null;
@@ -243,20 +249,21 @@ export const SignInBoard = memo(function SignInBoard({
         <p
           id="login-password-status"
           className="lg-status text-13"
-          data-error={passwordError ? "" : undefined}
+          data-error={passwordError || reachError ? "" : undefined}
           aria-live="polite"
         >
-          {passwordError ?? (caps ? <span className="glass-chip chip-late">Caps Lock is on</span> : "")}
+          {passwordError ?? reachError ?? (caps ? <span className="glass-chip chip-late">Caps Lock is on</span> : "")}
         </p>
       </div>
 
+      {/* Stays enabled while the server checks, so focus is not lost; a second press waits. */}
       <button
         type="submit"
         className="btn btn-primary lg-submit"
         disabled={!hydrated}
-        aria-busy={success ? true : undefined}
+        aria-busy={success || checking ? true : undefined}
       >
-        {success && signedIn ? `Signing in as ${signedIn.name}` : "Sign in"}
+        {success && signedIn ? `Signing in as ${signedIn.name}` : checking ? "Checking…" : "Sign in"}
       </button>
     </form>
   );

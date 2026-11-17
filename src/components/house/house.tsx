@@ -4,7 +4,7 @@
 "use client";
 
 import { memo, useEffect, useRef, type CSSProperties, type KeyboardEvent } from "react";
-import { useProjection } from "@/lib/demo-store";
+import { useProjection } from "@/lib/demo-core";
 import {
   courseRows,
   edges,

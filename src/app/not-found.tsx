@@ -1,11 +1,19 @@
 /*
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
+import type { Metadata } from "next";
 import Link from "next/link";
+import { NOT_FOUND_TITLE } from "@/app/shared-metadata";
 import { Brand } from "@/components/brand";
+import { HomeLink } from "@/components/home-link";
 
 // Any link that leads nowhere: the portal's own backdrop and glass, the brand, one line and
-// one way back, instead of the framework's bare black page.
+// one way back, instead of the framework's bare black page. The way back is the person's
+// own first screen when someone is signed in in this tab, else the sign-in screen.
+
+export const metadata: Metadata = {
+  title: NOT_FOUND_TITLE,
+};
 
 export default function NotFound() {
   return (
@@ -15,9 +23,7 @@ export default function NotFound() {
           <Brand />
         </Link>
         <h1 className="display display-lg text-balance text-ink">This page is not on the plan</h1>
-        <Link href="/" className="btn btn-primary min-h-12">
-          Back to the portal
-        </Link>
+        <HomeLink className="btn btn-primary min-h-12">Back to the portal</HomeLink>
       </section>
     </main>
   );

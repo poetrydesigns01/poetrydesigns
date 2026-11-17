@@ -279,6 +279,11 @@ export function StaffShell({ children }: { children: ReactNode }) {
                 <li>
                   <SignOutButton className="link inline-flex min-h-11 items-center text-ink-soft" />
                 </li>
+                <li>
+                  <Link href="/privacy" className="link inline-flex min-h-11 items-center text-13 text-ink-soft">
+                    Privacy
+                  </Link>
+                </li>
               </ul>
             </aside>
 

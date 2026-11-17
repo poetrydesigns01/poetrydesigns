@@ -35,7 +35,7 @@ export default function ChangesPage() {
 
       <ContractHero />
 
-      <section aria-labelledby="changes-table" className="glass-strong p-2 sm:p-3">
+      <section id="waiting" aria-labelledby="changes-table" className="glass-strong scroll-mt-24 p-2 sm:p-3">
         <h2 id="changes-table" className="lettering px-3 pb-1 pt-2 text-ink-soft">
           Recommended by architect
         </h2>

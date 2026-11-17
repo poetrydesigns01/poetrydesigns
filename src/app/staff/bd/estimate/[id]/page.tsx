@@ -4,9 +4,7 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { EstimatePage } from "@/components/bd/estimate-page";
-import type { ProjectId } from "@/lib/firm-data";
-
-const ESTIMATES: ProjectId[] = ["kulkarni", "iyer-cottage", "sharma", "iyer"];
+import { ESTIMATES, estimateFor } from "../estimates";
 
 export function generateStaticParams() {
   return ESTIMATES.map((id) => ({ id }));
@@ -23,6 +21,7 @@ export default function BdEstimatePage({ params }: PageProps<"/staff/bd/estimate
 
 async function EstimateFromParams({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!ESTIMATES.includes(id as ProjectId)) notFound();
-  return <EstimatePage id={id as ProjectId} />;
+  const project = estimateFor(id);
+  if (!project) notFound();
+  return <EstimatePage id={project} />;
 }

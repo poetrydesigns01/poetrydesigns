@@ -85,6 +85,8 @@ export function PersonMenu({
   };
 
   const item = "flex min-h-11 w-full cursor-pointer items-center rounded-xl px-2.5 text-left text-17 hover:bg-white/70";
+  // A quiet line under signing out: what the portal keeps, for anyone who asks.
+  const quiet = "flex min-h-11 w-full items-center rounded-xl px-2.5 text-left text-15 text-ink-soft hover:bg-white/70";
 
   const viewAs = others.length > 0 && (
     <div role="group" aria-labelledby={`demo-${role}-${variant}`}>
@@ -123,6 +125,11 @@ export function PersonMenu({
         </li>
         <li>
           <SignOutButton className={item} onDone={() => close(false)} />
+        </li>
+        <li>
+          <Link href="/privacy" className={quiet} onNavigate={() => close(false)}>
+            Privacy
+          </Link>
         </li>
       </ul>
     </div>

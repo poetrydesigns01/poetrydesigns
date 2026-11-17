@@ -3,15 +3,14 @@
  */
 import type { PersonId } from "./firm-data";
 
-// Demo-only accounts. They are checked in the browser against this list, so they are
-// not real security: anyone can read them here, and nothing is sent anywhere. They exist
-// so each role's screens can be opened by signing in the way the real portal will.
+// Demo-only accounts: who can sign in, and the screen each one opens. The browser gets this
+// list so the sign-in card can recognise an ID as it is typed. It holds no passwords: those
+// are checked on the server (app/api/sign-in), against salted keys the browser never sees.
+// The session itself stays a flag in the tab, so this is still not real security.
 
 export type DemoAccount = {
   /** What is typed in the ID field. "@poetrydesigns.in" may be added after it. */
   id: string;
-  /** Case-sensitive. */
-  password: string;
   person: PersonId;
   name: string;
   role: "client" | "bd" | "architect" | "site" | "finance" | "admin";
@@ -23,7 +22,6 @@ export type DemoAccount = {
 export const ACCOUNTS: DemoAccount[] = [
   {
     id: "meera.iyer",
-    password: "Meera@2026",
     person: "meera",
     name: "Meera Iyer",
     role: "client",
@@ -32,7 +30,6 @@ export const ACCOUNTS: DemoAccount[] = [
   },
   {
     id: "rohan.menon",
-    password: "Rohan@2026",
     person: "rohan",
     name: "Rohan Menon",
     role: "bd",
@@ -41,7 +38,6 @@ export const ACCOUNTS: DemoAccount[] = [
   },
   {
     id: "vikram.desai",
-    password: "Vikram@2026",
     person: "vikram",
     name: "Vikram Desai",
     role: "architect",
@@ -50,7 +46,6 @@ export const ACCOUNTS: DemoAccount[] = [
   },
   {
     id: "ananya.rao",
-    password: "Ananya@2026",
     person: "ananya",
     name: "Ananya Rao",
     role: "architect",
@@ -59,7 +54,6 @@ export const ACCOUNTS: DemoAccount[] = [
   },
   {
     id: "suresh.gowda",
-    password: "Suresh@2026",
     person: "suresh",
     name: "Suresh Gowda",
     role: "site",
@@ -68,7 +62,6 @@ export const ACCOUNTS: DemoAccount[] = [
   },
   {
     id: "manjunath.k",
-    password: "Manjunath@2026",
     person: "manjunath",
     name: "Manjunath K",
     role: "site",
@@ -77,7 +70,6 @@ export const ACCOUNTS: DemoAccount[] = [
   },
   {
     id: "prakash.hegde",
-    password: "Prakash@2026",
     person: "prakash",
     name: "Prakash Hegde",
     role: "finance",
@@ -86,7 +78,6 @@ export const ACCOUNTS: DemoAccount[] = [
   },
   {
     id: "divya.shenoy",
-    password: "Divya@2026",
     person: "divya",
     name: "Divya Shenoy",
     role: "finance",
@@ -95,7 +86,6 @@ export const ACCOUNTS: DemoAccount[] = [
   },
   {
     id: "shalini.murthy",
-    password: "Shalini@2026",
     person: "shalini",
     name: "Shalini Murthy",
     role: "admin",
@@ -104,24 +94,23 @@ export const ACCOUNTS: DemoAccount[] = [
   },
 ];
 
-const DOMAIN = "@poetrydesigns.in";
+/** The firm's email domain, which may be typed after an ID. */
+export const ID_DOMAIN = "@poetrydesigns.in";
+
+/** An ID as the accounts are keyed: trimmed, lower case, without "@poetrydesigns.in". */
+export function normaliseId(id: string): string {
+  const key = id.trim().toLowerCase();
+  return key.endsWith(ID_DOMAIN) ? key.slice(0, -ID_DOMAIN.length) : key;
+}
 
 /** The account an ID names: trimmed, any case, with or without "@poetrydesigns.in". */
 export function accountForId(id: string): DemoAccount | undefined {
-  let key = id.trim().toLowerCase();
-  if (key.endsWith(DOMAIN)) key = key.slice(0, -DOMAIN.length);
+  const key = normaliseId(id);
   return ACCOUNTS.find((account) => account.id === key);
 }
 
-export type SignInResult = { ok: true; account: DemoAccount } | { ok: false; reason: "unknown-id" | "wrong-password" };
-
 /**
- * Checks an ID and password against the demo accounts. These passwords are published to be
- * copied, so a space picked up at either end does not count; case still does.
+ * What POST /api/sign-in answers: 200 with the account the pair signs in to, 401 when the ID
+ * and password do not match, and 400 when the request is not an ID and a password.
  */
-export function findAccount(id: string, password: string): SignInResult {
-  const account = accountForId(id);
-  if (!account) return { ok: false, reason: "unknown-id" };
-  if (password.trim() !== account.password) return { ok: false, reason: "wrong-password" };
-  return { ok: true, account };
-}
+export type SignInReply = { ok: true; accountId: string } | { ok: false; error: string };

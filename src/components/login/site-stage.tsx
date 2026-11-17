@@ -13,10 +13,9 @@ import {
   type CSSProperties,
   type Ref,
 } from "react";
-import { CourseTrench } from "@/components/admin/course-trench";
+import dynamic from "next/dynamic";
 import { House, PegMark } from "@/components/house/house";
 import { mulberry32, pct } from "@/lib/draw";
-import { useFirm } from "@/lib/demo-store";
 import { ANCHORS } from "@/lib/house-model";
 import { useOnce } from "@/lib/motion";
 import { BlockOverlay } from "./block-overlay";
@@ -43,6 +42,12 @@ import {
 import { SiteRefs } from "./site-refs";
 import { EASE, Timers, modestDevice, reducedNow } from "./timing";
 import { useSiteLoop } from "./use-site-loop";
+
+// Only the admin's trenches read the firm's registers, and they show only once the admin is
+// picked. They load after the page is up, so the first paint and hydration never wait on them.
+const HorizonTrenches = dynamic(() => import("./horizon-trenches").then((m) => m.HorizonTrenches), {
+  ssr: false,
+});
 
 // The stage: a laterite site in the late afternoon sun with the real house half built in it. Everything a
 // keystroke does happens here by hand, through refs, so typing never renders the scene.
@@ -850,41 +855,6 @@ export const SiteStage = memo(function SiteStage({
         </div>
         <SceneFront refs={refs} />
       </div>
-    </div>
-  );
-});
-
-// Under each site on the admin's horizon, that project's money as course and trench: the
-// admin's own drawing, in the ground the pulled-back camera shows below the line. Positions
-// are shares of the stage; the sites stand past its edges, at SCENE.villa and SCENE.farm.
-const TRENCH_AT = [
-  { left: -18, w: 12 },
-  { left: 105.5, w: 12 },
-];
-
-const HorizonTrenches = memo(function HorizonTrenches() {
-  const firm = useFirm();
-  const sites = firm.projects.filter((p) => p.phase !== "draft" && p.id !== "iyer").slice(0, 2);
-  const scale = Math.max(1, ...sites.flatMap((p) => [Math.abs(p.margin ?? 0), Math.abs(p.cash)]));
-  return (
-    <div className="role-layer lg-trenches" data-for="admin">
-      {sites.map((p, k) => (
-        <div
-          key={p.id}
-          className="lg-trench"
-          style={{ left: `${TRENCH_AT[k].left}%`, width: `${TRENCH_AT[k].w}%`, "--k": k } as CSSProperties}
-        >
-          <CourseTrench
-            margin={p.margin}
-            cash={p.cash}
-            inDesign={p.margin === null}
-            scale={scale}
-            tone="paper"
-            width={120}
-            height={56}
-          />
-        </div>
-      ))}
     </div>
   );
 });

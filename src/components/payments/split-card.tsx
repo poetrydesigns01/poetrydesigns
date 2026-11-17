@@ -22,7 +22,7 @@ export function SplitCard() {
   const decided = [...demo.events].reverse().find((e) => e.kind === "schedule.decided" && e.projectId === "iyer" && e.n === change.n);
 
   return (
-    <section className="glass grid gap-3 p-4 sm:p-5" aria-labelledby="split-heading">
+    <section id="schedule-change" className="glass grid scroll-mt-24 gap-3 p-4 sm:p-5" aria-labelledby="split-heading">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="split-heading" className="text-17 font-semibold">
           Instalment {change.n} in two parts

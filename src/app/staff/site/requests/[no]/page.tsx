@@ -1,7 +1,9 @@
 /*
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { requestNumberOf } from "@/app/staff/request-guard";
 import { RequestDetail } from "@/components/site/request-detail";
 import { REQUEST_NUMBERS } from "@/lib/firm-data";
 
@@ -20,6 +22,7 @@ export default function SiteRequestPage({ params }: PageProps<"/staff/site/reque
 }
 
 async function RequestFromParams({ params }: { params: Promise<{ no: string }> }) {
-  const { no } = await params;
+  const no = requestNumberOf((await params).no);
+  if (!no) notFound();
   return <RequestDetail no={no} />;
 }

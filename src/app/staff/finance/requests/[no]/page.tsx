@@ -1,7 +1,9 @@
 /*
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { requestNumberOf } from "@/app/staff/request-guard";
 import { RequestDetail } from "@/components/finance/request-detail";
 import { REQUEST_NUMBERS } from "@/lib/firm-data";
 
@@ -20,6 +22,7 @@ export default function FinanceRequestPage({ params }: PageProps<"/staff/finance
 }
 
 async function DetailFromParams({ params }: { params: Promise<{ no: string }> }) {
-  const { no } = await params;
-  return <RequestDetail no={decodeURIComponent(no)} />;
+  const no = requestNumberOf((await params).no);
+  if (!no) notFound();
+  return <RequestDetail no={no} />;
 }

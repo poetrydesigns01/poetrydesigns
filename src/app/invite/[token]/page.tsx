@@ -6,20 +6,12 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Brand } from "@/components/brand";
 import { InviteForm } from "./invite-form";
+import { INVITES, inviteFor } from "./invites";
 
 // Accepting an invite, front end only. The client sets a password and opens their home,
 // signed in. Nothing typed here is checked, kept or sent: the fields have no names. It is
 // her first screen, so it is set like the sign-in page: the firm's name as a masthead and
 // the promise under it on the glass backdrop, the form in a frosted card beside them.
-
-const INVITES: Record<string, { by: string; project: string; clients: string; opens: string }> = {
-  "iyer-residence": {
-    by: "Rohan Menon",
-    project: "Iyer Residence",
-    clients: "you and Arjun Iyer",
-    opens: "/client",
-  },
-};
 
 export function generateStaticParams() {
   return Object.keys(INVITES).map((token) => ({ token }));
@@ -37,7 +29,7 @@ export default function InvitePage({ params }: PageProps<"/invite/[token]">) {
 
 async function InviteFromParams({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const invite = INVITES[token];
+  const invite = inviteFor(token);
   if (!invite) notFound();
 
   return (

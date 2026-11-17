@@ -70,7 +70,9 @@ export function Chat({
   const firm = useFirm();
   const chat = inRecordOrder(firm.chat(projectId), demo.events);
   const lastId = chat[chat.length - 1]?.id;
-  const [lightbox, setLightbox] = useState<{ photos: ChatPhoto[]; index: number; caption: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ photos: ChatPhoto[]; index: number; caption: string; from: string } | null>(
+    null,
+  );
   const panelRef = useRef<HTMLElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -192,6 +194,8 @@ export function Chat({
                   const person = firm.person(post.by);
                   const photos = photosOf(post);
                   const caption = `${own ? "You" : post.name}, ${dayWords(day.date)} ${formatTime(post.at)}`;
+                  // The photos' own text: whose they are and when, as the caption says it.
+                  const from = `${own ? "Your photo" : `Photo from ${post.name}`}, ${dayWords(day.date)} ${formatTime(post.at)}`;
                   return (
                     <li key={post.id} className={`flex ${own ? "justify-end" : "justify-start"} ${first ? "mt-2.5" : "mt-1"}`}>
                       <article
@@ -210,7 +214,11 @@ export function Chat({
                           <span className="sr-only">{post.name}: </span>
                         )}
                         {photos.length > 0 && (
-                          <PhotoGrid photos={photos} onOpen={(index) => setLightbox({ photos, index, caption })} />
+                          <PhotoGrid
+                            photos={photos}
+                            from={from}
+                            onOpen={(index) => setLightbox({ photos, index, caption, from })}
+                          />
                         )}
                         {post.text && (
                           <p className={`text-15 whitespace-pre-wrap text-ink ${photos.length > 0 ? "px-1.5 pt-1 pb-0.5" : ""}`}>
@@ -245,6 +253,7 @@ export function Chat({
         photos={lightbox?.photos ?? []}
         index={lightbox?.index ?? 0}
         caption={lightbox?.caption ?? ""}
+        from={lightbox?.from}
         onIndex={(index) => setLightbox((box) => (box ? { ...box, index } : box))}
         onClose={() => setLightbox(null)}
       />

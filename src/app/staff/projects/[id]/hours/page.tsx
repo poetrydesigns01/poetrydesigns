@@ -1,9 +1,10 @@
 /*
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ProjectHours } from "@/components/project/hours";
-import type { ProjectId } from "@/lib/firm-data";
+import { projectIdOf } from "../project-id";
 
 // Advisory hours: the pools, the sessions, hours bought and hours asked for.
 export default function Page({ params }: PageProps<"/staff/projects/[id]/hours">) {
@@ -15,6 +16,7 @@ export default function Page({ params }: PageProps<"/staff/projects/[id]/hours">
 }
 
 async function FromParams({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  return <ProjectHours projectId={id as ProjectId} />;
+  const projectId = projectIdOf((await params).id);
+  if (!projectId) notFound();
+  return <ProjectHours projectId={projectId} />;
 }

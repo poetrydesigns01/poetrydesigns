@@ -87,28 +87,41 @@
   padding: 20px 16px;
 }
 
-/* A quiet way into the demo walkthrough, at the foot of the card. */
+/* Quiet ways into the demo walkthrough and the privacy note, at the foot of the card. On
+   the narrowest phones the note drops under the walkthrough rather than squeezing it. */
 .lg-card-foot {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
   margin-top: 6px;
   margin-bottom: -10px;
 }
 
-.lg-follow {
+.lg-foot-link {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding-inline: 8px;
+  padding-inline: 6px;
   color: var(--color-ink-soft);
   text-decoration: underline;
   text-decoration-color: rgb(42 26 18 / 0.25);
   text-underline-offset: 0.2em;
 }
 
-.lg-follow:hover {
+.lg-foot-link:hover {
   color: var(--color-ink);
   text-decoration-color: currentColor;
+}
+
+.lg-foot-dot {
+  color: var(--color-ink-soft);
+}
+
+@media (max-width: 359.98px) {
+  .lg-foot-dot {
+    display: none;
+  }
 }
 
 /* Phones: the tiles say who is who, so the helper line goes, and the card sits a little

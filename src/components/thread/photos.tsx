@@ -46,17 +46,25 @@ export function photoWords(photo: ChatPhoto): string {
   return photo.type === "sample" ? SAMPLE_WORDS[photo.kind] : photo.name;
 }
 
-/** One photo filling its box (4 by 3 unless the box says otherwise). */
-export function PhotoArt({ photo }: { photo: ChatPhoto }) {
+/**
+ * One photo filling its box (4 by 3 unless the box says otherwise). `from` says whose post it
+ * came in and when ("Photo from Suresh Gowda, Today 10:05 am"); a photo from the device reads
+ * as that, since its file name says nothing. A sample is described by its drawing.
+ */
+export function PhotoArt({ photo, from }: { photo: ChatPhoto; from?: string }) {
   if (photo.type === "sample") return <SamplePhoto kind={photo.kind} tag={false} />;
   const url = deviceUrls.get(photo.name);
   if (url) {
     // A local blob from the device: nothing for the image optimiser to fetch.
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt={photo.name} />;
+    return <img src={url} alt={from ?? photo.name} />;
   }
   return (
-    <span className="grid h-full w-full place-items-center content-center gap-1 bg-sand px-2 text-center" role="img" aria-label={photo.name}>
+    <span
+      className="grid h-full w-full place-items-center content-center gap-1 bg-sand px-2 text-center"
+      role="img"
+      aria-label={from ? `${from}, ${photo.name}` : photo.name}
+    >
       <ImageIcon className="text-laterite" />
       <span className="max-w-full truncate text-13 text-ink-soft">{photo.name}</span>
     </span>
@@ -64,7 +72,16 @@ export function PhotoArt({ photo }: { photo: ChatPhoto }) {
 }
 
 /** The photos in a bubble: one wide, or a grid of two columns with "+n" on the fourth. */
-export function PhotoGrid({ photos, onOpen }: { photos: ChatPhoto[]; onOpen: (index: number) => void }) {
+export function PhotoGrid({
+  photos,
+  from,
+  onOpen,
+}: {
+  photos: ChatPhoto[];
+  /** Whose post and when, for the photos' text: "Photo from Suresh Gowda, Today 10:05 am". */
+  from?: string;
+  onOpen: (index: number) => void;
+}) {
   const shown = photos.slice(0, 4);
   const more = photos.length - shown.length;
   return (
@@ -76,9 +93,9 @@ export function PhotoGrid({ photos, onOpen }: { photos: ChatPhoto[]; onOpen: (in
           className={`chat-photo ${shown.length === 3 && i === 0 ? "col-span-2" : ""}`}
           style={shown.length === 3 && i === 0 ? { aspectRatio: "8 / 3" } : undefined}
           onClick={() => onOpen(i)}
-          aria-label={`Open photo ${i + 1} of ${photos.length}: ${photoWords(photo)}`}
+          aria-label={`Open photo ${i + 1} of ${photos.length}: ${photo.type === "file" && from ? from : photoWords(photo)}`}
         >
-          <PhotoArt photo={photo} />
+          <PhotoArt photo={photo} from={from} />
           {i === 3 && more > 0 && (
             <span className="chat-photo-more" aria-hidden>
               +{more}
@@ -96,6 +113,7 @@ export function Lightbox({
   photos,
   index,
   caption,
+  from,
   onIndex,
   onClose,
 }: {
@@ -103,6 +121,8 @@ export function Lightbox({
   photos: ChatPhoto[];
   index: number;
   caption: string;
+  /** Whose post and when, for the photo's text: "Photo from Suresh Gowda, Today 10:05 am". */
+  from?: string;
   onIndex: (index: number) => void;
   onClose: () => void;
 }) {
@@ -122,7 +142,7 @@ export function Lightbox({
     <dialog
       ref={ref}
       className="chat-lightbox"
-      aria-label={photo ? photoWords(photo) : "Photo"}
+      aria-label={photo ? (photo.type === "file" && from ? from : photoWords(photo)) : "Photo"}
       onClose={onClose}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -146,7 +166,7 @@ export function Lightbox({
           </div>
           <div className="relative">
             <div className="chat-photo">
-              <PhotoArt photo={photo} />
+              <PhotoArt photo={photo} from={from} />
             </div>
             {many && (
               <>

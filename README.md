@@ -15,7 +15,7 @@ Open http://localhost:3000 and sign in with one of the demo accounts below.
 
 ## Demo accounts
 
-Each role's screens open by signing in on the first screen. These accounts are for the demo only: they are checked in the browser against a list in `src/lib/demo-accounts.ts`, so they are not real security. IDs are not case-sensitive and may be typed with `@poetrydesigns.in` after them; passwords are case-sensitive.
+Each role's screens open by signing in on the first screen. These accounts are for the demo only. Passwords are checked on the server against salted keys in `src/lib/server/demo-passwords.ts`, so the browser never downloads them, but the session is only a flag kept in the browser tab, so this is not real security. IDs are not case-sensitive and may be typed with `@poetrydesigns.in` after them; passwords are case-sensitive.
 
 | ID | Password | Person | Role | Opens |
 |---|---|---|---|---|

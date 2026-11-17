@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ProjectProgramme } from "@/components/architect/programme";
 import { ProjectPlanTab } from "@/components/project/plan";
-import { projects, type ProjectId } from "@/lib/firm-data";
+import { projects } from "@/lib/firm-data";
+import { projectIdOf } from "../project-id";
 
 // The programme tab of a project record: the week chart and every plan task by stage, then
 // the payment stages and the cost revisions. Every staff role reads it; the Project Head and
@@ -24,10 +25,8 @@ export default function ProgrammePage({ params }: PageProps<"/staff/projects/[id
 }
 
 async function ProgrammeFromParams({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const project = projects.find((p) => p.id === id);
-  if (!project) notFound();
-  const projectId = project.id as ProjectId;
+  const projectId = projectIdOf((await params).id);
+  if (!projectId) notFound();
   return (
     <>
       <ProjectPlanTab projectId={projectId} />

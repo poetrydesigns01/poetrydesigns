@@ -123,7 +123,7 @@ export const GUIDES: Record<GuideRole, Guide> = {
         href: "/staff/architect",
       },
       {
-        text: "Assign work to your juniors.",
+        text: "Seniors assign work to their juniors.",
         how: "Say who, what to deliver, for which project and by when. It lands in their task sheet.",
         href: "/staff/architect/team",
       },

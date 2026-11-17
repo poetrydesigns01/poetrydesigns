@@ -66,7 +66,7 @@ export function StageTable({
   );
 
   return (
-    <section className="glass-strong p-2 sm:p-3" aria-labelledby="stages-heading">
+    <section id="stage" className="glass-strong scroll-mt-24 p-2 sm:p-3" aria-labelledby="stages-heading">
       <h2 id="stages-heading" className="sr-only">
         Instalments
       </h2>

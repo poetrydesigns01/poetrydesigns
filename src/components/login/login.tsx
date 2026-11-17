@@ -19,9 +19,10 @@ import {
 import { ARRIVED_KEY } from "@/components/arrival-veil";
 import { Brand } from "@/components/brand";
 import { SignOutButton } from "@/components/sign-out";
-import { ACCOUNTS, accountForId, findAccount, type DemoAccount } from "@/lib/demo-accounts";
-import { useDemo } from "@/lib/demo-store";
+import { ACCOUNTS, ID_DOMAIN, accountForId, normaliseId, type DemoAccount } from "@/lib/demo-accounts";
+import { useDemo } from "@/lib/demo-core";
 import { usePrefersReducedMotion } from "@/lib/motion";
+import { CHECK_PATIENCE_MS, checkPassword } from "./check-password";
 import { SignInBoard, type BoardHandlers, type BoardRefs } from "./sign-in-board";
 import { SiteStage, type StageHandle, type StagePhase } from "./site-stage";
 import { blocksFor, type LoginRole } from "./site-model";
@@ -31,13 +32,11 @@ import "./login.css";
 // The first screen: a frosted sign-in card beside a laterite house going up in the late
 // afternoon sun. Every character typed lays a block; a wrong password knocks the top ones
 // off; the right one tops the house out, and its front door opens on the person's screen.
-
-const DOMAIN = "@poetrydesigns.in";
+// The ID is recognised here as it is typed; the password is checked on the server.
 
 /** The one account an ID of three or more characters can still become, if only one. */
 function uniquePrefix(raw: string): DemoAccount | null {
-  let key = raw.trim().toLowerCase();
-  if (key.endsWith(DOMAIN)) key = key.slice(0, -DOMAIN.length);
+  const key = normaliseId(raw);
   if (key.length < 3) return null;
   const found = ACCOUNTS.filter((a) => a.id.startsWith(key));
   return found.length === 1 ? found[0] : null;
@@ -109,6 +108,9 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
   const [showPassword, setShowPassword] = useState(false);
   const [signedIn, setSignedIn] = useState<DemoAccount | null>(null);
   const [slowPush, setSlowPush] = useState(false);
+  // The server is checking the password; and what to say when it could not be reached.
+  const [checking, setChecking] = useState(false);
+  const [reachError, setReachError] = useState<string | null>(null);
 
   // What handlers and timers share between renders. Nothing here is drawn.
   const live = useRef({
@@ -119,6 +121,8 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
     timers: new Timers(),
     pushed: false,
     unskip: null as (() => void) | null,
+    /** The password check waiting on the server, if any. */
+    check: null as AbortController | null,
   });
 
   // The crane starts delivering on its own once the page is up; leaving clears everything.
@@ -133,6 +137,9 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
       state.timers.clear();
       window.clearTimeout(state.hover);
       state.unskip?.();
+      // An answer that arrives after the screen has gone is not acted on.
+      state.check?.abort();
+      state.check = null;
       if (state.pushed) leftRef.current();
     };
   }, []);
@@ -286,6 +293,57 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
     state.timers.after(1800, () => setSlowPush(true));
   };
 
+  // ---- A wrong password knocks the top blocks off ----
+  const wrongPassword = (account: DemoAccount) => {
+    const misses = (live.current.misses.get(account.id) ?? 0) + 1;
+    live.current.misses.set(account.id, misses);
+    const stuck =
+      account.role === "admin" ? "Still wrong. Check Caps Lock." : "Still wrong. Ask Shalini Murthy to reset it.";
+    const message = misses >= 3 ? stuck : `Wrong password. It is case-sensitive.${caps ? " Caps Lock is on." : ""}`;
+    announce(setPasswordError, message);
+    refs.password.current?.focus();
+    refs.password.current?.select();
+    if (reducedNow()) {
+      stage.current?.brick();
+    } else {
+      shake(refs.passwordRow.current);
+      const typed = values();
+      stage.current?.topple(blocksFor(typed.id.length, typed.password.length));
+    }
+  };
+
+  // ---- The password goes to the server; the house waits for its answer ----
+  const check = (account: DemoAccount, id: string, password: string) => {
+    const state = live.current;
+    const controller = new AbortController();
+    state.check = controller;
+    setChecking(true);
+    setReachError(null);
+    const patience = state.timers.after(CHECK_PATIENCE_MS, () => controller.abort());
+    void checkPassword(id, password, controller.signal).then((answer) => {
+      state.timers.cancel(patience);
+      // The screen has gone, or this check was dropped: its answer is not used.
+      if (state.check !== controller) return;
+      state.check = null;
+      setChecking(false);
+      // Typed over while the server answered: the answer is for words no longer there.
+      const now = values();
+      if (now.id !== id || now.password !== password) return;
+      const opens = answer.kind === "right" ? accountForId(answer.accountId) : undefined;
+      if (opens) {
+        succeed(opens);
+      } else if (answer.kind === "wrong") {
+        wrongPassword(account);
+      } else if (answer.kind === "busy") {
+        // Nothing was checked, so nothing falls: the same line as a lost connection, with the wait.
+        announce(setReachError, "Too many tries. Wait a minute and try again.");
+      } else {
+        // Nothing is lost: what was typed and the blocks it laid stay for the next try.
+        announce(setReachError, "Could not reach the server. Try again.");
+      }
+    });
+  };
+
   // ---- The board's handlers ----
   // The board gets one object for its whole life (stableOn, below), which calls these.
   const on: BoardHandlers = {
@@ -322,6 +380,7 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
       syncTyped();
       const raw = values().id;
       if (idError && raw.length > 0) setIdError(null);
+      if (reachError) setReachError(null);
       recognise(raw);
     },
     onIdFocus: () => {
@@ -332,6 +391,7 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
       if (phase === "success") return;
       syncTyped();
       if (passwordError && values().password.length > 0) setPasswordError(null);
+      if (reachError) setReachError(null);
     },
     onPasswordFocus: () => {
       if (!showPassword) stage.current?.shutter(true);
@@ -353,7 +413,8 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
     },
     onSubmit: (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (phase === "success") return;
+      // One check at a time: pressing again while the server answers does nothing.
+      if (phase === "success" || live.current.check) return;
       syncTyped();
       const { id, password } = values();
       const trimmed = id.trim();
@@ -371,7 +432,7 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
       if (!account) {
         const lower = trimmed.toLowerCase();
         const message =
-          lower.includes("@") && !lower.endsWith(DOMAIN)
+          lower.includes("@") && !lower.endsWith(ID_DOMAIN)
             ? "Use your ID without the email part."
             : `No account “${cut(trimmed)}”. Check the spelling.`;
         announce(setIdError, message);
@@ -393,26 +454,7 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
         return;
       }
 
-      const result = findAccount(id, password);
-      if (!result.ok) {
-        const misses = (live.current.misses.get(account.id) ?? 0) + 1;
-        live.current.misses.set(account.id, misses);
-        const stuck =
-          account.role === "admin" ? "Still wrong. Check Caps Lock." : "Still wrong. Ask Shalini Murthy to reset it.";
-        const message = misses >= 3 ? stuck : `Wrong password. It is case-sensitive.${caps ? " Caps Lock is on." : ""}`;
-        announce(setPasswordError, message);
-        refs.password.current?.focus();
-        refs.password.current?.select();
-        if (still) {
-          stage.current?.brick();
-        } else {
-          shake(refs.passwordRow.current);
-          stage.current?.topple(blocksFor(id.length, password.length));
-        }
-        return;
-      }
-
-      succeed(result.account);
+      check(account, id, password);
     },
   };
 
@@ -492,14 +534,22 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
             passwordError={passwordError}
             caps={caps}
             showPassword={showPassword}
+            checking={checking}
+            reachError={reachError}
             success={success}
             signedIn={signedIn}
             refs={refs}
             on={stableOn}
           />
           <p className="lg-card-foot">
-            <Link href="/follow" className="lg-follow text-13">
+            <Link href="/follow" className="lg-foot-link text-13">
               Follow one payment from site to bank
+            </Link>
+            <span className="lg-foot-dot" aria-hidden="true">
+              ·
+            </span>
+            <Link href="/privacy" className="lg-foot-link text-13">
+              Privacy
             </Link>
           </p>
         </div>

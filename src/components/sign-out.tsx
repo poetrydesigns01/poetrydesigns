@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useDemo } from "@/lib/demo-store";
+import { useDemo } from "@/lib/demo-core";
 
 // The way out of the portal: the session ends and the first screen opens. Everything done
 // in the tab is kept, so the next person to sign in sees the same record.

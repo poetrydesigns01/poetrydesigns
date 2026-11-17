@@ -126,7 +126,7 @@ function Count({ count }: { count: number }) {
   );
 }
 
-/** Her name, holding her hours, her record, the guide and the way out. */
+/** Her name, holding her hours, her record, the guide, the way out and the privacy note. */
 function NameMenu() {
   const ref = useRef<HTMLDetailsElement>(null);
   const { session } = useDemo();
@@ -167,6 +167,15 @@ function NameMenu() {
             className="flex min-h-11 w-full items-center rounded-xl px-3 text-left text-17 hover:bg-white/70"
             onDone={() => close(ref)}
           />
+        </li>
+        <li>
+          <Link
+            href="/privacy"
+            className="flex min-h-11 items-center rounded-xl px-3 text-15 text-ink-soft hover:bg-white/70"
+            onClick={() => close(ref)}
+          >
+            Privacy
+          </Link>
         </li>
       </ul>
     </details>
