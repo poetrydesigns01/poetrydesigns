@@ -5,51 +5,21 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  startTransition,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type FormEvent,
-  type KeyboardEvent,
-  type PointerEvent,
-} from "react";
-import { ARRIVED_KEY } from "@/components/arrival-veil";
-import { Brand } from "@/components/brand";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from "react";
+import { PoetryMark } from "@/components/brand";
 import { SignOutButton } from "@/components/sign-out";
-import { ACCOUNTS, ID_DOMAIN, accountForId, normaliseId, type DemoAccount } from "@/lib/demo-accounts";
+import { ID_DOMAIN, accountForId, type DemoAccount } from "@/lib/demo-accounts";
 import { useDemo } from "@/lib/demo-core";
-import { usePrefersReducedMotion } from "@/lib/motion";
 import { CHECK_PATIENCE_MS, checkPassword } from "./check-password";
-import { SignInBoard, type BoardHandlers, type BoardRefs } from "./sign-in-board";
-import { SiteStage, type StageHandle, type StagePhase } from "./site-stage";
-import { blocksFor, type LoginRole } from "./site-model";
-import { EASE, Timers, reducedNow } from "./timing";
 import "./login.css";
 
-// The first screen: a frosted sign-in card beside a laterite house going up in the late
-// afternoon sun. Every character typed lays a block; a wrong password knocks the top ones
-// off; the right one tops the house out, and its front door opens on the person's screen.
-// The ID is recognised here as it is typed; the password is checked on the server.
-
-/** The one account an ID of three or more characters can still become, if only one. */
-function uniquePrefix(raw: string): DemoAccount | null {
-  const key = normaliseId(raw);
-  if (key.length < 3) return null;
-  const found = ACCOUNTS.filter((a) => a.id.startsWith(key));
-  return found.length === 1 ? found[0] : null;
-}
-
-function cut(text: string): string {
-  return text.length > 32 ? `${text.slice(0, 31)}…` : text;
-}
+// The first screen: the firm's logo and one centred card with an ID (or work email) and a
+// password. The password is checked on the server; the account decides where it opens.
 
 const noop = () => () => {};
 
-/** False on the server and while hydrating; true once the tab's own state can be read. */
-function useOnClient(): boolean {
+/** False on the server and while hydrating; true once the page is live. */
+function useHydrated(): boolean {
   return useSyncExternalStore(
     noop,
     () => true,
@@ -57,10 +27,14 @@ function useOnClient(): boolean {
   );
 }
 
+function cut(text: string): string {
+  return text.length > 32 ? `${text.slice(0, 31)}…` : text;
+}
+
 /**
- * The router keeps a page it leaves in the document, hidden, and shows it again on the way
- * back. Once someone has signed in, the screen they leave is swapped for a fresh one, so
- * signing out never comes back to a topped-out house behind a wall of light.
+ * The router keeps a page it leaves and can show it again on the way back. Once someone has
+ * signed in, the screen is swapped for a fresh one, so signing out never returns to a card
+ * that still says "Signing in".
  */
 export function Login() {
   const [visit, setVisit] = useState(0);
@@ -70,73 +44,34 @@ export function Login() {
 function LoginScreen({ onLeft }: { onLeft: () => void }) {
   const router = useRouter();
   const demo = useDemo();
-  const reduced = usePrefersReducedMotion();
+  const hydrated = useHydrated();
 
-  const onClient = useOnClient();
-
-  const stage = useRef<StageHandle>(null);
-  const lightRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
   const idRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
-  const idRowRef = useRef<HTMLDivElement>(null);
-  const passwordRowRef = useRef<HTMLDivElement>(null);
-  const stampRef = useRef<HTMLDivElement>(null);
-  const checkedRef = useRef<HTMLSpanElement>(null);
-  // One set of refs for the life of the screen, so the board is not rendered for nothing.
-  const refs = useMemo<BoardRefs>(
-    () => ({
-      form: formRef,
-      id: idRef,
-      password: passwordRef,
-      idRow: idRowRef,
-      passwordRow: passwordRowRef,
-      stamp: stampRef,
-      checked: checkedRef,
-    }),
-    [],
-  );
 
-  const [role, setRole] = useState<LoginRole | null>(null);
-  const [preview, setPreview] = useState<LoginRole | null>(null);
-  const [match, setMatch] = useState<DemoAccount | null>(null);
-  const [prefixRole, setPrefixRole] = useState<LoginRole | null>(null);
-  const [phase, setPhase] = useState<StagePhase>("idle");
   const [idError, setIdError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [reachError, setReachError] = useState<string | null>(null);
   const [caps, setCaps] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [signedIn, setSignedIn] = useState<DemoAccount | null>(null);
-  const [slowPush, setSlowPush] = useState(false);
-  // The server is checking the password; and what to say when it could not be reached.
   const [checking, setChecking] = useState(false);
-  const [reachError, setReachError] = useState<string | null>(null);
+  const [signedIn, setSignedIn] = useState<DemoAccount | null>(null);
 
-  // What handlers and timers share between renders. Nothing here is drawn.
   const live = useRef({
-    pointer: null as string | null,
-    pointerAt: -Infinity,
-    hover: 0,
     misses: new Map<string, number>(),
-    timers: new Timers(),
-    pushed: false,
-    unskip: null as (() => void) | null,
-    /** The password check waiting on the server, if any. */
     check: null as AbortController | null,
+    patience: 0,
+    pushed: false,
   });
 
-  // The crane starts delivering on its own once the page is up; leaving clears everything.
   const leftRef = useRef(onLeft);
   useEffect(() => {
     leftRef.current = onLeft;
   });
   useEffect(() => {
     const state = live.current;
-    stage.current?.setAmbient(true);
     return () => {
-      state.timers.clear();
-      window.clearTimeout(state.hover);
-      state.unskip?.();
+      window.clearTimeout(state.patience);
       // An answer that arrives after the screen has gone is not acted on.
       state.check?.abort();
       state.check = null;
@@ -144,26 +79,15 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
     };
   }, []);
 
-  // ---- Small helpers, all for handlers and timers ----
-  const values = () => ({ id: refs.id.current?.value ?? "", password: refs.password.current?.value ?? "" });
-
-  const syncTyped = () => {
-    const v = values();
-    stage.current?.setTyped(blocksFor(v.id.length, v.password.length));
-    const active = typeof document !== "undefined" ? document.activeElement : null;
-    const focused = active === refs.id.current || active === refs.password.current;
-    stage.current?.setAmbient(v.id === "" && v.password === "" && !focused);
-  };
-
-  /** Sets a status message so that it is read out again even when it has not changed. */
+  /** Sets a message so a screen reader reads it again even when it has not changed. */
   const announce = (set: (value: string | null) => void, message: string) => {
     set(null);
     window.requestAnimationFrame(() => set(message));
   };
 
-  const shake = (row: HTMLElement | null) => {
-    if (!row || reducedNow()) return;
-    row.animate(
+  const shake = (el: HTMLElement | null) => {
+    if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    el.animate(
       [
         { transform: "translateX(0px)" },
         { transform: "translateX(-6px)" },
@@ -171,347 +95,114 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
         { transform: "translateX(-3px)" },
         { transform: "translateX(0px)" },
       ],
-      { duration: 280, easing: EASE.lime },
+      { duration: 280, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" },
     );
-  };
-
-  const chooseRole = (next: LoginRole) => {
-    if (next === role) return;
-    setRole(next);
-    setPreview(null);
-    stage.current?.morph(next);
-  };
-
-  const recognise = (raw: string) => {
-    const account = accountForId(raw) ?? null;
-    if (account !== match) {
-      setMatch(account);
-      if (account) {
-        router.prefetch(account.home);
-        chooseRole(account.role);
-      }
-    }
-    const prefix = account ? null : (uniquePrefix(raw)?.role ?? null);
-    if (prefix !== prefixRole) setPrefixRole(prefix);
-    return account;
-  };
-
-  // ---- Success: the house is topped out and the door opens on their screen ----
-  const openLight = (door: DOMRect) => {
-    const light = lightRef.current;
-    if (!light) return;
-    // On a short phone the window is not shown: the light opens from the middle instead.
-    const rect = door.width > 0 ? door : new DOMRect(window.innerWidth / 2 - 20, window.innerHeight / 2 - 30, 40, 60);
-    Object.assign(light.style, {
-      left: `${rect.left}px`,
-      top: `${rect.top}px`,
-      width: `${rect.width}px`,
-      height: `${rect.height}px`,
-      opacity: "1",
-    });
-    const scale = Math.max(window.innerWidth / Math.max(rect.width, 1), window.innerHeight / Math.max(rect.height, 1)) * 1.15;
-    const tx = window.innerWidth / 2 - (rect.left + rect.width / 2);
-    const ty = window.innerHeight / 2 - (rect.top + rect.height / 2);
-    light.animate(
-      [{ transform: "translate(0px, 0px) scale(1)" }, { transform: `translate(${tx}px, ${ty}px) scale(${scale.toFixed(2)})` }],
-      { duration: 260, easing: EASE.teak, fill: "forwards" },
-    );
-  };
-
-  const writeChecked = (first: string) => {
-    if (checkedRef.current) checkedRef.current.textContent = first;
-  };
-
-  const pressStamp = (account: DemoAccount) => {
-    const el = refs.stamp.current;
-    if (!el) return;
-    if (account.role === "client") {
-      el.animate(
-        [
-          { opacity: 0, transform: "rotate(-4deg) scale(1.18)" },
-          { opacity: 1, transform: "rotate(-4deg) scale(1)" },
-        ],
-        { duration: 180, easing: EASE.brass, fill: "forwards" },
-      );
-    } else {
-      el.animate(
-        [
-          { opacity: 0, transform: "rotate(-4deg) scale(1.6)", easing: EASE.lay },
-          { opacity: 1, transform: "rotate(-4deg) scale(0.96)", offset: 0.7 },
-          { opacity: 1, transform: "rotate(-4deg) scale(1)" },
-        ],
-        { duration: 260, fill: "forwards" },
-      );
-    }
   };
 
   const succeed = (account: DemoAccount) => {
-    const state = live.current;
-    // The tab is told first, so the next screen opens as this person, under the light.
     demo.signIn(account);
-    try {
-      window.sessionStorage.setItem(ARRIVED_KEY, "1");
-    } catch {
-      // Without storage the next screen simply opens without the light fading off it.
-    }
-    router.prefetch(account.home);
     setSignedIn(account);
-    setMatch(account);
-    setPrefixRole(null);
-    if (account.role !== role) setRole(account.role);
     setIdError(null);
     setPasswordError(null);
-    setPhase("success");
-
-    const first = account.name.split(" ")[0];
-    const go = () => {
-      if (state.pushed) return;
-      state.pushed = true;
-      state.unskip?.();
-      router.push(account.home);
-    };
-    // Any key or press skips straight in.
-    const skip = () => go();
-    window.addEventListener("keydown", skip);
-    window.addEventListener("pointerdown", skip);
-    state.unskip = () => {
-      window.removeEventListener("keydown", skip);
-      window.removeEventListener("pointerdown", skip);
-      state.unskip = null;
-    };
-
-    stage.current?.topOut(openLight);
-    if (reducedNow()) {
-      writeChecked(first);
-      state.timers.after(450, go);
-      return;
-    }
-    // The stamp lands early, while the house tops out, and holds until the flight.
-    state.timers.after(250, () => pressStamp(account));
-    state.timers.after(510, () => writeChecked(first));
-    state.timers.after(1400, go);
-    state.timers.after(1800, () => setSlowPush(true));
+    live.current.pushed = true;
+    router.push(account.home);
   };
 
-  // ---- A wrong password knocks the top blocks off ----
   const wrongPassword = (account: DemoAccount) => {
     const misses = (live.current.misses.get(account.id) ?? 0) + 1;
     live.current.misses.set(account.id, misses);
     const stuck =
       account.role === "admin" ? "Still wrong. Check Caps Lock." : "Still wrong. Ask Shalini Murthy to reset it.";
-    const message = misses >= 3 ? stuck : `Wrong password. It is case-sensitive.${caps ? " Caps Lock is on." : ""}`;
-    announce(setPasswordError, message);
-    refs.password.current?.focus();
-    refs.password.current?.select();
-    if (reducedNow()) {
-      stage.current?.brick();
-    } else {
-      shake(refs.passwordRow.current);
-      const typed = values();
-      stage.current?.topple(blocksFor(typed.id.length, typed.password.length));
-    }
+    announce(setPasswordError, misses >= 3 ? stuck : `Wrong password. It is case-sensitive.${caps ? " Caps Lock is on." : ""}`);
+    passwordRef.current?.focus();
+    passwordRef.current?.select();
+    shake(passwordRef.current?.parentElement ?? null);
   };
 
-  // ---- The password goes to the server; the house waits for its answer ----
-  const check = (account: DemoAccount, id: string, password: string) => {
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     const state = live.current;
+    // One check at a time: pressing again while the server answers does nothing.
+    if (signedIn || state.check) return;
+    const id = idRef.current?.value ?? "";
+    const password = passwordRef.current?.value ?? "";
+    const trimmed = id.trim();
+
+    if (!trimmed) {
+      announce(setIdError, "Enter your ID or work email.");
+      idRef.current?.focus();
+      return;
+    }
+    const account = accountForId(id);
+    if (!account) {
+      const lower = trimmed.toLowerCase();
+      announce(
+        setIdError,
+        lower.includes("@") && !lower.endsWith(ID_DOMAIN)
+          ? `Use your ${ID_DOMAIN} email or your ID.`
+          : `No account “${cut(trimmed)}”. Check the spelling.`,
+      );
+      idRef.current?.focus();
+      idRef.current?.select();
+      shake(idRef.current);
+      return;
+    }
+    if (!password) {
+      announce(setPasswordError, "Enter your password.");
+      passwordRef.current?.focus();
+      return;
+    }
+
     const controller = new AbortController();
     state.check = controller;
     setChecking(true);
     setReachError(null);
-    const patience = state.timers.after(CHECK_PATIENCE_MS, () => controller.abort());
+    state.patience = window.setTimeout(() => controller.abort(), CHECK_PATIENCE_MS);
     void checkPassword(id, password, controller.signal).then((answer) => {
-      state.timers.cancel(patience);
-      // The screen has gone, or this check was dropped: its answer is not used.
+      window.clearTimeout(state.patience);
       if (state.check !== controller) return;
       state.check = null;
       setChecking(false);
       // Typed over while the server answered: the answer is for words no longer there.
-      const now = values();
-      if (now.id !== id || now.password !== password) return;
+      if (idRef.current?.value !== id || passwordRef.current?.value !== password) return;
       const opens = answer.kind === "right" ? accountForId(answer.accountId) : undefined;
-      if (opens) {
-        succeed(opens);
-      } else if (answer.kind === "wrong") {
-        wrongPassword(account);
-      } else if (answer.kind === "busy") {
-        // Nothing was checked, so nothing falls: the same line as a lost connection, with the wait.
-        announce(setReachError, "Too many tries. Wait a minute and try again.");
-      } else {
-        // Nothing is lost: what was typed and the blocks it laid stay for the next try.
-        announce(setReachError, "Could not reach the server. Try again.");
-      }
+      if (opens) succeed(opens);
+      else if (answer.kind === "wrong") wrongPassword(account);
+      else if (answer.kind === "busy") announce(setReachError, "Too many tries. Wait a minute and try again.");
+      else announce(setReachError, "Could not reach the server. Try again.");
     });
   };
 
-  // ---- The board's handlers ----
-  // The board gets one object for its whole life (stableOn, below), which calls these.
-  const on: BoardHandlers = {
-    onRole: (next) => {
-      chooseRole(next);
-      const state = live.current;
-      // A click with a mouse moves on to the ID. A tap does not, so the keyboard stays shut.
-      if (state.pointer === "mouse" && performance.now() - state.pointerAt < 1000) {
-        refs.id.current?.focus({ preventScroll: true });
-      }
-      state.pointer = null;
-    },
-    onRoleKeyDown: (event: KeyboardEvent<HTMLFieldSetElement>) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        refs.id.current?.focus();
-      }
-    },
-    onTilePointerDown: (event: PointerEvent<HTMLLabelElement>) => {
-      live.current.pointer = event.pointerType;
-      live.current.pointerAt = performance.now();
-    },
-    onTileEnter: (next, event) => {
-      if (event.pointerType !== "mouse") return;
-      window.clearTimeout(live.current.hover);
-      live.current.hover = window.setTimeout(() => startTransition(() => setPreview(next)), 120);
-    },
-    onTileLeave: () => {
-      window.clearTimeout(live.current.hover);
-      startTransition(() => setPreview(null));
-    },
-    onIdInput: () => {
-      if (phase === "success") return;
-      syncTyped();
-      const raw = values().id;
-      if (idError && raw.length > 0) setIdError(null);
-      if (reachError) setReachError(null);
-      recognise(raw);
-    },
-    onIdFocus: () => {
-      stage.current?.twang();
-      syncTyped();
-    },
-    onPasswordInput: () => {
-      if (phase === "success") return;
-      syncTyped();
-      if (passwordError && values().password.length > 0) setPasswordError(null);
-      if (reachError) setReachError(null);
-    },
-    onPasswordFocus: () => {
-      if (!showPassword) stage.current?.shutter(true);
-      syncTyped();
-    },
-    onFieldBlur: () => {
-      stage.current?.shutter(false);
-      // Focus moves on before the next field says so; check once it has landed.
-      window.setTimeout(syncTyped, 0);
-    },
-    onPasswordKey: (event: KeyboardEvent<HTMLInputElement>) => {
-      const on = event.getModifierState("CapsLock");
-      if (on !== caps) setCaps(on);
-    },
-    onShow: () => {
-      const next = !showPassword;
-      setShowPassword(next);
-      if (next) stage.current?.shutter(false);
-    },
-    onSubmit: (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      // One check at a time: pressing again while the server answers does nothing.
-      if (phase === "success" || live.current.check) return;
-      syncTyped();
-      const { id, password } = values();
-      const trimmed = id.trim();
-      const still = reducedNow();
-
-      if (!trimmed) {
-        announce(setIdError, "Enter your ID, like firstname.lastname.");
-        refs.id.current?.focus();
-        stage.current?.twang();
-        if (still) stage.current?.brick();
-        return;
-      }
-
-      const account = recognise(id);
-      if (!account) {
-        const lower = trimmed.toLowerCase();
-        const message =
-          lower.includes("@") && !lower.endsWith(ID_DOMAIN)
-            ? "Use your ID without the email part."
-            : `No account “${cut(trimmed)}”. Check the spelling.`;
-        announce(setIdError, message);
-        refs.id.current?.focus();
-        refs.id.current?.select();
-        if (still) {
-          stage.current?.brick();
-        } else {
-          stage.current?.swingHook(10);
-          stage.current?.slack();
-          shake(refs.idRow.current);
-        }
-        return;
-      }
-
-      if (!password) {
-        announce(setPasswordError, "Enter your password.");
-        refs.password.current?.focus();
-        return;
-      }
-
-      check(account, id, password);
-    },
+  const onPasswordKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    const on = event.getModifierState("CapsLock");
+    if (on !== caps) setCaps(on);
   };
 
-  const handlers = useRef<BoardHandlers | null>(null);
-  useEffect(() => {
-    handlers.current = on;
-  });
-  const [stableOn] = useState<BoardHandlers>(() => ({
-    onRole: (next, pointer) => handlers.current?.onRole(next, pointer),
-    onRoleKeyDown: (event) => handlers.current?.onRoleKeyDown(event),
-    onTilePointerDown: (event) => handlers.current?.onTilePointerDown(event),
-    onTileEnter: (next, event) => handlers.current?.onTileEnter(next, event),
-    onTileLeave: () => handlers.current?.onTileLeave(),
-    onIdInput: () => handlers.current?.onIdInput(),
-    onIdFocus: () => handlers.current?.onIdFocus(),
-    onPasswordInput: () => handlers.current?.onPasswordInput(),
-    onPasswordFocus: () => handlers.current?.onPasswordFocus(),
-    onFieldBlur: () => handlers.current?.onFieldBlur(),
-    onPasswordKey: (event) => handlers.current?.onPasswordKey(event),
-    onShow: () => handlers.current?.onShow(),
-    onSubmit: (event) => {
-      // Never let the browser send the form itself, even before the handlers are set.
-      event.preventDefault();
-      handlers.current?.onSubmit(event);
-    },
-  }));
-
-  const success = phase === "success";
   // Someone already signed in in this tab who came back here: say so, and offer the way back.
-  const already = onClient && demo.session && !signedIn ? (accountForId(demo.session.id) ?? null) : null;
+  const already = hydrated && demo.session && !signedIn ? (accountForId(demo.session.id) ?? null) : null;
+  const busy = checking || signedIn !== null;
 
   return (
-    <main className="login glass-world" data-phase={phase} data-reduced={reduced ? "" : undefined}>
-      <p className="sr-only">
-        A laterite house being built on site, with a crane and scaffolding. Each character you type lays a block.
-      </p>
-      <p className="sr-only" role="status">
-        {success && signedIn ? `Signed in. Opening ${signedIn.name}'s screen.` : ""}
-      </p>
+    <main className="login glass-world">
+      <div className="lg-grid" aria-hidden="true" />
 
-      <div className="lg-scene">
-        <p className="lg-wordmark lg-exit">
-          <Brand size="hero" priority />
-        </p>
-        <div className="lg-view">
-          <p className="display lg-tagline lg-exit">From concept to reality.</p>
-          <div className="lg-window-slot">
-            <div className="lg-window">
-              <SiteStage ref={stage} role={role} preview={preview} phase={phase} reduced={reduced} />
-              <div className="lg-ground" aria-hidden="true" />
-            </div>
+      <div className="lg-column">
+        <header className="lg-lockup">
+          <PoetryMark className="lg-mark" />
+          <p className="lg-name">
+            <span className="lg-name-main">Poetry</span>
+            <span className="lg-name-sub">Designs</span>
+          </p>
+        </header>
+
+        <section className="lg-card glass-strong" aria-labelledby="login-title">
+          <div className="lg-card-head">
+            <h1 id="login-title" className="display text-32 lg-title">
+              Sign in
+            </h1>
+            <p className="text-15 lg-helper">From concept to reality, one place for your home.</p>
           </div>
-        </div>
-      </div>
 
-      <div className="lg-board-col">
-        <div className="lg-card glass-strong lg-exit">
           {already && (
             <div className="lg-session glass-inner text-15">
               <p>Signed in as {already.name}.</p>
@@ -519,49 +210,97 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
                 <Link href={already.home} className="link font-semibold">
                   Open your screen
                 </Link>
-                <SignOutButton
-                  className="link"
-                  onDone={() => refs.id.current?.focus({ preventScroll: true })}
-                />
+                <SignOutButton className="link" onDone={() => idRef.current?.focus({ preventScroll: true })} />
               </p>
             </div>
           )}
-          <SignInBoard
-            role={role}
-            prefixRole={prefixRole}
-            match={match}
-            idError={idError}
-            passwordError={passwordError}
-            caps={caps}
-            showPassword={showPassword}
-            checking={checking}
-            reachError={reachError}
-            success={success}
-            signedIn={signedIn}
-            refs={refs}
-            on={stableOn}
-          />
-          <p className="lg-card-foot">
-            <Link href="/follow" className="lg-foot-link text-13">
-              Follow one payment from site to bank
-            </Link>
-            <span className="lg-foot-dot" aria-hidden="true">
-              ·
-            </span>
-            <Link href="/privacy" className="lg-foot-link text-13">
-              Privacy
-            </Link>
-          </p>
-        </div>
-      </div>
 
-      <div ref={lightRef} className="lg-light" aria-hidden="true" />
-      <div className="lg-veil" aria-hidden="true" />
-      {slowPush && signedIn && (
-        <p className="lettering text-13 lg-opening" aria-hidden="true">
-          Opening {signedIn.name.split(" ")[0]}&apos;s screen
+          <form className="lg-form" noValidate onSubmit={onSubmit} aria-label="Sign in">
+            <div className="lg-field">
+              <label htmlFor="login-id" className="lg-label text-15">
+                Email or ID
+              </label>
+              <input
+                ref={idRef}
+                id="login-id"
+                name="username"
+                type="text"
+                className="glass-field lg-input"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="firstname.lastname"
+                aria-describedby="login-id-status"
+                aria-invalid={idError ? true : undefined}
+                readOnly={signedIn !== null}
+                onChange={() => {
+                  if (idError) setIdError(null);
+                  if (reachError) setReachError(null);
+                }}
+              />
+              <p id="login-id-status" className="lg-status text-13" aria-live="polite">
+                {idError}
+              </p>
+            </div>
+
+            <div className="lg-field">
+              <label htmlFor="login-password" className="lg-label text-15">
+                Password
+              </label>
+              <div className="lg-password">
+                <input
+                  ref={passwordRef}
+                  id="login-password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  className="glass-field lg-input lg-input-password"
+                  autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  aria-describedby="login-password-status"
+                  aria-invalid={passwordError ? true : undefined}
+                  readOnly={signedIn !== null}
+                  onChange={() => {
+                    if (passwordError) setPasswordError(null);
+                    if (reachError) setReachError(null);
+                  }}
+                  onKeyDown={onPasswordKey}
+                  onKeyUp={onPasswordKey}
+                />
+                <button
+                  type="button"
+                  className="lg-show text-13"
+                  aria-controls="login-password"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+              <p id="login-password-status" className="lg-status text-13" aria-live="polite">
+                {passwordError ?? reachError ?? (caps ? "Caps Lock is on." : null)}
+              </p>
+            </div>
+
+            {/* Disabled until the page is live, so the form never sends itself as a plain GET. */}
+            <button type="submit" className="btn btn-primary lg-submit" disabled={!hydrated} aria-busy={busy || undefined}>
+              {signedIn ? `Opening ${signedIn.name.split(" ")[0]}'s screen…` : checking ? "Checking…" : "Sign in"}
+            </button>
+          </form>
+        </section>
+
+        <p className="lg-foot text-13">
+          <Link href="/follow" className="lg-foot-link">
+            Follow one payment from site to bank
+          </Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/privacy" className="lg-foot-link">
+            Privacy
+          </Link>
         </p>
-      )}
+      </div>
     </main>
   );
 }

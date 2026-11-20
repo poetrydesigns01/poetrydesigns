@@ -1,1810 +1,274 @@
 /*
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
-/* The sign-in page: the same warm glass world as the dashboards. The brand and the promise
-   stand on the backdrop, the site sits in a window of late afternoon sky, and the sign-in
-   card is frosted glass. Markup is in components/login. Everything that reaches into the
-   house is scoped under .login-stage. Only transform and opacity move, apart from a few
-   short stroke draws on single paths. */
 
-/* ---- The page ---- */
+/* The sign-in page: the logo stacked over one centred card on the glass backdrop, with a
+   faint drawing grid fading out from the middle. Nothing moves but the entrance. */
 
 .login {
-  --pad-y: 16px;
-  --pad-x: 16px;
-  --sky: linear-gradient(180deg, #edd3ae 0%, #f4e3c8 32%, #f8eddc 74%, #f5e4cb 100%);
-  --earth: var(--tex-earth), linear-gradient(180deg, #bf946f 0%, #a97c58 100%);
-  --lg-brand-h: 56px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
   min-height: 100svh;
-  padding: var(--pad-y) var(--pad-x) 24px;
-  overflow-x: clip;
+  display: grid;
+  place-items: center;
+  padding: 40px 16px;
   color: var(--color-ink);
 }
 
-/* The firm's name leads; the promise follows, large but second, as the caption of the
-   window onto the site. All of it shares one left edge with the card. */
-.lg-scene {
+/* A drafting grid, centred on the card and fading out before the edges. */
+.lg-grid {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(42 26 18 / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(42 26 18 / 0.07) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center center;
+  -webkit-mask-image: radial-gradient(60vmax 46vmax at 50% 46%, #000 0%, rgb(0 0 0 / 0.4) 45%, transparent 75%);
+  mask-image: radial-gradient(60vmax 46vmax at 50% 46%, #000 0%, rgb(0 0 0 / 0.4) 45%, transparent 75%);
+}
+
+.lg-column {
+  width: 100%;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-width: 0;
+  align-items: stretch;
+  gap: 28px;
 }
 
-.lg-wordmark {
+/* ---- The logo: the firm's mark over its name, stacked as on its own logo ---- */
+.lg-lockup {
   display: flex;
-  max-width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
 }
 
-/* The logo's height here, --lg-brand-h, set per screen below; the desktop room above the
-   window is reckoned from it. */
-.lg-wordmark .brand {
-  --brand-h: var(--lg-brand-h);
+.lg-mark {
+  width: 58px;
+  height: auto;
+  filter: drop-shadow(0 10px 18px rgb(200 60 13 / 0.28));
 }
 
-.lg-view {
-  display: grid;
+.lg-name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  line-height: 1;
+}
+
+.lg-name-main {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: var(--text-32);
+  letter-spacing: 0.32em;
+  /* The tracking adds space after the last letter too: pull it back so the word centres. */
+  margin-right: -0.32em;
+  text-transform: uppercase;
+  /* The orange of the firm's own lettering. */
+  color: #c94a12;
+}
+
+.lg-name-sub {
+  display: flex;
+  align-items: center;
   gap: 12px;
-  min-width: 0;
-}
-
-.lg-tagline {
-  font-size: var(--text-22);
-  font-weight: 500;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  text-wrap: balance;
-}
-
-.lg-window-slot {
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-}
-
-/* The window onto the site: sky above, earth below, framed like the glass panels. It shares
-   its edges with the words above and the card below. */
-.lg-window {
-  position: relative;
-  width: 100%;
-  overflow: hidden;
-  border: 1px solid var(--glass-line);
-  border-radius: var(--radius-card);
-  background: var(--sky);
-  box-shadow: var(--glass-shadow);
-}
-
-.lg-ground {
-  height: 10px;
-  background: var(--earth);
-}
-
-.lg-board-col {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  min-width: 0;
-}
-
-.lg-card {
-  width: 100%;
-  max-width: 480px;
-  padding: 20px 16px;
-}
-
-/* Quiet ways into the demo walkthrough and the privacy note, at the foot of the card. On
-   the narrowest phones the note drops under the walkthrough rather than squeezing it. */
-.lg-card-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  margin-top: 6px;
-  margin-bottom: -10px;
-}
-
-.lg-foot-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding-inline: 6px;
-  color: var(--color-ink-soft);
-  text-decoration: underline;
-  text-decoration-color: rgb(42 26 18 / 0.25);
-  text-underline-offset: 0.2em;
-}
-
-.lg-foot-link:hover {
-  color: var(--color-ink);
-  text-decoration-color: currentColor;
-}
-
-.lg-foot-dot {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: var(--text-13);
+  letter-spacing: 0.56em;
+  text-transform: uppercase;
   color: var(--color-ink-soft);
 }
 
-@media (max-width: 359.98px) {
-  .lg-foot-dot {
-    display: none;
-  }
+.lg-name-sub::before,
+.lg-name-sub::after {
+  content: "";
+  width: 24px;
+  height: 1px;
+  background: rgb(42 26 18 / 0.25);
 }
 
-/* Phones: the tiles say who is who, so the helper line goes, and the card sits a little
-   tighter, so the Sign in button is in the first view. */
-@media (max-width: 639.98px) {
-  .login {
-    gap: 10px;
-  }
-
-  .lg-view {
-    gap: 10px;
-  }
-
-  .lg-helper {
-    display: none;
-  }
-
-  .lg-card {
-    padding-block: 16px 18px;
-  }
-}
-
-/* The narrowest phones: a little more room for the tiles. */
-@media (max-width: 359.98px) {
-  .login {
-    --pad-x: 12px;
-  }
-
-  .lg-card {
-    padding-inline: 14px;
-  }
-}
-
-/* Tablet: one column, the words, the site and the card on the same edges. */
-@media (min-width: 640px) {
-  .login {
-    --pad-y: 28px;
-    --pad-x: 32px;
-    --lg-brand-h: 72px;
-    gap: 20px;
-  }
-
-  .lg-scene,
-  .lg-board-col {
-    width: 100%;
-    max-width: 520px;
-    margin-inline: auto;
-  }
-
-  .lg-scene {
-    gap: 14px;
-  }
-
-  .lg-view {
-    gap: 18px;
-  }
-
-  .lg-tagline {
-    font-size: var(--text-32);
-    line-height: 1.1;
-  }
-
-  .lg-ground {
-    height: 14px;
-  }
-
-  .lg-card {
-    max-width: none;
-    padding: 24px;
-  }
-}
-
-/* Desktop: the words and the site on the left, the card on the right. The two share their
-   top and bottom edges: the brand starts level with the card, and the window's ground line
-   ends level with it. The pair is centred in the screen as one block. */
-@media (min-width: 1024px) {
-  .login {
-    --pad-y: clamp(24px, 5svh, 56px);
-    --pad-x: max(clamp(32px, 4.5vw, 80px), calc((100% - 1560px) / 2));
-    /* The logo grows with the screen's height, and the room the logo and the promise take
-       above the window grows with it. */
-    --lg-brand-h: clamp(72px, 11svh, 104px);
-    --head-room: calc(var(--lg-brand-h) + 76px);
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
-    column-gap: clamp(32px, 4.5vw, 80px);
-    align-content: center;
-    align-items: stretch;
-  }
-
-  /* The name and the promise stay together as one block at the top; any height to spare
-     opens up above the window, whose ground line stays level with the card's foot. */
-  .lg-scene {
-    width: auto;
-    max-width: none;
-    margin: 0;
-    justify-content: flex-start;
-    gap: clamp(10px, 1.8svh, 16px);
-  }
-
-  .lg-view {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: clamp(14px, 2.4svh, 24px);
-  }
-
-  /* As wide as the column, and no taller than the screen leaves under the words. When the
-     column is narrow the window cannot grow, so it sits in the middle of the room left. */
-  .lg-window-slot {
-    justify-content: flex-start;
-    margin-block: auto;
-  }
-
-  .lg-window {
-    width: min(100%, 1120px, calc((100svh - 2 * var(--pad-y) - var(--head-room)) * 1000 / 532));
-  }
-
-  .lg-ground {
-    height: 18px;
-  }
-
-  /* The card runs the full height of the brand and the window; when it has room to spare,
-     its content sits in the middle. */
-  .lg-board-col {
-    width: auto;
-    max-width: none;
-    margin: 0;
-    justify-items: stretch;
-  }
-
-  .lg-card {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 28px;
-  }
-}
-
-/* A narrow desktop has a smaller window beside the card, so the card is tighter too. */
-@media (min-width: 1024px) and (max-width: 1279.98px) {
-  .lg-card {
-    padding: 22px 24px;
-  }
-}
-
-@media (min-width: 1600px) {
-  .login {
-    grid-template-columns: minmax(0, 1fr) 460px;
-  }
-}
-
-@media (min-width: 1024px) and (max-height: 760px) {
-  .lg-card {
-    padding: 22px 24px;
-  }
+.lg-name-sub::after {
+  /* The tracking after the last letter already adds space on this side. */
+  margin-left: -0.56em;
 }
 
 /* ---- The card ---- */
-
-.login-board {
-  position: relative;
+.lg-card {
+  padding: 32px 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 }
 
-.lg-board-head {
-  position: relative;
-  display: grid;
-  gap: 4px;
+.lg-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.lg-h1 {
-  line-height: 1.1;
+.lg-title {
+  margin: 0;
 }
 
 .lg-helper {
+  margin: 0;
   color: var(--color-ink-soft);
-  text-wrap: pretty;
 }
 
-.lg-roles {
-  min-width: 0;
-  margin: 14px 0 0;
-  padding: 0;
-  border: 0;
-}
-
-.lg-tiles {
-  container-type: inline-size;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  /* Both rows take the taller one's height, even when only one name wraps. */
-  grid-auto-rows: 1fr;
-  gap: 8px;
-}
-
-/* A role is its name alone, centred in a light tile: a 3 by 2 grid at every width. */
-.role-tile {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 48px;
-  padding: 8px 6px;
-  border: 1px solid rgb(255 255 255 / 0.6);
-  border-radius: var(--radius-inner);
-  background: rgb(255 255 255 / 0.5);
-  color: var(--color-ink);
-  cursor: pointer;
-  user-select: none;
-  isolation: isolate;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform var(--dur-tap) var(--ease-lime);
-}
-
-/* The rosewood fill of a chosen tile, a layer under the words that fades in. */
-.role-tile::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  border-radius: inherit;
-  background: var(--color-rosewood);
-  opacity: 0;
-  transition: opacity var(--dur-tap) var(--ease-lime);
-}
-
-.role-tile:has(:checked)::before {
-  opacity: 1;
-}
-
-.lg-tile-label {
-  font-size: var(--text-13);
-  font-weight: 600;
-  line-height: 1.2;
-  text-align: center;
-}
-
-.lg-tile-short {
-  display: none;
-}
-
-@media (max-width: 359.98px) {
-  .lg-tiles {
-    gap: 6px;
-  }
-
-  .role-tile {
-    padding-inline: 4px;
-  }
-}
-
-/* A very narrow card: the long names give way to short ones. */
-@container (max-width: 300px) {
-  .lg-tile-short {
-    display: inline;
-  }
-
-  .lg-tile-long {
-    display: none;
-  }
-
-  .role-tile .lg-tile-tick {
-    top: 3px;
-    right: 3px;
-  }
-}
-
-@media (min-width: 640px) {
-  .role-tile {
-    min-height: 52px;
-  }
-
-  .lg-tile-label {
-    font-size: var(--text-15);
-  }
-}
-
-@media (min-width: 1024px) {
-  .lg-tile-label {
-    font-size: var(--text-13);
-  }
-}
-
-@media (min-width: 1024px) and (max-width: 1279.98px) {
-  .role-tile {
-    min-height: 48px;
-  }
-}
-
-@media (min-width: 1280px) {
-  .lg-tile-label {
-    font-size: var(--text-15);
-  }
-}
-
-/* Chosen: rosewood with lime words, and a tick in the corner, so it is never colour alone. */
-.role-tile:has(:checked) {
-  border-color: transparent;
-  color: var(--color-lime);
-}
-
-/* The tick sits in the corner, clear of the name: on a narrow tile it is drawn a little
-   smaller and tucked further in, above a long one-line name. */
-.lg-tile-tick {
-  --tick-scale: 0.75;
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--color-lime);
-  opacity: 0;
-  transform: scale(calc(var(--tick-scale) * 0.5));
-  transform-origin: 100% 0;
-  transition:
-    opacity var(--dur-tap) var(--ease-lime),
-    transform var(--dur-press) var(--ease-brass);
-}
-
-.lg-tile-tick::after {
-  content: "";
-  position: absolute;
-  left: 5.5px;
-  top: 3px;
-  width: 5px;
-  height: 8px;
-  border: solid var(--color-rosewood);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-
-.role-tile:has(:checked) .lg-tile-tick {
-  opacity: 1;
-  transform: scale(var(--tick-scale));
-}
-
-/* The tablet's tiles are wide enough for the full-size tick; the desktop card's are not. */
-@media (min-width: 640px) and (max-width: 1023.98px) {
-  .lg-tile-tick {
-    --tick-scale: 1;
-    top: 6px;
-    right: 6px;
-  }
-}
-
-.role-tile:has(:focus-visible) {
-  outline: 2px solid var(--color-brass);
-  outline-offset: 2px;
-}
-
-/* The ID typed so far can only be this person: their tile is ringed, not chosen. */
-.role-tile[data-prefix] {
-  border-color: var(--color-laterite);
-  border-style: dashed;
-}
-
-.role-tile:has(:disabled) {
-  cursor: default;
-  opacity: 0.5;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .role-tile:hover {
-    transform: translateY(-2px);
-  }
-
-  .role-tile:not(:has(:checked)):hover {
-    border-color: rgb(255 255 255 / 0.9);
-    background: rgb(255 255 255 / 0.82);
-  }
-}
-
-.field-row {
-  margin-top: 12px;
-}
-
-@media (min-width: 640px) {
-  .field-row {
-    margin-top: 16px;
-  }
-
-  .lg-roles {
-    margin-top: 16px;
-  }
-}
-
-.lg-password-row {
-  margin-top: 6px;
-}
-
-.lg-label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.lg-input {
-  display: block;
-  width: 100%;
-  min-height: 48px;
-  padding: 0 14px;
-  color: var(--color-ink);
-  font-size: var(--text-17);
-  line-height: 1.4;
-}
-
-.lg-input::placeholder {
-  color: var(--color-ink-soft);
-  opacity: 1;
-}
-
-.lg-input:focus-visible {
-  outline: 2px solid var(--color-brass);
-  outline-offset: 2px;
-}
-
-.lg-input[aria-invalid="true"] {
-  border-color: var(--color-brick);
-}
-
-.lg-input:-webkit-autofill,
-.lg-input:-webkit-autofill:hover,
-.lg-input:-webkit-autofill:focus {
-  box-shadow: inset 0 0 0 100px #fffcf7;
-  -webkit-text-fill-color: var(--color-ink);
-  caret-color: var(--color-ink);
-}
-
-.lg-input-password {
-  padding-right: 68px;
-}
-
-.lg-show {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 56px;
-  height: 44px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 10px;
-  background: none;
-  color: var(--color-ink);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.lg-show:hover {
-  background: rgb(42 26 18 / 0.06);
-}
-
-.lg-status {
-  min-height: 20px;
-  margin-top: 4px;
-  color: var(--color-ink-soft);
-  line-height: 1.45;
-}
-
-.lg-status[data-error] {
-  color: var(--color-brick);
-  font-weight: 600;
-}
-
-/* The password line keeps room for the Caps Lock chip, so nothing below it moves. */
-.lg-password-row .lg-status {
-  min-height: 24px;
-}
-
-/* A narrow phone keeps two lines, so a message that wraps does not move the button. */
-@media (max-width: 359.98px) {
-  .field-row .lg-status {
-    min-height: 38px;
-  }
-}
-
-.lg-submit {
-  width: 100%;
-  min-height: 48px;
-  margin-top: 12px;
-}
-
-/* The stamp lands beside the heading when the house is topped out. */
-.lg-stamp {
-  position: absolute;
-  top: -6px;
-  right: -4px;
+.lg-session {
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 112px;
-  padding: 4px 12px;
-  border: 3px double var(--color-kota);
-  border-radius: 10px;
-  background: rgb(255 253 249 / 0.94);
-  color: var(--color-kota);
-  line-height: 1;
-  opacity: 0;
-  pointer-events: none;
-  transform: rotate(-4deg);
+  gap: 6px;
 }
 
-.lg-kota-word {
-  line-height: 1;
-}
-
-.lg-stamp[data-kind="seal"] {
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-ink);
-}
-
-.lg-seal {
-  display: block;
-  width: 48px;
-  height: 48px;
-  overflow: visible;
-}
-
-/* Someone already signed in in this tab: who, then the way back to their screen, or out. */
-.lg-session {
-  display: grid;
-  gap: 0;
-  margin-bottom: 16px;
-  padding: 8px 12px 0;
+.lg-session p {
+  margin: 0;
 }
 
 .lg-session-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 18px;
+  gap: 16px;
 }
 
-.lg-session :is(a, button) {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
+.lg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lg-label {
+  font-weight: 600;
+}
+
+.lg-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  font-size: var(--text-17);
+}
+
+.lg-password {
+  position: relative;
+}
+
+.lg-input-password {
+  padding-right: 72px;
+}
+
+.lg-show {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+
+.lg-show:hover {
+  background: rgb(42 26 18 / 0.06);
   color: var(--color-ink);
 }
 
-/* Short phones and tablets: no room for the window as well as the card, so the brand and
-   the promise lead straight into the card, and the card is tighter. */
-@media (max-width: 1023.98px) and (max-height: 700px) {
-  .login {
-    gap: 12px;
-  }
+.lg-show:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
 
-  .lg-window-slot {
-    display: none;
-  }
+/* Always holds a line, so a message never pushes the form about. */
+.lg-status {
+  min-height: 1.3em;
+  margin: 0;
+  color: #a33a1a;
+  font-weight: 600;
+}
 
-  .lg-helper {
-    display: none;
+.lg-submit {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 6px;
+  font-size: var(--text-17);
+}
+
+.lg-foot {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: 0;
+  color: var(--color-ink);
+}
+
+.lg-foot-link {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-color: rgb(42 26 18 / 0.3);
+  text-underline-offset: 3px;
+}
+
+.lg-foot-link:hover {
+  text-decoration-color: currentColor;
+}
+
+/* ---- Entrance: the logo, then the card, rising into place ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .lg-lockup,
+  .lg-card,
+  .lg-foot {
+    animation: lg-rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
 
   .lg-card {
-    padding-block: 14px 16px;
+    animation-delay: 90ms;
   }
 
-  .role-tile {
-    min-height: 46px;
-    padding-block: 6px;
-  }
-
-  .lg-roles,
-  .field-row {
-    margin-top: 10px;
-  }
-
-  .lg-password-row {
-    margin-top: 4px;
+  .lg-foot {
+    animation-delay: 180ms;
   }
 }
 
-/* ---- The stage ---- */
-
-.login-stage {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1000 / 532;
-  overflow: hidden;
-  contain: layout paint;
-  container-type: inline-size;
-  border-radius: calc(var(--radius-card) - 1px) calc(var(--radius-card) - 1px) 0 0;
-}
-
-.login-camera {
-  position: absolute;
-  inset: 0;
-  transform-origin: 0 0;
-  transition: transform 700ms var(--ease-teak);
-}
-
-/* The flight carries the house out of its window and over the whole screen. */
-.login-stage[data-flight] {
-  overflow: visible;
-  contain: none;
-}
-
-.lg-window:has(.login-stage[data-flight]) {
-  overflow: visible;
-}
-
-.login[data-phase="success"] {
-  overflow: clip;
-}
-
-.login[data-phase="success"] .lg-scene {
-  position: relative;
-  z-index: 4;
-}
-
-.login-sky,
-.sun-x,
-.sun-y {
-  position: absolute;
-  inset: 0;
-}
-
-/* The sky and the earth reach well past the stage, so a camera move never shows an edge. */
-.login-sky::before {
-  content: "";
-  position: absolute;
-  inset: -60% -70% 0;
-  background: linear-gradient(180deg, #e4bf8f 0%, #edd3ae 37.5%, #f4e3c8 57%, #f8eddc 84%, #f5e4cb 100%);
-}
-
-.login-earth {
-  position: absolute;
-  left: -70%;
-  right: -70%;
-  top: 100%;
-  height: 45%;
-  background: var(--earth);
-}
-
-/* In the flight only the house and the site fly out over the page; the window keeps its
-   own sky, so nothing square spills out round it. The stage's sky, earth and far town fade
-   first (data-leaving), while the window still clips them, and only then go. */
-.login-sky::before,
-.login-earth,
-.sc-skyline {
-  transition: opacity 160ms var(--ease-lime);
-}
-
-.login-stage[data-leaving] .login-sky::before,
-.login-stage[data-leaving] :is(.login-earth, .sc-skyline) {
-  opacity: 0;
-}
-
-.login-stage[data-flight] .login-sky::before,
-.login-stage[data-flight] :is(.login-earth, .sc-skyline) {
-  display: none;
-}
-
-.sun-x {
-  animation: lg-sun-x 48s linear -10.5s infinite;
-}
-
-.sun-y {
-  animation: lg-sun-y 48s linear -10.5s infinite;
-}
-
-.sun {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: clamp(22px, 5cqw, 52px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  translate: -50% -50%;
-  /* A hot white core that warms to amber at the rim, with a soft glow round it. */
-  background: radial-gradient(circle at 50% 50%, #fffef8 0%, #fff6d6 30%, #ffdf8c 58%, #f7b24e 82%, #ec8f36 100%);
-  box-shadow:
-    0 0 8px 2px rgb(255 232 160 / 0.95),
-    0 0 28px 10px rgb(255 200 104 / 0.55),
-    0 0 80px 30px rgb(246 168 74 / 0.3);
-}
-
-/* The wide haze of light round the sun, breathing slowly. */
-.sun::before {
-  content: "";
-  position: absolute;
-  inset: -300%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgb(255 226 150 / 0.55) 0%, rgb(255 204 120 / 0.24) 28%, rgb(255 190 100 / 0) 62%);
-  pointer-events: none;
-  animation: lg-sun-haze 6s ease-in-out infinite alternate;
-}
-
-/* Soft shafts of light at uneven angles, feathered and blurred, turning very slowly. The
-   blur is fixed; only the turn moves. */
-.sun::after {
-  content: "";
-  position: absolute;
-  inset: -170%;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 8deg,
-    rgb(246 184 92 / 0) 0deg,
-    rgb(246 184 92 / 0.13) 5deg,
-    rgb(246 184 92 / 0) 13deg 31deg,
-    rgb(246 184 92 / 0.09) 37deg,
-    rgb(246 184 92 / 0) 44deg 70deg,
-    rgb(246 184 92 / 0.14) 77deg,
-    rgb(246 184 92 / 0) 88deg 112deg,
-    rgb(246 184 92 / 0.08) 117deg,
-    rgb(246 184 92 / 0) 123deg 151deg,
-    rgb(246 184 92 / 0.12) 159deg,
-    rgb(246 184 92 / 0) 168deg 199deg,
-    rgb(246 184 92 / 0.1) 205deg,
-    rgb(246 184 92 / 0) 213deg 236deg,
-    rgb(246 184 92 / 0.13) 244deg,
-    rgb(246 184 92 / 0) 253deg 281deg,
-    rgb(246 184 92 / 0.08) 286deg,
-    rgb(246 184 92 / 0) 292deg 318deg,
-    rgb(246 184 92 / 0.12) 326deg,
-    rgb(246 184 92 / 0) 336deg 360deg
-  );
-  filter: blur(1.5px);
-  -webkit-mask: radial-gradient(circle, transparent 0 18%, #000 30%, transparent 78%);
-  mask: radial-gradient(circle, transparent 0 18%, #000 30%, transparent 78%);
-  pointer-events: none;
-  animation: lg-sun-rays 120s linear infinite;
-}
-
-.login-stage:is([data-offscreen], [data-lite]) :is(.sun-x, .sun-y, .sc-pennant, .lb-lit) {
-  animation-play-state: paused;
-}
-
-.login-stage:is([data-offscreen], [data-lite]) .sun::before,
-.login-stage:is([data-offscreen], [data-lite]) .sun::after {
-  animation-play-state: paused;
-}
-
-.login-house {
-  position: absolute;
-  left: 6%;
-  top: 26.316%;
-  width: 72%;
-  aspect-ratio: 720 / 440;
-  container-type: inline-size;
-}
-
-/* ---- The scene, in daylight ---- */
-
-.sc {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-  fill: none;
-}
-
-.sc * {
-  vector-effect: non-scaling-stroke;
-}
-
-/* The far town, soft in the haze. */
-.sc-roofs {
-  fill: rgb(123 74 48 / 0.2);
-}
-
-.sc-palm path {
-  fill: none;
-  stroke: rgb(95 56 35 / 0.45);
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-
-.sc-palm .sc-trunk {
-  stroke-width: 3;
-}
-
-.role-layer {
-  opacity: 0;
-  transition: opacity var(--dur-row) var(--ease-lime);
-}
-
-.sc-laterite {
-  fill: var(--color-laterite);
-  stroke: rgb(42 26 18 / 0.5);
-  stroke-width: 1;
-}
-
-.sc-dashed {
-  fill: none;
-  stroke: var(--color-ink-soft);
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-}
-
-.sc-site {
-  transform-box: fill-box;
-  transform-origin: center bottom;
-  transform: scaleY(0);
-  transition: transform var(--dur-place) var(--ease-teak);
-}
-
-.sc-site-glass {
-  fill: var(--color-rosewood-2);
-  stroke: var(--color-rosewood);
-  stroke-width: 1;
-  stroke-opacity: 0.5;
-}
-
-.sc-site-mark {
-  stroke: var(--color-brass);
-  stroke-width: 2;
-  opacity: 0;
-  transition: opacity var(--dur-row) var(--ease-lime);
-}
-
-.sc-plot-dash {
-  fill: none;
-  stroke: var(--color-ink-soft);
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-  transition: opacity var(--dur-tap) var(--ease-lime);
-}
-
-.sc-plot-solid {
-  fill: none;
-  stroke: var(--color-rosewood);
-  stroke-width: 2;
-  opacity: 0;
-  transition: opacity var(--dur-tap) var(--ease-lime);
-}
-
-.sc-plot-hatch {
-  stroke: var(--color-laterite);
-  stroke-width: 1;
-  opacity: 0;
-  transition: opacity var(--dur-row) var(--ease-lime);
-}
-
-.sc-stake {
-  fill: var(--color-teak);
-  opacity: 0;
-  transform: translateY(-24px);
-  transition:
-    opacity 150ms var(--ease-lay),
-    transform 150ms var(--ease-brass);
-}
-
-.sc-plot-string {
-  fill: none;
-  stroke: var(--color-brick);
-  stroke-width: 1.5;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  transition: stroke-dashoffset 200ms var(--ease-teak);
-}
-
-.sc-pile-block {
-  fill: var(--color-laterite);
-  stroke: rgb(42 26 18 / 0.5);
-  stroke-width: 1;
-}
-
-.sc-pile-pit {
-  fill: var(--color-laterite-pit);
-}
-
-/* Casuarina poles: wood, not steel. */
-.sc-scaffold {
-  opacity: 0.6;
-  transition: opacity var(--dur-row) var(--ease-lime);
-}
-
-.sc-lift {
-  fill: none;
-  stroke: var(--color-teak);
-  stroke-width: 1;
-  transform-box: fill-box;
-  transform-origin: center bottom;
-  transition: transform var(--dur-place) var(--ease-teak);
-}
-
-.login-stage[data-lifts="1"] :is(.sc-lift[data-k="2"], .sc-lift[data-k="3"]),
-.login-stage[data-lifts="2"] .sc-lift[data-k="3"] {
-  transform: scaleY(0);
-}
-
-/* The crane in its brass paint, catching the low sun. */
-.sc-steel {
-  stroke: var(--color-brass);
-  stroke-width: 1;
-  opacity: 0.85;
-}
-
-.sc-counterweight {
-  fill: var(--color-laterite);
-  stroke: var(--color-rosewood);
-  stroke-width: 1;
-}
-
-.sc-pennant {
-  fill: var(--color-brick);
-  transform-box: fill-box;
-  transform-origin: left center;
-  animation: lg-pennant 2.4s ease-in-out infinite alternate;
-}
-
-.sc-trolley-box {
-  fill: var(--color-brass-deep);
-  stroke: var(--color-rosewood);
-  stroke-width: 1;
-}
-
-.sc-hook {
-  transform-box: view-box;
-  transform-origin: 0 0;
-}
-
-.sc-cable {
-  stroke: var(--color-rosewood-2);
-  stroke-width: 1;
-  transform-box: fill-box;
-  transform-origin: center top;
-}
-
-.sc-hook-j {
-  fill: none;
-  stroke: var(--color-rosewood-2);
-  stroke-width: 1.5;
-}
-
-.sc-carried {
-  opacity: 0;
-}
-
-.sc-carried rect {
-  fill: var(--color-laterite);
-  stroke: rgb(42 26 18 / 0.5);
-  stroke-width: 1;
-}
-
-.sc-bag rect {
-  fill: var(--color-plaster);
-  stroke: var(--color-plaster-shade);
-  stroke-width: 1;
-}
-
-.sc-pallet-board {
-  stroke: var(--color-teak);
-  stroke-width: 2;
-}
-
-/* ---- The blocks over the house ---- */
-
-.lb {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-  fill: none;
-}
-
-.lb * {
-  vector-effect: non-scaling-stroke;
-}
-
-.lb-block {
-  opacity: 0;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.lb-block[data-on] {
-  opacity: 1;
-}
-
-.lb-face {
-  fill: var(--color-laterite);
-  stroke: rgb(42 26 18 / 0.55);
-  stroke-width: 1;
-}
-
-.lb-face.lb-light {
-  fill: var(--color-laterite-face);
-}
-
-.lb-face.lb-dark,
-.lb-pits {
-  fill: var(--color-laterite-pit);
-}
-
-.lb-storey,
-.lb-frame {
-  transition: opacity var(--dur-row) var(--ease-lime);
-}
-
-/* Glass in daylight: a light warm wash with a brass glint, reflecting the low sun, so a
-   frame standing alone reads as part of the drawing, not as a dark box. */
-.lb-glass {
-  fill: rgb(123 74 48 / 0.28);
-  stroke: var(--color-rosewood);
-  stroke-width: 1;
-  stroke-opacity: 0.5;
-}
-
-.lb-mullions {
-  stroke: var(--color-brass-light);
-  stroke-width: 1;
-  stroke-opacity: 0.6;
-}
-
-.lb-joint {
-  stroke: var(--color-lime);
-  stroke-width: 1;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  opacity: 0;
-  shape-rendering: crispEdges;
-  transition:
-    stroke-dashoffset 200ms var(--ease-trowel),
-    opacity var(--dur-row) var(--ease-lime);
-}
-
-.lb-string {
-  opacity: 0;
-  transition:
-    opacity var(--dur-tap) var(--ease-lime),
-    transform var(--dur-lift) var(--ease-teak);
-}
-
-.lb-string[data-on] {
-  opacity: 1;
-}
-
-.lb-string-line {
-  stroke: var(--color-rosewood);
-  stroke-width: 1;
-}
-
-.lb-pin {
-  fill: var(--color-rosewood);
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.lb[data-brick] .lb-string-line {
-  stroke: var(--color-brick);
-}
-
-.lb[data-brick] .lb-pin {
-  fill: var(--color-brick);
-}
-
-.lb-shutter {
-  transform-box: fill-box;
-  transform-origin: center top;
-  transform: scaleY(0);
-  transition: transform var(--dur-lift) var(--ease-teak);
-}
-
-.lb-shutter-face {
-  fill: var(--color-teak);
-}
-
-.lb-slats {
-  stroke: var(--color-teak-light);
-  stroke-width: 1;
-  opacity: 0;
-  transition: opacity var(--dur-tap) var(--ease-lime);
-}
-
-.login-stage[data-shutter] .lb-shutter {
-  transform: scaleY(1);
-  transition-duration: var(--dur-place);
-}
-
-.login-stage[data-shutter] .lb-slats {
-  opacity: 1;
-  transition-delay: 200ms;
-}
-
-.lb-sweep {
-  stroke: var(--color-brass);
-  stroke-width: 2;
-  opacity: 0;
-}
-
-.lb-mote {
-  fill: var(--color-plaster-shade);
-  opacity: 0;
-}
-
-/* Warm light in the windows as the sun goes down. */
-.lb-lit {
-  fill: var(--color-brass-light);
-  opacity: 0;
-  animation: lg-dusk 48s linear -10.5s infinite;
-}
-
-.lb-door {
-  fill: var(--color-lime);
-  opacity: 0;
-}
-
-.lb-leaf {
-  opacity: 0;
-  transform-box: fill-box;
-}
-
-.lb-leaf[data-side="left"] {
-  transform-origin: left center;
-}
-
-.lb-leaf[data-side="right"] {
-  transform-origin: right center;
-}
-
-.lb-leaf rect {
-  fill: var(--color-teak);
-  stroke: var(--color-teak-light);
-  stroke-width: 1;
-}
-
-.lb-leaf path {
-  stroke: var(--color-teak-light);
-  stroke-width: 1;
-}
-
-.lb[data-door] :is(.lb-door, .lb-leaf) {
-  opacity: 1;
-}
-
-/* ---- The house, as the stage shows it ---- */
-
-/* The overlay draws its own string line. */
-.login-stage .house .string-line {
-  display: none;
-}
-
-/* The second floor's first course is typed, not shown in advance. */
-.login-stage .house .storey[data-state="under-way"] .course {
-  opacity: 0;
-  transform: translateY(-9px);
-}
-
-.login-stage .house .storey[data-state="under-way"] .wire {
-  stroke-dasharray: 3 6;
-  opacity: 0.55;
-}
-
-/* Topped out here is a fact, not a forecast: no haze, no dashed outline. */
-.login-stage .house .storey[data-future] .haze {
-  opacity: 0;
-}
-
-.login-stage .house .storey[data-future][data-state="built"] .wire {
-  opacity: 0;
-}
-
-.login-stage .house .storey[data-future][data-state="built"] .edge {
-  opacity: 1;
-}
-
-.login-stage .house .storey[data-future][data-state="built"] .lines {
-  opacity: 1;
-}
-
-.login-stage .house[data-forecast] g.pass {
-  opacity: 1;
-}
-
-.login-stage .house .storey .mass {
-  transition:
-    opacity var(--dur-row) var(--ease-lime),
-    transform var(--dur-pour) linear;
-}
-
-/* ---- The wake: once per page load the plinth pours and the first courses go down ---- */
-
-.login-stage[data-waking] .house .storey[data-storey="0"] .mass {
-  animation: house-pour var(--dur-pour) linear 100ms backwards;
-}
-
-.login-stage[data-waking] .lb-block[data-base] {
-  animation: house-lay var(--dur-course) var(--ease-lay) backwards;
-  animation-delay: calc(450ms + var(--o) * 35ms);
-}
-
-.login-stage[data-waking] .lb-frames {
-  animation: house-fade var(--dur-row) var(--ease-lime) 300ms backwards;
-}
-
-.login-stage[data-waking] .lb-string[data-on] .lb-string-in {
-  animation: house-fade var(--dur-row) var(--ease-lime) 1300ms backwards;
-}
-
-.login-stage[data-waking] .sc-trolley {
-  animation: lg-trolley-in 700ms var(--ease-teak) 200ms backwards;
-}
-
-/* ---- Who is signing in: each role moves the camera and shows its own work ---- */
-
-.login-stage[data-role="client"] .role-layer[data-for="client"],
-.login-stage[data-role="bd"] .role-layer[data-for="bd"],
-.login-stage[data-role="architect"] .role-layer[data-for="architect"],
-.login-stage[data-role="site"] .role-layer[data-for="site"],
-.login-stage[data-role="admin"] .role-layer[data-for="admin"] {
-  opacity: 1;
-}
-
-.login-stage[data-preview="client"] .role-layer[data-for="client"],
-.login-stage[data-preview="bd"] .role-layer[data-for="bd"],
-.login-stage[data-preview="architect"] .role-layer[data-for="architect"],
-.login-stage[data-preview="site"] .role-layer[data-for="site"],
-.login-stage[data-preview="admin"] .role-layer[data-for="admin"] {
-  opacity: 0.35;
-}
-
-/* The homeowner: the house still to come reads as her forecast, with her pegs on it. */
-.login-stage[data-role="client"] .house .storey[data-state="to-come"] .wire {
-  opacity: 1;
-  stroke: var(--color-brass);
-}
-
-.lg-peg {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-}
-
-.lg-peg-mark {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  height: clamp(28px, 7.2cqw, 56px);
-  width: auto;
-  translate: -50% 0;
-  overflow: visible;
-}
-
-.login-stage:is([data-role="client"], [data-preview="client"]) .lg-peg {
-  opacity: 1;
-}
-
-.login-stage[data-role="client"] .lg-peg {
-  animation: house-drop var(--dur-press) var(--ease-brass) backwards;
-  animation-delay: calc(200ms + var(--k, 0) * 85ms);
-}
-
-/* Business development: the plot is pegged out, string pulled between the stakes. */
-.login-stage:is([data-role="bd"], [data-preview="bd"]) .sc-stake {
-  opacity: 1;
-  transform: none;
-}
-
-.login-stage[data-role="bd"] .sc-stake {
-  transition-delay: calc(120ms + var(--k) * 110ms);
-}
-
-.login-stage:is([data-role="bd"], [data-preview="bd"]) .sc-plot-string {
-  stroke-dashoffset: 0;
-}
-
-.login-stage[data-role="bd"] .sc-plot-string {
-  transition-delay: calc(270ms + (var(--k) + 1) * 110ms);
-}
-
-.login-stage:is([data-role="bd"], [data-preview="bd"]) .sc-plot-dash {
-  opacity: 0;
-}
-
-.login-stage:is([data-role="bd"], [data-preview="bd"]) .sc-plot-solid {
-  opacity: 0.9;
-}
-
-.login-stage:is([data-role="bd"], [data-preview="bd"]) .sc-plot-hatch {
-  opacity: 0.35;
-}
-
-.login-stage[data-role="bd"] :is(.sc-plot-dash, .sc-plot-solid, .sc-plot-hatch) {
-  transition-delay: 640ms;
-}
-
-/* The architect: a T-square sweeps the house down into its own elevation drawing. */
-.login-stage[data-role="architect"] .lb-sweep {
-  animation: lg-sweep 820ms var(--ease-teak) both;
-}
-
-.login-stage[data-role="architect"] .lb-storey {
-  opacity: 0.18;
-  transition-delay: calc((3 - var(--s, 0)) * 170ms);
-}
-
-.login-stage[data-role="architect"] .house .storey .mass {
-  opacity: 0.18;
-  transition-delay: calc((3 - var(--s, 0)) * 170ms);
-}
-
-.login-stage[data-role="architect"] .house .storey .wire {
-  opacity: 0.9;
-  stroke: var(--color-rosewood);
-  stroke-dasharray: none;
-}
-
-.login-stage[data-role="architect"] .lb-glass {
-  stroke: var(--color-rosewood);
-  stroke-opacity: 0.9;
-}
-
-.lg-dims > * {
-  position: absolute;
-  opacity: 0;
-  transform: translateY(4px);
-  transition:
-    opacity var(--dur-row) var(--ease-lime),
-    transform var(--dur-row) var(--ease-lime);
-}
-
-.login-stage:is([data-role="architect"], [data-preview="architect"]) .lg-dims > * {
-  opacity: 1;
-  transform: none;
-}
-
-.login-stage[data-role="architect"] .lg-dims > * {
-  transition-delay: calc(700ms + var(--k, 0) * 60ms);
-}
-
-.lg-dim-run {
-  height: 0;
-  border-top: 1px solid var(--color-rosewood);
-}
-
-.lg-dim-run::before,
-.lg-dim-run::after {
-  content: "";
-  position: absolute;
-  top: -4px;
-  width: 1px;
-  height: 7px;
-  background: var(--color-rosewood);
-  rotate: 45deg;
-}
-
-.lg-dim-run::before {
-  left: 0;
-}
-
-.lg-dim-run::after {
-  right: 0;
-}
-
-.lg-dim-label {
-  position: absolute;
-  left: 50%;
-  bottom: 2px;
-  translate: -50% 0;
-  color: var(--color-ink);
-  white-space: nowrap;
-}
-
-.lg-level {
-  translate: 0 -50%;
-  padding-right: 4px;
-  color: var(--color-ink);
-  white-space: nowrap;
-}
-
-@media (max-width: 639.98px) {
-  .lg-dims {
-    display: none;
-  }
-}
-
-/* The site engineer: the crane brings a pallet of cement down beside the house. */
-.login-stage[data-role="site"] .sc-scaffold {
-  opacity: 0.95;
-}
-
-.login-stage[data-role="site"] .sc-pallet-at {
-  transition-duration: 0s;
-}
-
-/* Procurement and finance: lime runs into every finished course, as money into a paid stage. */
-.login-stage[data-role="finance"] .lb-joint[data-full],
-.login-stage[data-preview="finance"] .lb-joint[data-full] {
-  stroke-dashoffset: 0;
-  stroke-width: 2;
-  opacity: 0.92;
-}
-
-.login-stage[data-preview="finance"] .lb-joint[data-full] {
-  opacity: 0.35;
-}
-
-.login-stage[data-role="finance"] .lb-joint[data-full] {
-  transition:
-    stroke-dashoffset 400ms var(--ease-trowel),
-    opacity var(--dur-row) var(--ease-lime);
-  transition-delay: calc(var(--c, 0) * 45ms);
-}
-
-/* The admin: the camera pulls back and the other sites rise on the horizon. */
-.login-stage:is([data-role="admin"], [data-preview="admin"]) .sc-site {
-  transform: none;
-}
-
-.login-stage[data-role="admin"] .sc-site {
-  transition-delay: calc(var(--k) * 120ms);
-}
-
-.login-stage:is([data-role="admin"], [data-preview="admin"]) .sc-site-mark {
-  opacity: 0.9;
-}
-
-.login-stage[data-role="admin"] .sc-site-mark {
-  transition-delay: 440ms;
-}
-
-.lg-trenches {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.lg-trench {
-  position: absolute;
-  top: calc(100% + 0.4%);
-  opacity: 0;
-  transform: translateY(6px);
-  transition:
-    opacity var(--dur-row) var(--ease-lime),
-    transform var(--dur-row) var(--ease-lime);
-}
-
-.lg-trench svg {
-  width: 100%;
-  height: auto;
-}
-
-.login-stage:is([data-role="admin"], [data-preview="admin"]) .lg-trench {
-  opacity: 1;
-  transform: none;
-}
-
-.login-stage[data-role="admin"] .lg-trench {
-  transition-delay: calc(560ms + var(--k, 0) * 120ms);
-}
-
-/* ---- Topped out: the house is finished and the door opens on their screen ---- */
-
-.lb[data-topping] .lb-block {
-  opacity: 1;
-}
-
-.lb[data-topping] .lb-block:not([data-on]) {
-  animation: house-lay var(--dur-course) var(--ease-lay) backwards;
-  animation-delay: min(calc((var(--o) - var(--from, 0)) * 3ms), 260ms);
-}
-
-.login-stage[data-phase="success"] .lb-work {
-  opacity: 0;
-  transition: opacity 180ms var(--ease-lime) 220ms;
-}
-
-.login-stage[data-phase="success"] .lb-lit {
-  animation: none;
-  opacity: 0.6;
-  transition: opacity 200ms var(--ease-lime) 640ms;
-}
-
-.login-stage[data-phase="success"] :is(.sc-scaffold, .role-layer, .role-layer[data-for]) {
-  opacity: 0;
-  transition: opacity var(--dur-lift) var(--ease-lime) 300ms;
-}
-
-.login[data-phase="success"] .lg-exit {
-  opacity: 0;
-  transform: translateX(24px);
-  transition:
-    opacity 180ms var(--ease-lime) 960ms,
-    transform 180ms var(--ease-lime) 960ms;
-}
-
-/* The light through the open door: the same warm lime the next screen fades in from. */
-.lg-light {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 50;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  background: var(--color-lime);
-  pointer-events: none;
-  transform-origin: center;
-}
-
-.lg-veil {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  opacity: 0;
-  background: var(--color-lime);
-  pointer-events: none;
-}
-
-.lg-opening {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  z-index: 51;
-  translate: -50% -50%;
-  color: rgb(42 26 18 / 0.7);
-  animation: house-fade var(--dur-row) var(--ease-lime) both;
-}
-
-/* ---- Less motion: a still golden-hour frame. Every state is still reached. ---- */
-
-@media (prefers-reduced-motion: reduce) {
-  .sun-x,
-  .sun-y,
-  .sun::before,
-  .sun::after,
-  .sc-pennant,
-  .lb-lit {
-    animation: none;
+@keyframes lg-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
 
-  .sun-x {
-    transform: translateX(12%);
-  }
-
-  .sun-y {
-    transform: translateY(66%);
-  }
-
-  .lb-lit {
-    opacity: 0.3;
-  }
-
-  .login-camera {
-    transform: none !important;
-  }
-
-  .role-tile:hover {
-    transform: none !important;
-  }
-
-  .login[data-phase="success"] .lg-exit {
+  to {
+    opacity: 1;
     transform: none;
   }
 }
 
-.login-stage[data-reduced] .login-camera {
-  transform: none !important;
-}
-
-.login-stage[data-reduced] .role-layer {
-  transition: opacity 200ms linear !important;
-  transition-delay: 0s !important;
-}
-
-.login-stage[data-reduced][data-phase="success"] .lb-work {
-  display: none;
-}
-
-.login[data-reduced][data-phase="success"] .lg-stamp {
-  opacity: 1;
-}
-
-.login[data-reduced][data-phase="success"] .lg-veil {
-  opacity: 1;
-  transition: opacity 200ms linear !important;
-  transition-delay: 0s !important;
-}
-
-/* ---- Keyframes ---- */
-
-@keyframes lg-sun-haze {
-  from {
-    opacity: 0.7;
-    transform: scale(0.94);
+@media (max-width: 479.98px) {
+  .login {
+    padding: 28px 16px;
+    align-items: start;
   }
 
-  to {
-    opacity: 1;
-    transform: scale(1.06);
-  }
-}
-
-@keyframes lg-sun-rays {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes lg-sun-x {
-  from {
-    transform: translateX(-6%);
+  .lg-column {
+    gap: 22px;
   }
 
-  to {
-    transform: translateX(96%);
-  }
-}
-
-/* An arc: up from behind the ground at the left, down behind it at the right. */
-@keyframes lg-sun-y {
-  0% {
-    transform: translateY(112%);
-    animation-timing-function: cubic-bezier(0.25, 0.6, 0.5, 1);
+  .lg-mark {
+    width: 48px;
   }
 
-  50% {
-    transform: translateY(36%);
-    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
-  }
-
-  100% {
-    transform: translateY(112%);
-  }
-}
-
-/* Evening: the lights come on as the sun goes down, and go off before it rises. */
-@keyframes lg-dusk {
-  0%,
-  84% {
-    opacity: 0;
-  }
-
-  90%,
-  97% {
-    opacity: 0.55;
-  }
-
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes lg-pennant {
-  from {
-    transform: skewY(-6deg);
-  }
-
-  to {
-    transform: skewY(6deg);
-  }
-}
-
-@keyframes lg-trolley-in {
-  from {
-    transform: translateX(120px);
-  }
-}
-
-@keyframes lg-sweep {
-  0% {
-    transform: translateY(38px);
-    opacity: 1;
-  }
-
-  85% {
-    transform: translateY(392px);
-    opacity: 1;
-  }
-
-  100% {
-    transform: translateY(392px);
-    opacity: 0;
+  .lg-card {
+    padding: 24px 20px 20px;
   }
 }
