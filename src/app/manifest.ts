@@ -5,7 +5,8 @@ import type { MetadataRoute } from "next";
 import { DESCRIPTION, SITE_NAME } from "./shared-metadata";
 
 // For the people who add the portal to a phone's home screen, site engineers above all: it
-// opens like an app, on the sand of the glass backdrop, with the house mark as its icon.
+// opens like an app, on the sand of the glass backdrop, with the firm's orange house mark on
+// a cream tile as its icon (the maskable one keeps the mark inside the central safe circle).
 
 export default function manifest(): MetadataRoute.Manifest {
   return {

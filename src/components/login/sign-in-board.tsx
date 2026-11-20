@@ -15,7 +15,6 @@ import {
 import { SealMark } from "@/components/house/house";
 import type { DemoAccount } from "@/lib/demo-accounts";
 import { ROLE_SENTENCE } from "./role-caption";
-import { RoleGlyph } from "./role-glyphs";
 import { ROLES, type LoginRole } from "./site-model";
 
 // The sign-in card: who is signing in, their ID and password, and the stamp that lands
@@ -170,7 +169,6 @@ export const SignInBoard = memo(function SignInBoard({
                 disabled={success && role !== r}
                 onChange={() => on.onRole(r, null)}
               />
-              <RoleGlyph role={r} />
               <span className="lg-tile-label">
                 <span className="lg-tile-short">{TILE[r].short}</span>
                 <span className="lg-tile-long">{TILE[r].long}</span>

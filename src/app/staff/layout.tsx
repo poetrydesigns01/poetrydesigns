@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 // only once someone has signed in on the first screen.
 export default function StaffLayout({ children }: LayoutProps<"/staff">) {
   return (
-    <SessionGate>
+    <SessionGate area="staff">
       <StaffShell>{children}</StaffShell>
     </SessionGate>
   );

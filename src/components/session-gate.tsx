@@ -6,6 +6,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { Brand } from "@/components/brand";
+import { accountForId } from "@/lib/demo-accounts";
 import { useDemo, useStoreReady } from "@/lib/demo-store";
 import { ArrivalVeil } from "./arrival-veil";
 
@@ -19,15 +20,20 @@ import { ArrivalVeil } from "./arrival-veil";
 // read (the key below), and every hook in it starts from the tab's events. After that the
 // gate stays open across navigations, so nothing remounts.
 
-export function SessionGate({ children }: { children: ReactNode }) {
+// Each area opens only for its own people: the homeowner's screens for the client, the staff
+// screens for the team. Anyone else is sent to their own home.
+export function SessionGate({ area, children }: { area: "client" | "staff"; children: ReactNode }) {
   const onClient = useStoreReady();
   const { session } = useDemo();
   const router = useRouter();
-  const open = onClient && session !== null;
+  const belongs = session !== null && (area === "client") === (session.role === "client");
+  const open = onClient && belongs;
 
   useEffect(() => {
-    if (onClient && session === null) router.replace("/");
-  }, [onClient, session, router]);
+    if (!onClient) return;
+    if (session === null) router.replace("/");
+    else if (!belongs) router.replace(accountForId(session.id)?.home ?? "/");
+  }, [onClient, session, belongs, router]);
 
   return (
     <>

@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 // on the glass backdrop (.glass-world in globals.css).
 export default function ClientLayout({ children }: LayoutProps<"/client">) {
   return (
-    <SessionGate>
+    <SessionGate area="client">
       <Settle>
         <PauseProvider>
           <div className="glass-world flex min-h-svh flex-1 flex-col">

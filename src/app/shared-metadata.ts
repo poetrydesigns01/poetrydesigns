@@ -37,7 +37,7 @@ export const DESCRIPTION =
   "The Poetry Designs portal: homeowners and the team follow drawings, approvals, site updates and payments for every home Poetry designs and builds in Bengaluru.";
 
 /** The words of opengraph-image.alt.txt and twitter-image.alt.txt. */
-export const SOCIAL_IMAGE_ALT = "Poetry Designs: a house half drawn, half built in laterite. From concept to reality.";
+export const SOCIAL_IMAGE_ALT = "Poetry Designs: the orange house mark beside the word POETRY. From concept to reality.";
 
 /** app/opengraph-image.png, for a segment that sets its own openGraph. */
 export const SOCIAL_IMAGE = {

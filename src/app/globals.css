@@ -3537,68 +3537,53 @@ input.staff-field::-webkit-calendar-picker-indicator {
 }
 
 /* ---- The brand ----
-   One lockup, components/brand.tsx: the mark stands on the name's baseline, the name is set
-   in Eczar at its heavier weight, and a project or a place follows as a quiet second. Every
-   length is in em of the name, so one font size per variant sets the whole lockup. */
+   One lockup, components/brand.tsx: the firm's house mark beside its word POETRY, both in
+   the logo's own orange on every ground, never recoloured. The word's capitals are centred
+   in its image, so centring the two centres the capitals on the mark. Every length is a
+   share of the mark's height, --brand-h, so one height per variant sets the whole lockup:
+   the word is 0.495 of it (capitals 0.47), the space between them 0.3. */
 
 .brand {
-  --brand-ink: currentColor;
-  --brand-built: var(--color-laterite);
+  --brand-h: 32px;
   --brand-second: var(--color-ink-soft);
   --brand-hair: rgb(42 26 18 / 0.22);
   display: inline-grid;
   grid-template-columns: auto auto auto minmax(0, auto);
   grid-template-areas: "mark word rule context";
-  align-items: baseline;
+  align-items: center;
   max-width: 100%;
   min-width: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-22);
   line-height: 1;
-  color: var(--brand-ink);
 }
 
 .on-dark .brand {
-  --brand-built: currentColor;
   --brand-second: rgb(250 248 245 / 0.75);
   --brand-hair: rgb(250 248 245 / 0.28);
 }
 
 .brand-mark {
   grid-area: mark;
-  width: 0.86em;
-  height: 0.86em;
-  margin-right: 0.3em;
-  overflow: visible;
-}
-
-.brand-mark-drawn {
-  fill: none;
-  stroke: var(--brand-ink);
-  stroke-width: 1.9;
-  stroke-dasharray: 3 2.4;
-  stroke-linecap: butt;
-  stroke-linejoin: miter;
-  opacity: 0.6;
-}
-
-.brand-mark-built {
-  fill: var(--brand-built);
+  display: block;
+  width: calc(var(--brand-h) * 0.964);
+  height: var(--brand-h);
+  margin-right: calc(var(--brand-h) * 0.3);
 }
 
 .brand-word {
   grid-area: word;
-  font-weight: 600;
-  letter-spacing: -0.022em;
-  white-space: nowrap;
+  display: block;
+  width: auto;
+  max-width: none;
+  height: calc(var(--brand-h) * 0.495);
+  user-select: none;
 }
 
 .brand-rule {
   grid-area: rule;
   display: none;
   width: 1px;
-  height: 0.78em;
-  margin-inline: 0.55em 0.5em;
+  height: calc(var(--brand-h) * 0.62);
+  margin-inline: calc(var(--brand-h) * 0.4) 12px;
   background: var(--brand-hair);
 }
 
@@ -3616,21 +3601,28 @@ input.staff-field::-webkit-calendar-picker-indicator {
   text-overflow: ellipsis;
 }
 
-/* Inline: a hairline from the baseline to the cap height, then the context on the baseline. */
+/* Inline: a hairline as tall as the mark's walls, then the context, all on the mark's middle. */
 .brand[data-layout="inline"] .brand-rule {
   display: block;
 }
 
-/* Stacked: the context hangs under the name, from its first letter. */
+/* Stacked: the mark stands beside two lines, the word and under it the context, from the
+   word's first letter. */
 .brand[data-layout="stacked"] {
   grid-template-columns: auto minmax(0, auto);
   grid-template-areas:
     "mark word"
-    ". context";
-  row-gap: 0.3em;
+    "mark context";
+  align-content: center;
+  row-gap: 4px;
+}
+
+.brand[data-layout="stacked"] .brand-word {
+  align-self: end;
 }
 
 .brand[data-layout="stacked"] .brand-context {
+  align-self: start;
   font-size: var(--text-13);
   font-weight: 560;
   letter-spacing: 0.01em;
@@ -3641,11 +3633,17 @@ input.staff-field::-webkit-calendar-picker-indicator {
     grid-template-columns: auto minmax(0, auto);
     grid-template-areas:
       "mark word"
-      ". context";
-    row-gap: 0.22em;
+      "mark context";
+    align-content: center;
+    row-gap: 4px;
+  }
+
+  .brand[data-layout="adaptive"] .brand-word {
+    align-self: end;
   }
 
   .brand[data-layout="adaptive"] .brand-context {
+    align-self: start;
     font-size: var(--text-13);
     font-weight: 560;
     letter-spacing: 0.01em;
@@ -3658,35 +3656,39 @@ input.staff-field::-webkit-calendar-picker-indicator {
   }
 }
 
-/* The narrowest phones keep the name whole and let the context go. */
-@media (max-width: 359.98px) {
+/* A laptop's bar has the room for a slightly larger logo; the staff rail, where the logo is
+   the first thing in its column, larger again. */
+@media (min-width: 1024px) {
   .brand-nav {
-    font-size: var(--text-17);
+    --brand-h: 36px;
   }
+}
 
+.brand-rail {
+  --brand-h: 40px;
+}
+
+/* The narrowest phones keep the logo whole and let the context go. */
+@media (max-width: 359.98px) {
   .brand[data-layout="adaptive"] .brand-context {
     display: none;
   }
 }
 
-/* The sign-in page: the name leads at display size. */
+/* The sign-in and invitation pages: the logo leads, well above everything else. */
 .brand-hero {
-  font-size: var(--text-32);
+  --brand-h: 56px;
 }
 
-.brand-hero .brand-mark {
-  margin-right: 0.24em;
-}
-
-.brand-hero .brand-word {
-  letter-spacing: -0.028em;
-}
-
-/* From an ordinary phone up the name is set at display size; at 44px it is about 335px wide,
-   so only the narrowest phones keep it at 32. */
-@media (min-width: 370px) {
+@media (min-width: 640px) {
   .brand-hero {
-    font-size: var(--text-display);
+    --brand-h: 72px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .brand-hero {
+    --brand-h: 88px;
   }
 }
 

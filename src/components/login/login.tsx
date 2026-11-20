@@ -497,7 +497,7 @@ function LoginScreen({ onLeft }: { onLeft: () => void }) {
 
       <div className="lg-scene">
         <p className="lg-wordmark lg-exit">
-          <Brand size="hero" />
+          <Brand size="hero" priority />
         </p>
         <div className="lg-view">
           <p className="display lg-tagline lg-exit">From concept to reality.</p>

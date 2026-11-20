@@ -4,13 +4,13 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { PoetryMark, WORDMARK } from "@/components/brand";
 
 // The last resort, for a failure in the root layout itself. It replaces the whole document
 // and gets none of the portal's stylesheet or fonts, so the brand, the card and the two ways
 // on are set inline, in the portal's colours, with the system's own type.
 
 const INK = "#2a1a12";
-const LATERITE = "#7b4a30";
 const DISPLAY = "Georgia, 'Times New Roman', serif";
 
 const button: CSSProperties = {
@@ -60,28 +60,18 @@ export default function GlobalError({ retry }: { error: unknown; retry: () => vo
             boxShadow: "0 12px 32px -14px rgb(74 44 26 / 0.3)",
           }}
         >
-          <p
-            style={{
-              margin: 0,
-              display: "inline-flex",
-              alignItems: "baseline",
-              fontFamily: DISPLAY,
-              fontSize: "1.375rem",
-              fontWeight: 600,
-              lineHeight: 1,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            <svg
-              viewBox="2 2 28 28"
-              aria-hidden="true"
-              focusable="false"
-              style={{ width: "0.86em", height: "0.86em", marginRight: "0.3em", overflow: "visible" }}
-            >
-              <path d="M15.4 4.2 4 13.4V29h11.4" fill="none" stroke={INK} strokeWidth={1.9} strokeDasharray="3 2.4" opacity={0.6} />
-              <path d="M16.6 3 29 13v17h-6.2v-8.6h-3.9V30h-2.3z" fill={LATERITE} />
-            </svg>
-            Poetry Designs
+          <p style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: 10 }}>
+            <PoetryMark height={32} style={{ display: "block" }} />
+            {/* The firm's own lettering, as on every other page. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={WORDMARK.src}
+              width={WORDMARK.width}
+              height={WORDMARK.height}
+              alt="Poetry Designs"
+              decoding="async"
+              style={{ display: "block", width: "auto", height: 16 }}
+            />
           </p>
           <h1 style={{ margin: 0, fontFamily: DISPLAY, fontSize: "2rem", fontWeight: 500, lineHeight: 1.12 }}>
             Something went wrong
