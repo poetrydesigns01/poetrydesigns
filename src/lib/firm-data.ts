@@ -12,6 +12,7 @@ import {
   type Task,
 } from "./demo-data";
 import type { StoreyGroup } from "./projection";
+import type { DeskEventBody } from "./bd-data";
 import { projectCode, type PlanSeed } from "./workflow-plan";
 import { milestoneStage, WORKFLOW_TEMPLATE } from "./workflow-template";
 
@@ -108,7 +109,7 @@ export const people: Person[] = [
     name: "Kavya Reddy",
     first: "Kavya",
     role: "bd",
-    title: "Client relations, point of contact",
+    title: "Client relations",
     senior: false,
     lead: "rohan",
     phone: "+91 98450 01122",
@@ -579,6 +580,10 @@ export type ProjectSeed = {
   originalValue: number;
   /** Approved before the demo. */
   revisions: { id: string; label: string; amount: number; days: number; approvedAt: string }[];
+  /**
+   * `poc` is the BD person who holds the client, from the enquiry on: the contact the client
+   * sees, the one their feedback (NPS) counts for, and the one escalations go to (advisorOf).
+   */
   team: { poc: PersonId; head: PersonId; architects: PersonId[]; engineers: PersonId[]; procurement: PersonId[] };
   /** BD's note to the Project Head. */
   handoff: string;
@@ -700,7 +705,7 @@ export const projects: ProjectSeed[] = [
         approvedAt: "2026-06-12T20:05",
       },
     ],
-    team: { poc: "kavya", head: "vikram", architects: ["ananya"], engineers: ["suresh", "manjunath"], procurement: ["prakash"] },
+    team: { poc: "rohan", head: "vikram", architects: ["ananya"], engineers: ["suresh", "manjunath"], procurement: ["prakash"] },
     handoff: "Meera and Arjun live in Dubai until March 2027. Calls after 7 pm. They want the prayer room facing east.",
     phase: "building",
     milestones: iyerRows,
@@ -739,7 +744,7 @@ export const projects: ProjectSeed[] = [
     onboardedBy: "rohan",
     originalValue: 4320000,
     revisions: [],
-    team: { poc: "kavya", head: "lakshmi", architects: ["karan"], engineers: [], procurement: ["prakash"] },
+    team: { poc: "rohan", head: "lakshmi", architects: ["karan"], engineers: [], procurement: ["prakash"] },
     handoff: "Same family as Iyer Residence. They want a deep verandah and a rainwater tank.",
     phase: "in-design",
     milestones: schedule("farmhouse", 4320000, { 0: { state: "paid", paidOn: "2026-10-06" } }),
@@ -832,7 +837,7 @@ export const projects: ProjectSeed[] = [
     onboardedBy: "rohan",
     originalValue: 7670000,
     revisions: [],
-    team: { poc: "kavya", head: "lakshmi", architects: ["ananya", "karan"], engineers: ["ravi"], procurement: ["prakash"] },
+    team: { poc: "rohan", head: "lakshmi", architects: ["ananya", "karan"], engineers: ["ravi"], procurement: ["prakash"] },
     handoff: "Leah works from home and wants the study away from the road.",
     phase: "building",
     // Construction milestone 2 (ground floor block work) under way.
@@ -992,7 +997,7 @@ export const projects: ProjectSeed[] = [
     onboardedBy: "rohan",
     originalValue: 5720000,
     revisions: [],
-    team: { poc: "kavya", head: "lakshmi", architects: ["karan"], engineers: [], procurement: ["prakash"] },
+    team: { poc: "rohan", head: "lakshmi", architects: ["karan"], engineers: [], procurement: ["prakash"] },
     handoff: "Rakesh wants the design fast; he has a plan approval appointment in December.",
     phase: "invited",
     milestones: schedule("cement-blocks", 5720000, { 0: { state: "paid", paidOn: "2026-11-06" } }),
@@ -1024,7 +1029,7 @@ export const projects: ProjectSeed[] = [
     onboardedBy: "rohan",
     originalValue: 6720000,
     revisions: [],
-    team: { poc: "kavya", head: "lakshmi", architects: [], engineers: [], procurement: ["prakash"] },
+    team: { poc: "rohan", head: "lakshmi", architects: [], engineers: [], procurement: ["prakash"] },
     handoff: "",
     phase: "draft",
     milestones: [],
@@ -1470,10 +1475,10 @@ export const registerNotes: RegisterNote[] = [
     id: "note:iyer-split",
     projectId: "iyer",
     for: "vikram",
-    by: "kavya",
+    by: "rohan",
     on: "2026-11-09",
     n: 6,
-    text: "Kavya noted on 9 Nov that Meera's bank releases instalment 6 in two parts.",
+    text: "Rohan noted on 9 Nov that Meera's bank releases instalment 6 in two parts.",
   },
 ];
 
@@ -1848,9 +1853,11 @@ export const seedCredits: Credits[] = [
   { projectId: "sharma", before: { granted: 12, used: 0 }, during: { granted: 8, used: 0 }, constructionStarted: false },
 ];
 
-export const seedCreditRequests: CreditRequest[] = [
-  { id: "hours:nair-1", projectId: "nair", by: "Priya Nair", hours: 4, at: "2026-11-06T18:30" },
-];
+/**
+ * @deprecated Hours asked for are client requests now, routed to the Project Head, not BD:
+ * Priya Nair's 4 hours is `req-nair-1` in bd-data.ts `seedDeskEvents`.
+ */
+export const seedCreditRequests: CreditRequest[] = [];
 
 export const seedAdditions: CreditAddition[] = [
   {
@@ -1867,7 +1874,10 @@ export const seedAdditions: CreditAddition[] = [
   },
 ];
 
-/** Price of bought hours, before GST. Sample, open question. */
+/**
+ * @deprecated Hours are charged at the admin's architect fee now: `firm.feeRule.ratePerHour`
+ * (seed `SEED_FEE_RULE` in bd-data.ts, ₹3,500 an hour plus GST). Kept for the older hours screens.
+ */
 export const HOUR_PRICE = 5000;
 /** Low means this many hours or fewer left in the current pool. */
 export const LOW_HOURS = 3;
@@ -1912,7 +1922,7 @@ export const seedPosts: Post[] = [
   {
     id: "p3",
     projectId: "iyer",
-    by: "kavya",
+    by: "rohan",
     at: "2026-10-31T10:15",
     text: "Yes. Suresh will keep two samples at site from 10 am.",
     photos: [],
@@ -2121,7 +2131,10 @@ export const designSummaries: DesignSummary[] = [
 
 // ---- Onboarding ----
 
-export type DraftId = "kulkarni" | "new";
+export type DraftId = "kulkarni" | "new" | "new-2" | "new-3";
+
+/** The blank onboarding drafts a prospect's sign-up fills, first free first. */
+export const BLANK_DRAFT_IDS: DraftId[] = ["new", "new-2", "new-3"];
 
 export type DraftStep1 = {
   clients: string[];
@@ -2208,6 +2221,8 @@ export const seedDrafts: Draft[] = [
     },
   },
   { id: "new", startedAt: "", by: "rohan" },
+  { id: "new-2", startedAt: "", by: "rohan" },
+  { id: "new-3", startedAt: "", by: "rohan" },
 ];
 
 // ---- Emails (only ever shown as previews) ----
@@ -2355,7 +2370,9 @@ export type EventBody =
   /** The admin generated (or re-generated) a project's plan from the workflow template. */
   | { kind: "plan.generated"; projectId: ProjectId; preStart: string; constructionStart?: string }
   /** The admin gave a plan task to someone else. `taskId` is the template task id ("m4-ff-blocks"). */
-  | { kind: "plan.task-assigned"; projectId: ProjectId; taskId: string; to: PersonId; from?: PersonId; reason?: string };
+  | { kind: "plan.task-assigned"; projectId: ProjectId; taskId: string; to: PersonId; from?: PersonId; reason?: string }
+  // ---- Prospects, client requests and fees, client feedback, architects on a project, pictures (bd-data.ts) ----
+  | DeskEventBody;
 
 /** One entry in the record. `id` is "e1", "e2", ... in order; `at` comes from stampNow(). */
 export type FirmEvent = EventBody & { id: string; at: string; by: PersonId };

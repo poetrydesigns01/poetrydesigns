@@ -7,7 +7,7 @@ import { titled } from "@/app/shared-metadata";
 
 // Names the screen in the browser tab and in history; the page draws the rest.
 
-export const metadata: Metadata = { title: titled("Desk") };
+export const metadata: Metadata = { title: titled("Today") };
 
 export default function StaffArchitectLayout({ children }: { children: ReactNode }) {
   return children;

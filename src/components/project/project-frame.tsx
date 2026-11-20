@@ -9,15 +9,16 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { stageChip } from "@/components/admin/admin-data";
 import { Icon, Meter } from "@/components/admin/glass-kit";
 import { Brand } from "@/components/brand";
-import { ProjectMark } from "@/components/instruments/project-mark";
 import { PersonMenu } from "@/components/register/person-menu";
 import { PLACES, useStaffRole } from "@/components/register/staff-shell";
 import { StatusChip } from "@/components/register/status-chip";
+import { ProjectPicture } from "@/components/shared/project-tile";
 import { useFirm } from "@/lib/demo-store";
 import { templateOf, type ProjectId, type StaffRole } from "@/lib/firm-data";
 
-// The project record's frame: a glass header with the project's name, code, category, its
-// stage and how far the payment stages have come, then the row of tabs as glass pills. A
+// The project record's frame: a glass header with the project's picture (the uploaded 3D
+// elevation, else the house drawn), its name, code, category, its stage and how far the
+// payment stages have come, then the row of tabs as glass pills. A
 // tab a role may not open is not drawn. A draft shows how far its setting up has gone.
 
 type Tab = { label: string; path: string; roles?: StaffRole[] };
@@ -29,7 +30,8 @@ const TABS: Tab[] = [
   { label: "Designs", path: "/designs" },
   { label: "Materials", path: "/materials" },
   { label: "Estimate", path: "/estimate" },
-  { label: "Hours", path: "/hours" },
+  { label: "Requests", path: "/hours" },
+  { label: "Team", path: "/team" },
   { label: "Money", path: "/money", roles: ["finance", "admin"] },
   { label: "Log", path: "/log" },
 ];
@@ -89,7 +91,7 @@ export function ProjectFrame({ projectId, children }: { projectId: ProjectId; ch
             {home.label}
           </Link>
           <div className="flex items-center gap-3">
-            <ProjectMark projectId={p.id} tone="light" className="w-12 shrink-0 sm:w-14" />
+            <ProjectPicture project={p} thumbnail={firm.thumbnail(p.id)} className="w-16 shrink-0 sm:w-24" />
             <h1 className="display min-w-0 flex-1 text-balance text-22 text-ink lg:text-32">{p.name}</h1>
             {/* On a phone the map is one round button beside the name, not a line of its own. */}
             <a

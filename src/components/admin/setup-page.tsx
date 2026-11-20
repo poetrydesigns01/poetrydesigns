@@ -12,21 +12,23 @@ import { emailRules } from "@/lib/firm-data";
 import { formatShortDate, formatStampShort, inr } from "@/lib/format";
 import { vendorWhat } from "./admin-data";
 import { CatalogueTab } from "./catalogue-tab";
+import { FeeRuleTab } from "./fee-rule";
 import { Count, GlassTable, Icon, Panel, Segments } from "./glass-kit";
 import { TemplatesTab } from "./templates-tab";
 import { StruckNote, TwoStepDelete } from "./two-step-delete";
 import { WorkflowTab } from "./workflow-tab";
 
-// The admin's setup: the project workflow, category templates, the material catalogue, vendors, the email rules
-// and the platform. One tab at a time.
+// The admin's setup: the project workflow, category templates, the material catalogue, vendors, the architect
+// fee, the email rules and the platform. One tab at a time.
 
-type Tab = "workflow" | "templates" | "catalogue" | "vendors" | "emails" | "platform";
+type Tab = "workflow" | "templates" | "catalogue" | "vendors" | "fees" | "emails" | "platform";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "workflow", label: "Workflow" },
   { id: "templates", label: "Templates" },
   { id: "catalogue", label: "Catalogue" },
   { id: "vendors", label: "Vendors" },
+  { id: "fees", label: "Fees" },
   { id: "emails", label: "Emails" },
   { id: "platform", label: "Platform" },
 ];
@@ -36,6 +38,7 @@ const HEADLINES: Record<Tab, string> = {
   templates: "Category templates",
   catalogue: "Material catalogue",
   vendors: "Vendors",
+  fees: "Architect fee",
   emails: "Email rules",
   platform: "Platform",
 };
@@ -51,6 +54,7 @@ export function SetupPage() {
         {tab === "templates" && <TemplatesTab />}
         {tab === "catalogue" && <CatalogueTab />}
         {tab === "vendors" && <VendorsTab />}
+        {tab === "fees" && <FeeRuleTab />}
         {tab === "emails" && <EmailsTab />}
         {tab === "platform" && <PlatformTab />}
       </div>

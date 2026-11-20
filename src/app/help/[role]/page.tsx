@@ -10,7 +10,7 @@ import { GUIDE_ROLES, GUIDES, isGuideRole, type Guide } from "@/components/guide
 import { OpenStep } from "@/components/guides/open-step";
 import { countWord } from "@/lib/format";
 
-// One role's guide: three to five numbered steps, each with the screen it happens on.
+// One role's guide: five or six numbered steps, each with the screen it happens on.
 
 export function generateStaticParams() {
   return GUIDE_ROLES.map((role) => ({ role }));

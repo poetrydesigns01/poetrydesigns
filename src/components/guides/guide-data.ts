@@ -1,7 +1,7 @@
 /*
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
-// The short guides for the training session: one per role, three to five steps each. Every
+// The short guides for the training session: one per role, five or six steps each. Every
 // step is one sentence, one line on how it is done, and the screen it happens on. Plain
 // data, so the guide pages can be drawn on the server.
 
@@ -38,7 +38,7 @@ export const GUIDES: Record<GuideRole, Guide> = {
     steps: [
       {
         text: "Your home shows what is waiting for you.",
-        how: "The brass peg on the house marks the next thing, and the list under it says what slips if it waits.",
+        how: "The brass peg on the house marks the next thing. After each milestone, it asks you to rate us 0 to 10.",
         href: "/client",
       },
       {
@@ -57,6 +57,11 @@ export const GUIDES: Record<GuideRole, Guide> = {
         href: "/client/changes",
       },
       {
+        text: "Ask for more hours or a design change.",
+        how: "It goes to your Project Head. You approve the cost before it is billed.",
+        href: "/client/hours",
+      },
+      {
         text: "Updates replace the WhatsApp group.",
         how: "Site photos, new drawings and every decision land here, with the floor they are about.",
         href: "/client/updates",
@@ -70,9 +75,14 @@ export const GUIDES: Record<GuideRole, Guide> = {
     home: { label: "Back to Today", href: "/staff/bd" },
     steps: [
       {
-        text: "Start a new project and save it as a draft at any step.",
-        how: "Client and site, then category and estimate, then the agreement, then the team and hours.",
-        href: "/staff/bd/onboard",
+        text: "Register each enquiry in Under discussion.",
+        how: "Phone and email are checked. A lead held in the last 12 months cannot be added again.",
+        href: "/staff/bd/prospects/new",
+      },
+      {
+        text: "Move a lead from level 0 to level 3.",
+        how: "When the sign-up is paid, tap Sign-up paid. The client moves to Onboarding with the enquiry filled in.",
+        href: "/staff/bd/prospects",
       },
       {
         text: "Enter the estimate in front of the client and download it.",
@@ -80,18 +90,13 @@ export const GUIDES: Record<GuideRole, Guide> = {
         href: "/staff/bd/estimate/kulkarni",
       },
       {
-        text: "Upload the signed agreement and set the team and hours.",
-        how: "Pick the point of contact, the Project Head and the hours before and during construction.",
+        text: "Upload the signed agreement, set the team, then open the workspace.",
+        how: "Pick the point of contact, the Project Head and the hours; the client is invited when it opens.",
         href: "/staff/bd/onboard/kulkarni",
       },
       {
-        text: "Open the workspace; this counts as one onboarded client.",
-        how: "The client is invited by email the moment it opens.",
-        href: "/staff/bd/projects",
-      },
-      {
-        text: "Add bought hours once the payment arrives.",
-        how: "Note the amount and the bank reference; the client sees who added them and when.",
+        text: "Settle what a Project Head escalates to you.",
+        how: "Charge or waive the fee and note what was agreed. Hour requests stay with the Project Head.",
         href: "/staff/bd/hours",
       },
     ],
@@ -100,11 +105,11 @@ export const GUIDES: Record<GuideRole, Guide> = {
     role: "architect",
     title: "Architect and Project Head",
     who: "For Vikram Desai, Lakshmi Narayan and their juniors.",
-    home: { label: "Back to your desk", href: "/staff/architect" },
+    home: { label: "Back to Today", href: "/staff/architect" },
     steps: [
       {
-        text: "Your desk lists what is your turn.",
-        how: "Overdue first, then what has waited longest. What waits on others sits beside it.",
+        text: "Today lists what waits on you.",
+        how: "Urgent first, then what has waited longest. Client requests for hours and changes are yours to decide.",
         href: "/staff/architect",
       },
       {
@@ -123,8 +128,8 @@ export const GUIDES: Record<GuideRole, Guide> = {
         href: "/staff/architect",
       },
       {
-        text: "Seniors assign work to their juniors.",
-        how: "Say who, what to deliver, for which project and by when. It lands in their task sheet.",
+        text: "Seniors put juniors on projects and set their tasks.",
+        how: "A project's Team tab ranks juniors by fit, to invite or assign. Tasks are set here: who, what, by when.",
         href: "/staff/architect/team",
       },
     ],
@@ -135,6 +140,11 @@ export const GUIDES: Record<GuideRole, Guide> = {
     who: "For Suresh Gowda and Manjunath K.",
     home: { label: "Back to Today", href: "/staff/site" },
     steps: [
+      {
+        text: "Today lists what waits on you, urgent first.",
+        how: "Five days waiting or past its date is urgent, with a brick mark. Your sites follow.",
+        href: "/staff/site",
+      },
       {
         text: "Request material in three taps.",
         how: "Pick the material, the size and the quantity. With no signal it waits and sends itself later.",
@@ -179,6 +189,11 @@ export const GUIDES: Record<GuideRole, Guide> = {
         href: "/staff/finance/money",
       },
       {
+        text: "Bill the architect fees clients approve.",
+        how: "They wait in Money in under Architect fees. Raise the invoice, then record the receipt with its UTR.",
+        href: "/staff/finance/money",
+      },
+      {
         text: "Enter bills against a milestone, before GST.",
         how: "A bill against a PO moves it from committed to spent.",
         href: "/staff/finance/costs",
@@ -192,28 +207,33 @@ export const GUIDES: Record<GuideRole, Guide> = {
     home: { label: "Back to Today", href: "/staff/admin" },
     steps: [
       {
-        text: "Today lists only what needs you.",
-        how: "Short cash, a margin below zero, a request nobody has seen, a client who has waited a week.",
+        text: "Today lists what needs you, urgent first.",
+        how: "Five days waiting or past its date is urgent, with a brick mark. Projects needing a look follow.",
         href: "/staff/admin",
       },
       {
-        text: "Profit shows margin and cash side by side.",
-        how: "Margin on the work done so far, before GST, next to what came in and went out.",
+        text: "Projects shows each home as a tile, profit below.",
+        how: "Tap Pictures to add a photo to a tile. The table puts margin and cash side by side.",
         href: "/staff/admin/projects",
       },
       {
-        text: "People sets roles, seniors and Project Heads.",
-        how: "Every change asks for a reason, and the reason is kept in the log.",
-        href: "/staff/admin/people",
+        text: "Leads shows who holds each enquiry.",
+        how: "A lead is held for 12 months. Only you can reassign one, and it needs a reason.",
+        href: "/staff/admin/leads",
       },
       {
-        text: "Setup holds templates and the catalogue.",
-        how: "Milestone percentages must add up to 100 before a template can be saved.",
+        text: "Setup holds templates, the catalogue and fees.",
+        how: "Fees sets the architect's rate an hour. Client requests are priced from it, plus 18% GST.",
         href: "/staff/admin/setup",
       },
       {
+        text: "Performance has a report for each person.",
+        how: "Approval delays, client NPS and tasks. Open a name for the report; it prints on its own.",
+        href: "/staff/admin/performance",
+      },
+      {
         text: "The log cannot be edited.",
-        how: "Every approval and every staff action, with name, date and time. Deletes stay as struck lines.",
+        how: "Every approval and staff action, with name and time. Role changes in People keep their reason here.",
         href: "/staff/admin/log",
       },
     ],

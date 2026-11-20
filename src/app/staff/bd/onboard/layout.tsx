@@ -3,11 +3,11 @@
  */
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { titled } from "@/app/shared-metadata";
+import { PRIVATE, titled } from "@/app/shared-metadata";
 
 // Names the screen in the browser tab and in history; the page draws the rest.
 
-export const metadata: Metadata = { title: titled("Onboard") };
+export const metadata: Metadata = { title: titled("Onboarding"), robots: PRIVATE };
 
 export default function StaffBdOnboardLayout({ children }: { children: ReactNode }) {
   return children;

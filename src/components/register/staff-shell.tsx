@@ -12,6 +12,7 @@ import { SignOutButton } from "@/components/sign-out";
 import { useDemo, useFirm } from "@/lib/demo-store";
 import type { StaffRole } from "@/lib/firm-data";
 import { countWord } from "@/lib/format";
+import { placeItems, todayItems } from "@/lib/today-count";
 import { PersonMenu } from "./person-menu";
 import { scopeFor, viewerIdOf } from "./project-switch";
 import { PauseBar, PauseProvider } from "./recording-pause";
@@ -21,8 +22,12 @@ import { PauseBar, PauseProvider } from "./recording-pause";
 // screen and a tab bar of at most four places runs along the bottom. The shell also holds
 // the one pause provider for every staff screen.
 
-/** `short` is the tab bar's word on the narrowest phones, where four tabs share 320 px. */
-export type Place = { label: string; href: string; leads?: boolean; short?: string };
+/**
+ * `short` is the tab bar's word on phones under 430 px, where four tabs share the width.
+ * `everyProject`: the page lists every project whatever the project switch says, so its
+ * count does too.
+ */
+export type Place = { label: string; href: string; leads?: boolean; short?: string; everyProject?: boolean };
 
 const ROOT: Record<StaffRole, string> = {
   bd: "/staff/bd",
@@ -36,20 +41,21 @@ const ROOT: Record<StaffRole, string> = {
 export const PLACES: Record<StaffRole, Place[]> = {
   bd: [
     { label: "Today", href: "/staff/bd" },
-    { label: "Onboard", href: "/staff/bd/onboard" },
-    { label: "Projects", href: "/staff/bd/projects" },
-    { label: "Hours asked", short: "Hours", href: "/staff/bd/hours" },
+    { label: "Under discussion", short: "Leads", href: "/staff/bd/prospects", everyProject: true },
+    { label: "Onboarding", short: "Onboard", href: "/staff/bd/onboard", everyProject: true },
+    { label: "Projects", href: "/staff/bd/projects", everyProject: true },
+    { label: "Escalations", href: "/staff/bd/hours" },
   ],
   architect: [
-    { label: "Desk", href: "/staff/architect" },
-    { label: "Designs", href: "/staff/architect/designs" },
+    { label: "Today", href: "/staff/architect" },
+    { label: "Designs", href: "/staff/architect/designs", everyProject: true },
     { label: "Tasks", href: "/staff/architect/tasks" },
-    { label: "Team", href: "/staff/architect/team", leads: true },
+    { label: "Team", href: "/staff/architect/team", leads: true, everyProject: true },
   ],
   site: [
     { label: "Today", href: "/staff/site" },
     { label: "Request", href: "/staff/site/request" },
-    { label: "My requests", href: "/staff/site/requests" },
+    { label: "My requests", href: "/staff/site/requests", everyProject: true },
     { label: "Tasks", href: "/staff/site/tasks" },
   ],
   finance: [
@@ -57,16 +63,17 @@ export const PLACES: Record<StaffRole, Place[]> = {
     { label: "Requests", href: "/staff/finance/requests" },
     { label: "Money in", href: "/staff/finance/money" },
     { label: "Money out", href: "/staff/finance/costs" },
-    { label: "Vendors", href: "/staff/finance/vendors" },
-    { label: "Team", href: "/staff/finance/team", leads: true },
+    { label: "Vendors", href: "/staff/finance/vendors", everyProject: true },
+    { label: "Team", href: "/staff/finance/team", leads: true, everyProject: true },
   ],
   admin: [
     { label: "Today", href: "/staff/admin" },
-    { label: "Projects", href: "/staff/admin/projects" },
-    { label: "People", href: "/staff/admin/people" },
-    { label: "Setup", href: "/staff/admin/setup" },
-    { label: "Log", href: "/staff/admin/log" },
-    { label: "Performance", href: "/staff/admin/performance" },
+    { label: "Projects", href: "/staff/admin/projects", everyProject: true },
+    { label: "People", href: "/staff/admin/people", everyProject: true },
+    { label: "Leads", href: "/staff/admin/leads", everyProject: true },
+    { label: "Setup", href: "/staff/admin/setup", everyProject: true },
+    { label: "Log", href: "/staff/admin/log", everyProject: true },
+    { label: "Performance", href: "/staff/admin/performance", everyProject: true },
   ],
 };
 
@@ -224,11 +231,17 @@ export function StaffShell({ children }: { children: ReactNode }) {
   const places = PLACES[role].filter((place) => !place.leads || person?.senior);
   const active = activeHref(pathname, role, places);
   const scope = scopeFor(role, personId, demo.scope, firm);
-  const turns = firm.turns(personId, scope);
+  const today = todayItems(firm, role, personId, scope);
 
-  // Today counts every row in "Your turn". A list place counts the rows that open on it.
+  // Today counts the rows its board lists. A list place counts the Today rows that open on it
+  // or on a page that belongs to it, for the project its page shows.
   const countOf = (place: Place, index: number) =>
-    index === 0 ? turns.length : turns.filter((item) => under(item.href.split(/[?#]/)[0], place.href)).length;
+    index === 0
+      ? today.length
+      : placeItems(firm, role, personId, place.everyProject ? "all" : scope, [
+          place.href,
+          ...ALIASES.filter((a) => a.href === place.href).map((a) => a.prefix),
+        ]).length;
 
   const tabs = places.length === 4 ? places : places.slice(0, 3);
   const more = places.length === 4 ? [] : places.slice(3);
@@ -305,8 +318,8 @@ export function StaffShell({ children }: { children: ReactNode }) {
                 >
                   {place.short ? (
                     <>
-                      <span className="truncate max-[359px]:hidden">{place.label}</span>
-                      <span className="truncate min-[360px]:hidden">{place.short}</span>
+                      <span className="truncate max-[429px]:hidden">{place.label}</span>
+                      <span className="truncate min-[430px]:hidden">{place.short}</span>
                     </>
                   ) : (
                     <span className="truncate">{place.label}</span>

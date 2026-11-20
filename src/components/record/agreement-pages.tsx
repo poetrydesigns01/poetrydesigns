@@ -52,7 +52,7 @@ const PAGES: Record<House, Page[]> = {
         "This agreement is made on 25 May 2026 between Poetry Designs, Bengaluru, the builder, and Meera Iyer and Arjun Iyer, the owners.",
         "The property is Plot 504, CFS Layout, Kanakapura Road, Bengaluru 560062.",
         "Poetry Designs will design and build a city villa of 3,200 sq ft built-up area on it, as shown in the drawings the owners approve.",
-        "Kavya Reddy, client relations, is the owners' point of contact. A Project Head is named for the building work.",
+        "Rohan Menon, client relations, is the owners' point of contact. A Project Head is named for the building work.",
       ],
     },
     {
@@ -75,7 +75,7 @@ const PAGES: Record<House, Page[]> = {
         "This agreement is made on 2 October 2026 between Poetry Designs, Bengaluru, the builder, and Meera Iyer and Arjun Iyer, the owners.",
         "The property is Plot 112, NHF Layout, Nandi Hills Road, Chikkaballapur 562101.",
         "Poetry Designs will design and build a farmhouse of 1,800 sq ft built-up area on it, as shown in the drawings the owners approve.",
-        "Kavya Reddy, client relations, is the owners' point of contact. Lakshmi Narayan is the Project Head.",
+        "Rohan Menon, client relations, is the owners' point of contact. Lakshmi Narayan is the Project Head.",
       ],
     },
     {

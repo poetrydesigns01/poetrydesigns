@@ -8,23 +8,27 @@ import { dated, Empty, IconArrow, Panel, StepDots } from "@/components/architect
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
 import { useFirm } from "@/lib/demo-store";
+import { DESK_HREF } from "@/lib/desk";
+import { ONBOARDING, UNDER_DISCUSSION } from "@/lib/prospects";
 import { draftName } from "./bd-words";
 import { STEP_NAMES, type StepNo } from "./draft-steps";
 
-// Onboard: the workspaces being set up, with the four steps as dots, and the ones opened.
+// Onboarding: customers who paid the sign-up, their workspaces being set up (the four steps
+// as dots) and the ones opened. Prospects stay under discussion until the sign-up is paid.
 
 export function OnboardList() {
   const firm = useFirm();
   const drafts = firm.drafts.filter((d) => d.by === "rohan");
-  const working = drafts.filter((d) => !d.opened && d.stepsDone > 0);
+  const working = drafts.filter((d) => !d.opened && (d.stepsDone > 0 || d.fromProspect));
+  const signedUpOn = (prospectId?: string) => (prospectId ? firm.prospect(prospectId)?.signUp?.on : undefined);
   const opened = drafts.filter((d) => d.opened);
 
   return (
     <>
       <StaffBoard
-        place="Onboard"
+        place={ONBOARDING}
         headline={working.length === 0 ? "Nothing in setup" : `${working.length} in setup`}
-        primary={{ label: "New project", href: "/staff/bd/onboard/new" }}
+        primary={working.length === 0 ? { label: UNDER_DISCUSSION, href: DESK_HREF.prospects } : undefined}
         chip={false}
       />
       <div className="mt-6 grid items-start gap-4 lg:mt-8 min-[1200px]:grid-cols-2">
@@ -42,6 +46,9 @@ export function OnboardList() {
                         {d.nextStep ? `Next: ${STEP_NAMES[d.nextStep as StepNo]}` : "Ready to open"}
                       </span>
                     </span>
+                    {signedUpOn(d.fromProspect?.prospectId) && (
+                      <StatusChip tone="done">Signed up {dated(signedUpOn(d.fromProspect?.prospectId) ?? "")}</StatusChip>
+                    )}
                     <StepDots done={d.stepsDone} label={`${d.stepsDone} of 4 steps`} />
                     <IconArrow className="text-ink-soft" />
                   </Link>

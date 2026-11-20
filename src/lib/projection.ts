@@ -38,6 +38,8 @@ import {
 } from "./firm-data";
 import { seedDesignItems, seedDrawings, siteTaskTitle as planSiteTaskTitle } from "./portal-data";
 import { fallsInMilestone, instalmentOf, workflowTask } from "./workflow-template";
+import { deskLogWords } from "./desk-log";
+import { hoursBoughtInTab } from "./fees";
 import {
   addDays,
   datePart,
@@ -615,6 +617,11 @@ export function logEntryOf(event: FirmEvent, events: FirmEvent[]): LogEntry | nu
         action: `Gave ${name(event.to)} ${projectName(event.projectId)}: ${workflowTask(event.taskId)?.name ?? event.taskId}.`,
         reason: event.reason || undefined,
       };
+    default: {
+      // Prospects, client requests and fees, feedback, architects on a project, pictures.
+      const words = deskLogWords(event, events, projectName, name);
+      return words ? { ...base, ...words } : null;
+    }
   }
 }
 
@@ -1163,14 +1170,34 @@ export function derive(state: DeriveInput): Projection {
   const added: CreditAddition[] = seedAdditions.filter((a) => a.projectId === "iyer");
   const sessions: Session[] = iyerCredits.entries.map((entry, i) => ({ ...entry, id: `cr${i + 1}` }));
   let requested: { hours: number; at: string } | null =
-    state.creditsRequested && !events.some((e) => e.kind === "credits.requested" && e.projectId === "iyer")
+    state.creditsRequested &&
+    !events.some(
+      (e) =>
+        (e.kind === "credits.requested" && e.projectId === "iyer") ||
+        (e.kind === "client-request.raised" && e.request.projectId === "iyer" && e.request.type === "hours"),
+    )
       ? { hours: 5, at: TODAY }
       : null;
+  const bought = hoursBoughtInTab(events).filter((b) => b.projectId === "iyer");
   for (const e of iyerEvents) {
     if (e.kind === "credits.added" && e.addition.projectId === "iyer") {
       added.push(e.addition);
       (e.addition.pool === "before" ? before : during).granted += e.addition.hours;
       requested = null;
+    } else if (e.kind === "client-request.raised" && e.request.type === "hours" && e.request.projectId === "iyer") {
+      requested = { hours: e.request.hours ?? 0, at: e.at };
+    } else if (
+      (e.kind === "client-request.declined" ||
+        e.kind === "client-request.approved" ||
+        e.kind === "client-request.settled" ||
+        e.kind === "fee.declined" ||
+        e.kind === "fee.received") &&
+      e.projectId === "iyer"
+    ) {
+      // Hours join the pool when given: the fee received, waived by BD, or nothing to pay.
+      const given = bought.find((b) => b.eventId === e.id);
+      if (given) during.granted += given.hours;
+      if (given || e.kind === "client-request.declined" || e.kind === "fee.declined") requested = null;
     } else if (e.kind === "credits.edited") {
       (e.pool === "before" ? before : during).granted = e.to;
     } else if (e.kind === "credits.requested") {

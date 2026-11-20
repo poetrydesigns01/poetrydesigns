@@ -231,7 +231,7 @@ export const seedDesignItems: DesignItemSeed[] = [
 
 /** When someone last opened a thread before the demo. */
 export const seedThreadReads: { projectId: ProjectId; by: PersonId; at: string }[] = [
-  { projectId: "iyer", by: "kavya", at: "2026-10-31T10:12" },
+  { projectId: "iyer", by: "rohan", at: "2026-10-31T10:12" },
   { projectId: "iyer", by: "vikram", at: "2026-11-07T19:50" },
   { projectId: "iyer", by: "meera", at: "2026-11-09T21:40" },
   { projectId: "nair", by: "suresh", at: "2026-11-10T11:05" },

@@ -182,10 +182,10 @@ export function DraftPage({ id }: { id: DraftId }) {
   return (
     <>
       <StaffBoard
-        place="Onboard"
+        place="Onboarding"
         headline={name}
         chip={false}
-        back={{ label: "Onboard", href: "/staff/bd/onboard" }}
+        back={{ label: "Onboarding", href: "/staff/bd/onboard" }}
       />
       <div className="mt-6 grid gap-4 lg:mt-8">
         <div ref={stepsRef} tabIndex={-1} className="grid scroll-mt-4 gap-4 outline-none">

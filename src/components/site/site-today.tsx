@@ -5,14 +5,17 @@
 
 import Link from "next/link";
 import { useId } from "react";
+import { ProjectsAttention, WaitingPanel } from "@/components/admin/today-desk";
 import { useScope } from "@/components/register/project-switch";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
+import { taskActionFor } from "@/components/shared/task-action";
+import type { AttentionItem } from "@/lib/desk";
 import { useFirm, useViewer } from "@/lib/demo-store";
 import type { ProjectId } from "@/lib/firm-data";
 import { formatShortDate } from "@/lib/format";
+import { todayItems } from "@/lib/today-count";
 import { AwaitedPanel, LockBanner, NextMilestone, StageMeter, awaitedFor, milestoneLine } from "./milestone";
-import { NeedsYou } from "./rows";
 import {
   Icon,
   PHOTO_EVERY_DAYS,
@@ -23,12 +26,12 @@ import {
   isMine,
   isOpenRequest,
   lastPhotos,
-  openTurns,
   procurementDays,
   requestStatus,
   requestTitle,
   siteTasksOf,
 } from "./site-kit";
+import { DeliveredButton } from "./rows";
 import { TaskCard } from "./task-card";
 import "./site.css";
 
@@ -90,15 +93,30 @@ export function SiteToday() {
   const projectId: ProjectId = scope === "all" ? "iyer" : scope;
   const project = firm.project(projectId);
   const stage = firm.siteStage(projectId);
-  const turns = openTurns(firm.turns(me.id, projectId), firm);
+  // What waits on him, urgent first, as the rail's Today counts it; a milestone still locked
+  // for its instalment is not his yet.
+  const waiting = todayItems(firm, "site", me.id, projectId);
+  // Answered in the row: his own task to hand in, a junior's to review, a delivery to mark.
+  const rowAction = (item: AttentionItem) => {
+    if (item.id.startsWith("task:")) return taskActionFor(firm, item.id, me.id);
+    if (item.id.startsWith("mr:") && item.action === "Mark delivered") {
+      const request = firm.requests.find((r) => `mr:${r.no}` === item.id);
+      return request ? <DeliveredButton request={request} person={me.id} /> : null;
+    }
+    return null;
+  };
+  // His sites as pictures, the ones that need attention first; a calm one says what waits on him there.
+  const mySites = firm.projects.filter((p) => p.phase !== "draft" && p.team.engineers.includes(me.id));
+  const everySite = todayItems(firm, "site", me.id, "all");
   const tasksId = useId();
 
   if (!project || !stage) {
     return (
       <div className="site-screen">
         <StaffBoard place="Today" headline={project?.name ?? "Today"} />
-        <NeedsYou items={turns} person={me.id} />
+        <WaitingPanel items={waiting} action={rowAction} />
         <p className="glass px-4 py-3 text-15 text-ink">No milestone on site</p>
+        <ProjectsAttention person={me.id} title="Your sites" others={mySites} waiting={everySite} />
       </div>
     );
   }
@@ -159,6 +177,8 @@ export function SiteToday() {
         ]}
       />
 
+      <WaitingPanel items={waiting} action={rowAction} />
+
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="grid gap-4">
           <section className="grid gap-2" aria-labelledby={tasksId}>
@@ -186,11 +206,12 @@ export function SiteToday() {
         </div>
 
         <div className="grid gap-4">
-          <NeedsYou items={turns} person={me.id} />
           <AwaitedPanel projectId={projectId} />
           <SideRequests projectId={projectId} />
         </div>
       </div>
+
+      <ProjectsAttention person={me.id} title="Your sites" others={mySites} waiting={everySite} />
     </div>
   );
 }

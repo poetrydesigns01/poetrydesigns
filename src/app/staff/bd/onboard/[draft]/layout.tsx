@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ draft: st
   const { draft } = await params;
   if (!DRAFT_IDS.includes(draft as DraftId)) return { title: MISSING_TITLE };
   const name = projects.find((p) => p.id === draft)?.name ?? "New project";
-  return { title: `${name} · Onboard` };
+  return { title: `${name} · Onboarding` };
 }
 
 export default function DraftLayout({ children }: { children: ReactNode }) {

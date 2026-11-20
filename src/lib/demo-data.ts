@@ -54,12 +54,21 @@ export type Contact = {
   responds?: string;
 };
 
+/** The office line, after the people. */
+export const office: Contact = {
+  level: "If you still need help",
+  name: "Poetry Designs office",
+  role: "Director's desk",
+  phone: "+91 80 4000 5566",
+};
+
+/** As seeded. The client home reads the live team instead (the BD person who holds them, then the Project Head). */
 export const contacts: Contact[] = [
   {
     level: "Your point of contact",
-    name: "Kavya Reddy",
+    name: "Rohan Menon",
     role: "Client relations",
-    phone: "+91 98450 01122",
+    phone: "+91 98450 01100",
   },
   {
     level: "If that does not settle it",
@@ -67,12 +76,7 @@ export const contacts: Contact[] = [
     role: "Project Head",
     phone: "+91 98450 03344",
   },
-  {
-    level: "If you still need help",
-    name: "Poetry Designs office",
-    role: "Director's desk",
-    phone: "+91 80 4000 5566",
-  },
+  office,
 ];
 
 export type MilestoneStatus = "paid" | "awaiting-approval" | "in-progress" | "upcoming";

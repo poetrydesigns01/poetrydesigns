@@ -3,16 +3,32 @@
  */
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
+import { NpsScore } from "@/components/shared/nps-score";
 import { useFirm } from "@/lib/demo-store";
-import { courses, performance, templateOf, type PerformanceRow } from "@/lib/firm-data";
-import { daysBetween, formatShortDate, listWords } from "@/lib/format";
+import type { Appraisal } from "@/lib/desk";
+import { performance, templateOf, type PerformanceRow } from "@/lib/firm-data";
 import { GlassTable, Initials, Meter, Panel, Segments, StatCard, StatRow } from "./glass-kit";
+import {
+  PERIOD_OPTIONS,
+  SLOW_DAYS,
+  TEAM_SORTS,
+  appraised,
+  daysWords,
+  periodOf,
+  sortTeam,
+  type PeriodId,
+  type TeamSort,
+} from "./appraisal-data";
 
-// How the juniors are doing over the last 90 days: tasks, on time, late, revisions and days
-// taken, in one table; then the recent tasks of each junior who had any, late ones in brick.
+// Appraisals: for each person on the staff over a period, the approvals they handled and how
+// long each waited on them (the average and the worst), what is overdue on them now, and for
+// business development and the Project Heads, client feedback (NPS, with its count). Sorted
+// by the delay by default; each name opens a printable report. The juniors' task record
+// follows.
 
 type Key = "tasks" | "onTimePercent" | "late" | "avgRevisions";
 
@@ -23,33 +39,141 @@ const SORTS: { id: Key; label: string }[] = [
   { id: "avgRevisions", label: "Revisions" },
 ];
 
+function Delay({ days }: { days: number | null }) {
+  if (days === null) return <span className="font-normal text-ink-soft">–</span>;
+  return <span className={`figure ${days >= SLOW_DAYS ? "late-text" : "font-normal"}`}>{daysWords(days)}</span>;
+}
+
 export function PerformancePage() {
   const firm = useFirm();
+  const [periodId, setPeriodId] = useState<PeriodId>("cycle");
+  const [teamSort, setTeamSort] = useState<TeamSort>("delay");
   const [sort, setSort] = useState<Key>("tasks");
+  const period = periodOf(periodId);
+
+  const team = appraised(firm.people).map((p) => firm.appraisal(p.id, period));
+  const teamRows = sortTeam(team, teamSort);
+  const handled = team.reduce((t, a) => t + a.approvals.handled, 0);
+  const delays = team.flatMap((a) => a.approvals.records.map((r) => r.delayDays));
+  const avgDelay = delays.length > 0 ? Math.round((delays.reduce((t, d) => t + d, 0) / delays.length) * 10) / 10 : null;
+  const urgentNow = team.reduce((t, a) => t + a.overdueNow, 0);
+  const nps = firm.npsFirm;
+
   const rows = [...performance].sort((a, b) => b[sort] - a[sort]);
-  const tasks = performance.reduce((t, r) => t + r.tasks, 0);
-  const onTime = performance.reduce((t, r) => t + r.onTime, 0);
-  const late = performance.reduce((t, r) => t + r.late, 0);
-  const revisions = tasks > 0 ? performance.reduce((t, r) => t + r.avgRevisions * r.tasks, 0) / tasks : 0;
   const name = (row: PerformanceRow) => firm.person(row.person)?.name ?? row.person;
   const kinds = (row: PerformanceRow) => row.byCategory.map((c) => templateOf(c.category).name).join(" · ");
-  // A line every junior shares says nothing about any one of them, so it is left off then.
   const kindsDiffer = new Set(performance.map(kinds)).size > 1;
-  const busy = rows.filter((row) => (courses[row.person] ?? []).length > 0);
-  const idle = rows.filter((row) => (courses[row.person] ?? []).length === 0);
+  const reportHref = (a: Appraisal) => `/staff/admin/performance/${a.personId}?period=${period.id}`;
 
   return (
     <>
-      <StaffBoard place="Performance" headline="Juniors, last 90 days" chip={false} />
+      <StaffBoard place="Performance" headline={`Appraisals, ${period.label}`} chip={false} />
       <div className="mt-6 grid gap-5">
-        <StatRow cols={4} label="All juniors">
-          <StatCard label="Tasks" value={tasks} icon="check" />
-          <StatCard label="On time" value={`${tasks > 0 ? Math.round((onTime / tasks) * 100) : 0}%`} icon="clock" />
-          <StatCard label="Late" value={late} icon="alert" tone={late > 0 ? "late" : undefined} />
-          <StatCard label="Revisions" value={revisions.toFixed(1)} sub="Average per task" icon="file" />
+        <Segments<PeriodId> label="Period" value={periodId} onChange={setPeriodId} options={PERIOD_OPTIONS} />
+
+        <StatRow cols={4} label="The team">
+          <StatCard label="Approvals handled" value={handled} icon="check" />
+          <StatCard
+            label="Average delay"
+            value={daysWords(avgDelay)}
+            icon="clock"
+            tone={avgDelay !== null && avgDelay >= SLOW_DAYS ? "late" : undefined}
+          />
+          <StatCard label="Urgent now" value={urgentNow} icon="alert" tone={urgentNow > 0 ? "late" : undefined} />
+          <StatCard
+            label="Client NPS"
+            value={nps.nps === null ? "–" : nps.nps > 0 ? `+${nps.nps}` : nps.nps}
+            sub={nps.count === 1 ? "1 answer" : `${nps.count} answers`}
+            icon="users"
+            tone={nps.nps !== null && nps.nps < 0 ? "late" : undefined}
+          />
         </StatRow>
 
-        <Panel title="By junior" aside={<Segments<Key> label="Sort" value={sort} onChange={setSort} options={SORTS} />} strong>
+        <Panel
+          title="Team"
+          aside={<Segments<TeamSort> label="Sort team" value={teamSort} onChange={setTeamSort} options={TEAM_SORTS} />}
+          strong
+        >
+          <GlassTable<Appraisal>
+            caption={`Team, ${period.label}`}
+            rows={teamRows}
+            rowKey={(a) => a.personId}
+            wide="lg"
+            lead={(a) => (
+              <Link href={reportHref(a)} className="group -my-2 flex min-h-11 items-center gap-2">
+                <Initials name={a.name} />
+                <span className="grid min-w-0">
+                  <span className="link truncate">{a.name}</span>
+                  <span className="truncate text-13 font-normal text-ink-soft">{firm.person(a.personId)?.title}</span>
+                </span>
+              </Link>
+            )}
+            chip={(a) =>
+              a.overdueNow > 0 ? <StatusChip tone="late">{a.overdueNow} urgent</StatusChip> : <StatusChip tone="done">Clear</StatusChip>
+            }
+            columns={[
+              {
+                label: "Person",
+                cell: (a) => (
+                  <Link href={reportHref(a)} className="group -my-2 flex min-h-11 min-w-48 items-center gap-2">
+                    <Initials name={a.name} />
+                    <span className="grid min-w-0">
+                      <span className="link truncate">{a.name}</span>
+                      <span className="truncate text-13 font-normal text-ink-soft">{firm.person(a.personId)?.title}</span>
+                    </span>
+                  </Link>
+                ),
+              },
+              { label: "Handled", align: "right", width: "w-24", cell: (a) => <span className="figure font-normal">{a.approvals.handled}</span> },
+              { label: "Avg delay", align: "right", width: "w-28", cell: (a) => <Delay days={a.approvals.avgDelayDays} /> },
+              {
+                label: "Worst",
+                cell: (a) =>
+                  a.approvals.worst ? (
+                    <span className="grid min-w-0 max-w-56">
+                      <Delay days={a.approvals.worst.delayDays} />
+                      <span className="truncate text-13 font-normal text-ink-soft">{a.approvals.worst.what}</span>
+                    </span>
+                  ) : (
+                    <span className="font-normal text-ink-soft">–</span>
+                  ),
+              },
+              {
+                label: "Waiting now",
+                width: "w-32",
+                phone: false,
+                cell: (a) =>
+                  a.pending.count === 0 ? (
+                    <StatusChip tone="done">Clear</StatusChip>
+                  ) : (
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="figure font-normal">{a.pending.count}</span>
+                      {a.overdueNow > 0 && <StatusChip tone="late">{a.overdueNow} urgent</StatusChip>}
+                    </span>
+                  ),
+              },
+              {
+                label: "NPS",
+                width: "w-40",
+                cell: (a) =>
+                  a.nps ? (
+                    <NpsScore
+                      value={a.nps.nps}
+                      count={a.nps.count}
+                      promoters={a.nps.promoters}
+                      passives={a.nps.passives}
+                      detractors={a.nps.detractors}
+                      size="sm"
+                    />
+                  ) : (
+                    <span className="font-normal text-ink-soft">–</span>
+                  ),
+              },
+            ]}
+          />
+        </Panel>
+
+        <Panel title="Juniors, tasks" aside={<Segments<Key> label="Sort juniors" value={sort} onChange={setSort} options={SORTS} />}>
           <GlassTable<PerformanceRow>
             caption="Juniors, last 90 days"
             rows={rows}
@@ -97,43 +221,6 @@ export function PerformancePage() {
             ]}
           />
         </Panel>
-
-        {/* Recent tasks, one panel per junior who had any; an odd last panel takes the row. */}
-        <section aria-labelledby="recent-tasks" className="grid gap-3">
-          <h2 id="recent-tasks" className="px-1 text-17 font-semibold text-ink">
-            Recent tasks, last 30 days
-          </h2>
-          <div className="grid gap-5 lg:grid-cols-2 lg:[&>*:last-child:nth-child(odd)]:col-span-2">
-            {busy.map((row) => {
-              const blocks = courses[row.person] ?? [];
-              return (
-                <Panel key={row.person} title={name(row)}>
-                  <ul className="grid gap-1">
-                    {blocks.map((b) => (
-                      <li key={b.title} className="glass-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5">
-                        <span className="grid min-w-0">
-                          <span className="truncate text-15">{b.title}</span>
-                          <span className="text-13 text-ink-soft">
-                            {firm.project(b.projectId)?.name} · {formatShortDate(b.assigned)} · {daysBetween(b.assigned, b.accepted)} days
-                            {b.revisions > 0 ? ` · ${b.revisions} ${b.revisions === 1 ? "revision" : "revisions"}` : ""}
-                          </span>
-                        </span>
-                        {b.lateDays > 0 ? (
-                          <StatusChip tone="late">{b.lateDays === 1 ? "1 day late" : `${b.lateDays} days late`}</StatusChip>
-                        ) : (
-                          <StatusChip tone="done">On time</StatusChip>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </Panel>
-              );
-            })}
-          </div>
-          {idle.length > 0 && (
-            <p className="px-1 text-15 text-ink-soft">No tasks for {listWords(idle.map(name))}.</p>
-          )}
-        </section>
       </div>
     </>
   );

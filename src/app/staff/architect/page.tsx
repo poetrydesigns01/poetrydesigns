@@ -3,7 +3,7 @@
  */
 import { ArchitectDesk } from "@/components/architect/desk";
 
-// The studio desk: the Project Head's turn, what waits on clients, and the team's day.
+// The studio's Today: what waits on the architect, urgent first, the client requests and the projects.
 export default function ArchitectDeskPage() {
   return <ArchitectDesk />;
 }

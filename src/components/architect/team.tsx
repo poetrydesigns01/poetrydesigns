@@ -5,34 +5,36 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Chip, ChipGroup } from "@/components/register/chips";
+import { fitFacts } from "@/components/project/team";
 import { usePause } from "@/components/register/recording-pause";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
-import { useDemo, useFirm } from "@/lib/demo-store";
+import { useFirm } from "@/lib/demo-store";
 import type { TaskView } from "@/lib/firm";
-import { performance, WEEK, type PersonId, type ProjectId } from "@/lib/firm-data";
+import { performance, WEEK, type PersonId } from "@/lib/firm-data";
 import { datePart } from "@/lib/format";
 import { AssignForm } from "./assign-form";
+import { ProjectRow } from "./project-row";
 import { isOpen, juniorsOf, taskChip, taskRank, useArchitect } from "./common";
-import { dayTime, Empty, IconArrow, IconPlus, Panel, rowBtn } from "./glass-ui";
+import { dayTime, Empty, IconArrow, Panel, rowBtn } from "./glass-ui";
 import { ReviewPanel } from "./review-panel";
 
-// A senior architect's team: assign a task, the juniors' tasks as one table with reviews
-// answered in their rows, how each junior has done over 90 days, and who is on each project.
+// A senior architect's team, to watch each person: assign a task, the juniors' tasks as one
+// table with reviews answered in their rows, how each junior has done over 90 days and where
+// they are strong, and the projects this head runs. Juniors are put on a project, or invited,
+// from that project's Team tab.
+
+const KIND_WORDS = { "city-villa": "city villa", farmhouse: "farmhouse", eco: "eco home", "cement-blocks": "block home" } as const;
 
 const COLS = "md:grid md:grid-cols-[minmax(0,1fr)_6rem_8.5rem_7.5rem_6.5rem]";
 
 export function ArchitectTeam() {
   const firm = useFirm();
-  const demo = useDemo();
   const pause = usePause();
   const me = useArchitect();
   const [assigning, setAssigning] = useState(false);
   const [review, setReview] = useState<string | null>(null);
   const [who, setWho] = useState<PersonId | "all">("all");
-  const [adding, setAdding] = useState<ProjectId | null>(null);
-  const [addWho, setAddWho] = useState<PersonId | null>(null);
 
   if (!me.senior) {
     return (
@@ -40,7 +42,7 @@ export function ArchitectTeam() {
         <StaffBoard place="Team" headline="For senior architects" chip={false} />
         <div className="glass mt-6 p-4">
           <Link href="/staff/architect" className="btn btn-glass min-h-11 gap-1.5 px-4 text-15">
-            Desk <IconArrow />
+            Today <IconArrow />
           </Link>
         </div>
       </>
@@ -48,10 +50,19 @@ export function ArchitectTeam() {
   }
 
   const juniors = juniorsOf(firm, me.id);
+  const strengthWords = (person: PersonId) => {
+    const s = firm.architectStrengths(person);
+    const kinds = Object.entries(s.categories)
+      .filter(([, n]) => (n ?? 0) > 0)
+      .map(([id, n]) => `${n} ${KIND_WORDS[id as keyof typeof KIND_WORDS] ?? id}${n === 1 ? "" : "s"}`);
+    return [...kinds, ...fitFacts(s).slice(0, 1)].join(" · ");
+  };
   const juniorIds = new Set(juniors.map((p) => p.id));
   const inScope = (t: TaskView) => me.scope === "all" || t.projectId === me.scope;
+  // His juniors' tasks, and any task he set someone else (a site check, say), so every hand-in
+  // he reviews is here.
   const tasks = firm.tasks
-    .filter((t) => t.kind === "work" && juniorIds.has(t.person) && inScope(t) && (who === "all" || t.person === who))
+    .filter((t) => t.kind === "work" && (juniorIds.has(t.person) || t.assignedBy === me.id) && inScope(t) && (who === "all" || t.person === who))
     .filter((t) => t.status !== "accepted" || (t.acceptedAt && datePart(t.acceptedAt) >= WEEK.from))
     .sort((a, b) => taskRank(a) - taskRank(b) || (a.dueAt ?? "").localeCompare(b.dueAt ?? ""));
   const inReview = tasks.filter((t) => t.status === "submitted").length;
@@ -60,22 +71,6 @@ export function ArchitectTeam() {
   const headed = firm.projects.filter(
     (p) => p.phase !== "draft" && p.phase !== "handed-over" && p.team.head === me.id && (me.scope === "all" || p.id === me.scope),
   );
-
-  const addMember = (projectId: ProjectId, origin: HTMLElement) => {
-    if (pause.pending !== null || !addWho) return;
-    const personId = addWho;
-    const { record } = demo;
-    const by = me.id;
-    pause.start({
-      what: `${firm.person(personId)?.name ?? personId} added to ${firm.project(projectId)?.name ?? projectId}`,
-      origin,
-      commit: () => {
-        record({ kind: "member.added", team: "Studio", personId, sites: [projectId], by });
-        setAdding(null);
-        setAddWho(null);
-      },
-    });
-  };
 
   return (
     <>
@@ -193,7 +188,10 @@ export function ArchitectTeam() {
                 .filter((row) => juniorIds.has(row.person))
                 .map((row) => (
                   <li key={row.person} className="glass-inner grid gap-2 p-3">
-                    <p className="text-15 font-semibold text-ink">{firm.person(row.person)?.name}</p>
+                    <p className="grid gap-0.5">
+                      <span className="text-15 font-semibold text-ink">{firm.person(row.person)?.name}</span>
+                      <span className="text-13 text-ink-soft">{strengthWords(row.person)}</span>
+                    </p>
                     <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                       {[
                         ["Tasks", String(row.tasks)],
@@ -218,65 +216,17 @@ export function ArchitectTeam() {
             ) : (
               <ul className="grid grid-cols-1 gap-1">
                 {headed.map((p) => {
-                  const free = juniors.filter((j) => !p.team.architects.includes(j.id));
-                  const open = adding === p.id;
+                  const team = firm.architectTeam(p.id);
+                  const invited = team.members.filter((m) => m.state === "invited").length;
+                  const names = team.members
+                    .filter((m) => m.state === "assigned")
+                    .map((m) => firm.person(m.personId)?.first ?? m.personId);
                   return (
-                    <li key={p.id} className="glass-row px-3 py-2.5">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                        <Link
-                          href={`/staff/projects/${p.id}`}
-                          className="link flex min-h-11 min-w-0 flex-[1_1_10rem] items-center text-15 font-semibold text-ink"
-                        >
-                          <span className="truncate">{p.name}</span>
-                        </Link>
-                        {/* The team as plain names: a pill with a dot reads as a status. */}
-                        <span className="text-15 text-ink-soft">
-                          {p.team.architects.length === 0
-                            ? "No juniors"
-                            : p.team.architects.map((id) => firm.person(id)?.first ?? id).join(" · ")}
-                        </span>
-                        {free.length > 0 && (
-                          <button
-                            type="button"
-                            className={`${rowBtn} gap-1.5`}
-                            aria-expanded={open}
-                            aria-label={open ? `Close, ${p.name}` : `Add a junior to ${p.name}`}
-                            onClick={() => {
-                              if (open) {
-                                if (pause.pending !== null) pause.cancel();
-                                setAdding(null);
-                              } else {
-                                setAdding(p.id);
-                                setAddWho(free[0]?.id ?? null);
-                              }
-                            }}
-                          >
-                            <IconPlus className={open ? "rotate-45" : ""} />
-                            {open ? "Close" : "Add"}
-                          </button>
-                        )}
-                      </div>
-                      {open && (
-                        <div className="glass-inner mt-2 grid gap-3 p-3">
-                          <ChipGroup label="Add">
-                            {free.map((j) => (
-                              <Chip key={j.id} pressed={addWho === j.id} onClick={() => setAddWho(j.id)}>
-                                {j.name}
-                              </Chip>
-                            ))}
-                          </ChipGroup>
-                          <div>
-                            <button
-                              type="button"
-                              className="btn btn-primary min-h-11 px-4 text-15"
-                              aria-disabled={pause.pending !== null}
-                              onClick={(event) => addMember(p.id, event.currentTarget)}
-                            >
-                              Add {firm.person(addWho ?? free[0].id)?.first}
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                    <li key={p.id}>
+                      <ProjectRow project={p} href={`/staff/projects/${p.id}/team`}>
+                        <span className="text-13 text-ink-soft">{names.length > 0 ? names.join(" · ") : "No juniors"}</span>
+                        {invited > 0 && <StatusChip tone="waiting">{`${invited} invited`}</StatusChip>}
+                      </ProjectRow>
                     </li>
                   );
                 })}

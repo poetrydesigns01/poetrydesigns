@@ -8,6 +8,7 @@ import { useClientHome } from "@/components/client-home/data";
 import { ElevationPanel } from "@/components/client-home/elevation-panel";
 import { KeyFigures } from "@/components/client-home/key-figures";
 import { NextActionCard } from "@/components/client-home/next-action";
+import { NpsCard } from "@/components/client-home/nps-card";
 import { StageRail } from "@/components/client-home/stage-rail";
 import { TeamCard } from "@/components/client-home/team-card";
 import "@/components/client-home/home.css";
@@ -15,6 +16,7 @@ import { client } from "@/lib/demo-data";
 
 // Iyer Residence home: the one thing that needs her, her front elevation with the house
 // rising, four figures, the approvals stage by stage, and the timeline down the right side.
+// After a milestone, one feedback question (0 to 10) sits under the greeting until answered.
 
 export default function ClientHome() {
   const home = useClientHome();
@@ -26,6 +28,8 @@ export default function ClientHome() {
         <header>
           <h1 className="display text-32 text-ink">Hello, {client.firstName}</h1>
         </header>
+
+        <NpsCard />
 
         <div className="grid gap-4 md:grid-cols-2 lg:gap-5">
           <NextActionCard actions={home.actions} />

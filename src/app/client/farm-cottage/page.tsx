@@ -28,7 +28,7 @@ export default function FarmCottageHome() {
   if (!cottage) return null;
 
   const signUp = cottage.milestones.find((m) => m.n === 0);
-  const poc = firm.person(cottage.team.poc);
+  const poc = firm.person(firm.advisorOf(cottage.id));
   const head = firm.person(cottage.team.head);
   const beforeLeft = credits ? credits.before.granted - credits.before.used : 0;
 

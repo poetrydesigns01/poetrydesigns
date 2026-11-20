@@ -4,6 +4,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
 import { useFirm } from "@/lib/demo-store";
@@ -17,7 +18,7 @@ import { healthOf, portfolio } from "./portfolio";
 // contract value, work done, costs so far, margin so far, received, spent and cash. A loss
 // or a cash shortfall is written in brick. Each project opens its Money tab.
 
-export function ProfitTable() {
+export function ProfitTable({ children }: { children?: ReactNode } = {}) {
   const firm = useFirm();
   const rows = worstFirst(firm.projects.filter((p) => p.phase !== "draft").map((p) => ({ p }))).map(({ p }) => p);
   const sum = portfolio(rows, firm);
@@ -28,6 +29,7 @@ export function ProfitTable() {
       <StaffBoard place="Projects" headline={losing > 0 ? `${losing} need attention` : "Every project healthy"} chip={false} />
 
       <div className="mt-6 grid gap-5">
+        {children}
         <StatRow cols={5} label="Before GST">
           <StatCard label="Contract value" value={inrShort(sum.contract)} sub={`${rows.length} projects`} icon="file" />
           <StatCard label="Work done" value={inrShort(sum.workDone)} icon="hammer" />

@@ -5,14 +5,17 @@
 
 import Link from "next/link";
 import { GlassTable, Icon, inrShort, Panel } from "@/components/admin/glass-kit";
+import { ProjectsAttention, WaitingPanel } from "@/components/admin/today-desk";
 import { useScope } from "@/components/register/project-switch";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
+import { taskActionFor } from "@/components/shared/task-action";
 import { StatStrip, requestTitle, type StatItem } from "@/components/site/site-kit";
 import { useFirm, useViewer } from "@/lib/demo-store";
 import type { PoView, RequestView } from "@/lib/firm";
 import { formatShortDate, inr } from "@/lib/format";
 import type { PaymentStageView } from "@/lib/portal";
+import { todayItems } from "@/lib/today-count";
 import { instShort, weekLanes, weekShort } from "./instalment-weeks";
 import { MarkSeen } from "./mark-seen";
 import { requestTask, taskWords } from "./request-task";
@@ -57,7 +60,11 @@ export function FinanceToday() {
       ? firm.pos.filter((po) => firm.turns(accountant.id, scope).some((t) => t.id === `bill:${po.no}`))
       : [];
 
-  const n = turns.length;
+  // What waits on this person, urgent first, each with how long it has waited: the rows the
+  // rail's Today figure counts.
+  const waiting = todayItems(firm, "finance", me.id, scope);
+  const urgent = waiting.filter((x) => x.tier === "urgent").length;
+  const n = waiting.length;
   const headline = n === 0 ? `All clear, ${me.first}` : `${n} ${n === 1 ? "thing needs" : "need"} you, ${me.first}`;
   const oldest = fresh[0] ?? open[0];
 
@@ -226,7 +233,7 @@ export function FinanceToday() {
       <StaffBoard
         place="Today"
         headline={headline}
-        state={overdue.items.length > 0 ? `${overdue.items.length} overdue` : undefined}
+        state={urgent > 0 ? `${urgent} urgent` : overdue.items.length > 0 ? `${overdue.items.length} overdue` : undefined}
         primary={
           buyer && oldest
             ? { label: `Open ${oldest.no}`, href: `/staff/finance/requests/${oldest.no}` }
@@ -238,12 +245,17 @@ export function FinanceToday() {
         }
       />
       <div className="mt-6 grid gap-5">
+        <WaitingPanel
+          items={waiting}
+          action={(item) => taskActionFor(firm, item.id, me.id)}
+        />
         <StatStrip label="Today at a glance" items={stats} />
         {buyer && requestsPanel}
         <div className="grid items-start gap-5 xl:grid-cols-2">
           {moneyPanel}
           {billsPanel}
         </div>
+        <ProjectsAttention person={me.id} scope={scope} />
       </div>
     </>
   );

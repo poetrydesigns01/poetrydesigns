@@ -15,7 +15,6 @@ import {
   registerNotes,
   seedAdditions,
   seedBills,
-  seedCreditRequests,
   seedCredits,
   seedDrafts,
   seedPos,
@@ -100,6 +99,9 @@ import {
   type ProjectPlan,
 } from "./workflow-plan";
 import { fallsInMilestone, instalmentOf, milestoneStage, WORKFLOW_TEMPLATE, type WorkflowTemplate } from "./workflow-template";
+import { deriveDesk, type DeskApi } from "./desk";
+import { deriveClientRequests, deskEvents, hoursBoughtInTab } from "./fees";
+import { deriveProspects, draftStep1Of } from "./prospects";
 
 // The staff side's one pure derivation. Everything a register, a board or a ledger shows
 // is worked out here from the seed in firm-data.ts and the events recorded in this tab.
@@ -389,6 +391,8 @@ export type DraftView = Draft & {
   opened: boolean;
   openedAt?: string;
   projectId?: ProjectId;
+  /** Filled in from a converted prospect's enquiry (step 1, the sign-up money); the rest is for step 2. */
+  fromProspect?: { prospectId: string; category: CategoryId; plotArea: number; bedrooms: number; budget: number };
 };
 
 export type ProjectSchedule = ScheduleChange & { projectId: ProjectId };
@@ -405,7 +409,8 @@ export type DesignView = {
   days: number;
 };
 
-export type Firm = {
+/** The firm's registers before the BD and architect refinement (desk.ts) is laid over them. */
+export type FirmCore = {
   people: Person[];
   projects: ProjectView[];
   requests: RequestView[];
@@ -480,6 +485,9 @@ export type Firm = {
   /** Every plan task given to a person, open ones first, across projects. */
   planTasksFor: (person: PersonId) => PlanView["tasks"];
 };
+
+/** Everything the staff screens read: the registers, and the BD and architect refinement from desk.ts. */
+export type Firm = FirmCore & DeskApi;
 
 // ---- Small helpers ----
 
@@ -699,9 +707,20 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
   }
   const templateOf = (id: CategoryId) => liveTemplates.find((t) => t.id === id) ?? liveTemplates[0];
 
-  // Drafts, with the steps saved here and whether the workspace was opened.
+  // Drafts, with the steps saved here and whether the workspace was opened. A prospect who
+  // paid the sign-up (prospect.converted) fills in step 1 and the sign-up money first.
+  const converted = deriveProspects(events).filter((p) => p.status === "converted" && p.draftId);
   const drafts: DraftView[] = seedDrafts.map((seed) => {
     const draft: Draft = { ...seed };
+    const prospect = converted.find((p) => p.draftId === seed.id);
+    if (prospect) {
+      if (!draft.step1) draft.step1 = draftStep1Of(prospect);
+      if (!draft.startedAt) {
+        draft.startedAt = prospect.convertedAt ?? "";
+        draft.by = prospect.advisor;
+      }
+      if (prospect.signUp && !draft.step3?.signUp) draft.step3 = { ...(draft.step3 ?? {}), signUp: { ...prospect.signUp } };
+    }
     for (const e of of("draft.saved")) {
       if (e.draftId !== seed.id) continue;
       if (!draft.startedAt) draft.startedAt = e.at;
@@ -732,6 +751,15 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       opened: !!opened,
       openedAt: opened?.at,
       projectId: opened?.projectId,
+      fromProspect: prospect
+        ? {
+            prospectId: prospect.id,
+            category: prospect.category,
+            plotArea: prospect.plotArea,
+            bedrooms: prospect.bedrooms,
+            budget: prospect.budget,
+          }
+        : undefined,
     };
   });
 
@@ -798,6 +826,13 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       const list =
         e.team === "Studio" ? p.team.architects : e.team === "Site" ? p.team.engineers : p.team.procurement;
       if (!list.includes(e.personId)) list.push(e.personId);
+    }
+    // Architects the Project Head assigned (or who accepted an invitation) and removed.
+    for (const e of events) {
+      if (e.kind === "project.architect-assigned" && e.projectId === p.id && !p.team.architects.includes(e.personId))
+        p.team.architects.push(e.personId);
+      else if (e.kind === "project.architect-removed" && e.projectId === p.id)
+        p.team.architects = p.team.architects.filter((id) => id !== e.personId);
     }
     for (const e of of("milestone.revised")) {
       if (e.projectId !== p.id) continue;
@@ -1064,7 +1099,8 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
   // generates one (plan.generated), with tasks given to someone else (plan.task-assigned).
   const teamFor = (p: ProjectSeed): PlanTeam => ({
     client: p.id === "iyer" || p.id === "iyer-cottage" ? "meera" : null,
-    business: p.onboardedBy,
+    // The BD person who holds the client, who may not be the one who filled in the onboarding.
+    business: p.team.poc,
     finance: "divya",
     architect: p.team.head,
     designer: p.team.architects[0] ?? p.team.head,
@@ -1527,6 +1563,9 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
     const before = { ...seed.before };
     const during = { ...seed.during };
     const added: CreditAddition[] = [];
+    // Hours paid for here through an architect fee (client request, head's approval, fee received).
+    for (const bought of hoursBoughtInTab(events))
+      if (bought.projectId === seed.projectId) (seed.constructionStarted ? during : before).granted += bought.hours;
     for (const addition of seedAdditions) {
       if (addition.projectId !== seed.projectId) continue;
       added.push(addition);
@@ -1558,8 +1597,14 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
     };
   });
 
-  const creditRequests: CreditRequestView[] = [
-    ...seedCreditRequests,
+  // Hours asked for are client requests now (fees.ts), routed to the Project Head; listed here
+  // for the older hours screens, `open` until the head decides and the fee is settled.
+  const hourRequests = deriveClientRequests(deskEvents(events), (id) => {
+    const seed = seedProjects.find((x) => x.id === id);
+    const head = of("head.changed").filter((e) => e.projectId === id).pop()?.to ?? seed?.team.head;
+    return head ? { head, client: seed?.clients[0] ?? "Client" } : undefined;
+  }).filter((r) => r.type === "hours");
+  const legacyRequests = [
     ...of("credits.requested").map((e) => ({
       id: `hours:${e.id}`,
       projectId: e.projectId,
@@ -1567,7 +1612,9 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       hours: e.hours,
       at: e.at,
     })),
-    ...(state.creditsRequested && !of("credits.requested").some((e) => e.projectId === "iyer")
+    ...(state.creditsRequested &&
+    !of("credits.requested").some((e) => e.projectId === "iyer") &&
+    !hourRequests.some((r) => r.projectId === "iyer")
       ? [{ id: "hours:iyer-asked", projectId: "iyer" as ProjectId, by: "Meera Iyer", hours: 5, at: `${TODAY_ISO}T09:00` }]
       : []),
   ].map((r) => ({
@@ -1575,6 +1622,18 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
     days: daysSince(r.at),
     open: !additions.some((a) => a.projectId === r.projectId && a.at >= r.at),
   }));
+  const creditRequests: CreditRequestView[] = [
+    ...hourRequests.map((r) => ({
+      id: `hours:${r.id}`,
+      projectId: r.projectId,
+      by: r.askedBy,
+      hours: r.hours ?? 0,
+      at: r.raisedAt,
+      days: daysSince(r.raisedAt),
+      open: r.open,
+    })),
+    ...legacyRequests,
+  ];
 
   // Designs with the client, on every project.
   const designViews: DesignView[] = [
@@ -2137,7 +2196,8 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
 
     if (me.role === "bd") {
       for (const d of drafts) {
-        if (d.by !== person || d.opened || d.stepsDone === 0) continue;
+        // A prospect who paid the sign-up waits on BD from that day, before any step is saved.
+        if (d.by !== person || d.opened || (d.stepsDone === 0 && !d.fromProspect)) continue;
         const name = d.step1?.name ?? (d.id === "kulkarni" ? "Kulkarni Eco Home" : d.step1?.clients[0] ?? "New client");
         const days = daysSince(d.startedAt || TODAY_ISO);
         items.push(
@@ -2154,23 +2214,10 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
           }),
         );
       }
-      for (const r of creditRequests) {
-        if (!r.open) continue;
-        items.push(
-          withStamps({
-            id: r.id,
-            projectId: r.projectId,
-            title: `${r.by} asked for ${r.hours} more hours`,
-            sentence: `${projectName(r.projectId)}. Asked on ${formatShortDate(datePart(r.at))}. Payment not received yet.`,
-            margin: ageWords(r.days),
-            days: r.days,
-            href: "/staff/bd/hours",
-            action: { label: "Add hours", href: "/staff/bd/hours" },
-          }),
-        );
-      }
+      // Hours asked for go to the Project Head now (fees.ts); BD sees a request only once it
+      // is escalated (desk.ts attentionFor). An invitation is the client's own BD person's to chase.
       for (const p of projectViews) {
-        if (p.phase !== "invited" || p.clientSignedInOn || !p.invitedAt) continue;
+        if (p.phase !== "invited" || p.clientSignedInOn || !p.invitedAt || p.team.poc !== person) continue;
         const days = daysSince(p.invitedAt);
         items.push(
           withStamps({
@@ -2378,7 +2425,7 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
 
     if (me.role === "bd") {
       const cottage = projectOf("iyer-cottage");
-      if (cottage && !estimateApproved)
+      if (cottage && !estimateApproved && cottage.team.poc === person)
         items.push(
           withClient(cottage, {
             id: "estimate:iyer-cottage",
@@ -2565,7 +2612,7 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
       .filter((r) => (side === "client") === (r.by === "meera" || r.by === "arjun"))
       .reduce((latest, r) => (r.at > latest ? r.at : latest), "");
 
-  return {
+  const core: FirmCore = {
     people,
     projects: projectViews,
     requests,
@@ -2638,6 +2685,7 @@ export function deriveFirm(state: DemoState, given?: Projection): Firm {
         .sort((a, b) => order[a.state] - order[b.state] || a.plannedStart.localeCompare(b.plannedStart));
     },
   };
+  return { ...core, ...deriveDesk(core, events) };
 }
 
 function seedThreadReadsFor(id: ProjectId): { by: PersonId; at: string }[] {
@@ -2645,7 +2693,7 @@ function seedThreadReadsFor(id: ProjectId): { by: PersonId; at: string }[] {
 }
 
 /** The draft ids BD can open, for static params. */
-export const DRAFT_IDS: DraftId[] = ["kulkarni", "new"];
+export const DRAFT_IDS: DraftId[] = ["kulkarni", "new", "new-2", "new-3"];
 
 /** Who a role is viewed as by default. */
 export const DEFAULT_VIEWER: Record<StaffRole, PersonId> = {

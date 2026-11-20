@@ -3,12 +3,12 @@
  */
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { titled } from "@/app/shared-metadata";
+import { PRIVATE, titled } from "@/app/shared-metadata";
 
 // Names the screen in the browser tab and in history; the page draws the rest.
 
-export const metadata: Metadata = { title: titled("Hours asked") };
+export const metadata: Metadata = { title: titled("Escalations"), robots: PRIVATE };
 
-export default function StaffBdHoursLayout({ children }: { children: ReactNode }) {
+export default function StaffBdEscalationsLayout({ children }: { children: ReactNode }) {
   return children;
 }

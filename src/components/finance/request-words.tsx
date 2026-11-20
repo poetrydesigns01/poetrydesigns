@@ -2,7 +2,7 @@
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
 import { StatusChip } from "@/components/register/status-chip";
-import { ageWords, type RequestView } from "@/lib/firm";
+import { ageWords, daysSince, type RequestView } from "@/lib/firm";
 import { datePart, daysBetween } from "@/lib/format";
 import type { Tone } from "@/lib/portal";
 
@@ -46,10 +46,12 @@ export function requestChip(r: RequestView, { late = true }: { late?: boolean } 
  *  or once it is late for the site, when it says so. */
 export function WaitingChip({ r }: { r: RequestView }) {
   const late = lateForSite(r);
-  const tone = late || r.days >= 4 ? "chip-late" : r.days >= 2 ? "chip-waiting" : "chip-done";
+  // With no PO yet it has waited since it reached procurement, as Today and the site count it.
+  const days = r.pos.length === 0 && !r.queued ? daysSince(r.sentAt || r.at) : r.days;
+  const tone = late || days >= 4 ? "chip-late" : days >= 2 ? "chip-waiting" : "chip-done";
   return (
     <span className={`glass-chip whitespace-nowrap tabular-nums ${tone}`}>
-      {ageWords(r.days)}
+      {ageWords(days)}
       {late ? " · late" : ""}
     </span>
   );

@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 
 // The tab's name, after the project's (see the project layout); the page draws the rest.
 
-export const metadata: Metadata = { title: "Hours" };
+export const metadata: Metadata = { title: "Requests" };
 
 export default function StaffProjectsIdHoursLayout({ children }: { children: ReactNode }) {
   return children;

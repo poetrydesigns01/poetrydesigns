@@ -1,10 +1,16 @@
 /*
  * Copyright 2026 AvlysAI Pvt. Ltd. All rights reserved.
  */
-import { contacts } from "@/lib/demo-data";
+"use client";
+
+import { office, type Contact } from "@/lib/demo-data";
+import { useFirm } from "@/lib/demo-store";
+import type { PersonId } from "@/lib/firm-data";
+import { PROJECT } from "./data";
 import { PhoneIcon } from "./icons";
 
-// Who to call, in the order to call them.
+// Who to call, in the order to call them: the BD person who holds the client (the same person
+// their feedback counts for and escalations go to), the Project Head, then the office.
 
 function initials(name: string): string {
   const words = name.split(" ").filter((w) => /^[A-Z]/.test(w));
@@ -16,6 +22,18 @@ function tel(phone: string) {
 }
 
 export function TeamCard() {
+  const firm = useFirm();
+  const head = firm.project(PROJECT)?.team.head;
+  const person = (id: PersonId | undefined, level: string, role: string): Contact[] => {
+    const p = id ? firm.person(id) : undefined;
+    return p ? [{ level, name: p.name, role, phone: p.phone }] : [];
+  };
+  const contacts: Contact[] = [
+    ...person(firm.advisorOf(PROJECT), "Your point of contact", "Client relations"),
+    ...person(head, "If that does not settle it", "Project Head"),
+    office,
+  ];
+
   return (
     <section className="glass p-2 sm:p-3" aria-labelledby="team-title">
       <h2 id="team-title" className="display px-3 pt-2 pb-1 text-22 text-ink">

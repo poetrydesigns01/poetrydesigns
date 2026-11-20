@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useId, useRef, useState, type FormEvent, type RefObject } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { dayWords } from "@/components/admin/admin-data";
 import { Count, Empty, Icon, Meter, Panel } from "@/components/admin/glass-kit";
 import { Chip, ChipGroup, field } from "@/components/register/chips";
@@ -14,14 +14,14 @@ import { StatusChip } from "@/components/register/status-chip";
 import { stampNow } from "@/lib/clock";
 import { TODAY } from "@/lib/demo-data";
 import { getDemoSnapshot, useDemo, useFirm, useProjection } from "@/lib/demo-store";
-import type { CreditRequestView } from "@/lib/firm";
-import { HOUR_PRICE, type CreditAddition, type FirmEvent, type Pool, type ProjectId } from "@/lib/firm-data";
+import type { CreditAddition, FirmEvent, Pool, ProjectId } from "@/lib/firm-data";
 import { formatStampShort, hours, inr } from "@/lib/format";
+import { ClientRequests } from "./requests";
 
-// The client's advisory hours on this project: the two pools as cards with a meter, the
-// sessions logged against them, and hours bought and asked for. Only the admin changes a
-// pool (with a reason, kept in the log) or adds hours the client paid for offline; an open
-// request opens that form already filled in.
+// The client's requests on this project (more hours, design changes), answered by the Project
+// Head with the fee worked out on approval; then the two pools as cards with a meter, the
+// sessions logged against them, and hours bought. Only the admin changes a pool (with a
+// reason, kept in the log) or adds hours the client paid for offline.
 
 const POOL_NAME = { before: "Before construction", during: "During construction" } as const;
 
@@ -33,12 +33,15 @@ export function ProjectHours({ projectId }: { projectId: ProjectId }) {
   const projection = useProjection();
   const role = useStaffRole();
   const [form, setForm] = useState<Form>(null);
-  const [answering, setAnswering] = useState<CreditRequestView | null>(null);
-  const addRef = useRef<HTMLInputElement>(null);
   const p = firm.project(projectId);
   const credit = firm.credits.find((c) => c.projectId === projectId);
+  // BD sees only what was escalated to them; routine hour and design requests are the head's.
+  const bd = role === "bd";
+  const requests = firm.requestsFor(projectId).filter((r) => !bd || r.escalation);
+  const requestsTitle = bd ? "Escalations" : "Requests";
+  const noRequests = bd ? "No escalations" : "No requests";
   if (!p || p.phase === "draft") return null;
-  if (!credit) return <Empty>No hours set yet.</Empty>;
+  if (!credit) return <ClientRequests title={requestsTitle} requests={requests} empty={noRequests} />;
 
   const sessions =
     projectId === "iyer"
@@ -60,20 +63,17 @@ export function ProjectHours({ projectId }: { projectId: ProjectId }) {
     (e): e is Extract<FirmEvent, { kind: "credits.edited" }> => e.kind === "credits.edited" && e.projectId === projectId,
   );
   const last = edits[edits.length - 1];
-  const requests = firm.creditRequests.filter((r) => r.projectId === projectId);
-  const openRequests = requests.filter((r) => r.open).length;
   const addedTo = (pool: "before" | "during") =>
     credit.added.filter((a) => a.pool === pool).reduce((sum, a) => sum + a.hours, 0);
   const admin = role === "admin";
-  const nothingBought = credit.added.length === 0 && requests.length === 0;
+  const nothingBought = credit.added.length === 0;
 
-  const openForm = (next: Form) => {
-    setForm((f) => (f === next ? null : next));
-    if (next !== "add") setAnswering(null);
-  };
+  const openForm = (next: Form) => setForm((f) => (f === next ? null : next));
 
   return (
     <div className="grid gap-5">
+      <ClientRequests id="requests" title={requestsTitle} requests={requests} empty={noRequests} />
+
       <section aria-label="The pools" className="grid gap-3 sm:grid-cols-2">
         {(["before", "during"] as const).map((pool) => (
           <PoolCard
@@ -119,16 +119,11 @@ export function ProjectHours({ projectId }: { projectId: ProjectId }) {
 
       {admin && form === "add" && (
         <AddBoughtHours
-          key={answering?.id ?? "unasked"}
           projectId={projectId}
           projectName={p.name}
           current={credit.current}
-          request={answering}
-          inputRef={addRef}
-          onDone={() => {
-            setAnswering(null);
-            setForm(null);
-          }}
+          rate={firm.feeRule.ratePerHour}
+          onDone={() => setForm(null)}
         />
       )}
       {admin && form === "change" && (
@@ -175,38 +170,8 @@ export function ProjectHours({ projectId }: { projectId: ProjectId }) {
         </Panel>
 
         {!nothingBought && (
-          <Panel
-            title="Bought and asked"
-            aside={openRequests > 0 ? <StatusChip tone="waiting">{`${openRequests} open`}</StatusChip> : undefined}
-          >
+          <Panel title="Bought" aside={<Count n={credit.added.length} />}>
             <ul className="grid gap-1">
-              {requests.map((r) => (
-                <li key={r.id} className="glass-row flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
-                  <span className="grid min-w-0">
-                    <span className="text-15 font-semibold">
-                      {r.by} asked {hours(r.hours)}
-                    </span>
-                    <span className="text-13 text-ink-soft">{dayWords(r.at)}</span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    {r.open ? <StatusChip tone="waiting">Open</StatusChip> : <StatusChip tone="done">Added</StatusChip>}
-                    {admin && r.open && answering?.id !== r.id && (
-                      <button
-                        type="button"
-                        className="btn btn-glass min-h-11 px-4 text-15"
-                        onClick={() => {
-                          setAnswering(r);
-                          setForm("add");
-                          // The form is filled in for this request, and its first field takes focus.
-                          window.setTimeout(() => addRef.current?.focus(), 0);
-                        }}
-                      >
-                        Add
-                      </button>
-                    )}
-                  </span>
-                </li>
-              ))}
               {credit.added.map((a) => (
                 <li key={a.id} className="glass-row flex items-center justify-between gap-4 px-3 py-2.5">
                   <span className="grid min-w-0">
@@ -260,21 +225,20 @@ function AddBoughtHours({
   projectId,
   projectName,
   current,
-  request,
-  inputRef,
+  rate,
   onDone,
 }: {
   projectId: ProjectId;
   projectName: string;
   current: "before" | "during";
-  request: CreditRequestView | null;
-  inputRef: RefObject<HTMLInputElement | null>;
+  /** The admin's fee an hour, before GST. */
+  rate: number;
   onDone: () => void;
 }) {
   const demo = useDemo();
   const pause = usePause();
   const ids = useId();
-  const [count, setCount] = useState(request ? String(request.hours) : "");
+  const [count, setCount] = useState("");
   const [pool, setPool] = useState<"before" | "during">(current);
   const [amount, setAmount] = useState<string | null>(null);
   const [receivedOn, setReceivedOn] = useState(TODAY);
@@ -282,9 +246,8 @@ function AddBoughtHours({
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const value = Number(count);
-  // Prefilled at the hour price until the admin types what was actually paid.
-  const paid = amount === null ? (Number.isFinite(value) ? value * HOUR_PRICE : 0) : Number(amount);
-  const asked = request ? `${request.by} asked on ${dayWords(request.at)}.` : "";
+  // Prefilled at the fee an hour until the admin types what was actually paid.
+  const paid = amount === null ? (Number.isFinite(value) ? value * rate : 0) : Number(amount);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -293,7 +256,7 @@ function AddBoughtHours({
       return setError("Hours in halves, such as 5 or 2.5.");
     if (!(paid > 0)) return setError("Amount received, before GST.");
     if (!reference.trim()) return setError("Add the payment reference.");
-    const why = reason.trim() || asked;
+    const why = reason.trim();
     if (!why) return setError("Add the reason.");
     setError("");
     const ref = reference.trim();
@@ -323,16 +286,12 @@ function AddBoughtHours({
   };
 
   return (
-    <Panel
-      title="Add hours"
-      strong
-      aside={request ? <StatusChip tone="waiting">{`${request.by} · ${hours(request.hours)}`}</StatusChip> : undefined}
-    >
+    <Panel title="Add hours" strong>
       <form onSubmit={submit} className="grid gap-4 px-1">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Hours" htmlFor={`${ids}-hours`}>
             <input
-              ref={inputRef}
+              autoFocus
               id={`${ids}-hours`}
               type="number"
               inputMode="decimal"
@@ -343,7 +302,7 @@ function AddBoughtHours({
               onChange={(e) => setCount(e.target.value)}
             />
           </Field>
-          <Field label="Received, before GST" hint={`${inr(HOUR_PRICE)} an hour`} htmlFor={`${ids}-amount`}>
+          <Field label="Received, before GST" hint={`${inr(rate)} an hour`} htmlFor={`${ids}-amount`}>
             <input
               id={`${ids}-amount`}
               type="number"
@@ -390,7 +349,6 @@ function AddBoughtHours({
               type="text"
               className={field}
               value={reason}
-              placeholder={asked || undefined}
               onChange={(e) => setReason(e.target.value)}
             />
           </Field>

@@ -7,6 +7,7 @@ import { useId, useState } from "react";
 import { useScope } from "@/components/register/project-switch";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
+import { TaskRowAction, taskTurn } from "@/components/shared/task-action";
 import { useFirm, useViewer } from "@/lib/demo-store";
 import type { PersonId, ProjectId } from "@/lib/firm-data";
 import type { SiteMilestoneView, SiteTaskView } from "@/lib/portal";
@@ -33,7 +34,8 @@ import "./site.css";
 
 // The plan's site tasks: the milestone in hand, then the next one (locked until its
 // instalment is in). One row per task with its dates, progress and the state of its
-// materials, crews and drawings; a row opens in place for updates and requests.
+// materials, crews and drawings; a row opens in place for updates and requests. Above them,
+// the tasks given to him one by one (handed in here) and his juniors' hand-ins to review.
 
 type Filter = "all" | "mine" | "late" | "done" | PersonId;
 
@@ -178,6 +180,39 @@ function Group({
   );
 }
 
+/** Work tasks set person to person: his own to hand in, and juniors' hand-ins he reviews. */
+function YourWork({ person, projectId }: { person: PersonId; projectId: ProjectId }) {
+  const firm = useFirm();
+  const id = useId();
+  const rows = firm.tasks
+    .filter((t) => t.projectId === projectId && taskTurn(t, person) !== null)
+    .sort((a, b) => (a.dueAt ?? "~").localeCompare(b.dueAt ?? "~"));
+  if (rows.length === 0) return null;
+  return (
+    <section className="glass p-2 sm:p-3" aria-labelledby={id}>
+      <h2 id={id} className="px-2 pt-1 pb-2 text-17 font-semibold text-ink">
+        Your work
+      </h2>
+      <ul className="grid gap-0.5">
+        {rows.map((t) => {
+          const review = taskTurn(t, person) === "review";
+          return (
+            <li key={t.id} className="glass-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5">
+              <span className="grid min-w-0 gap-0.5">
+                <span className="truncate text-15 font-semibold text-ink">{t.title}</span>
+                <span className="truncate text-13 text-ink-soft">
+                  {[review ? t.personName.split(" ")[0] : `From ${t.assignedByName.split(" ")[0]}`, t.due ?? undefined].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+              <TaskRowAction itemId={`task:${t.id}`} person={person} />
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export function SiteTasks() {
   const firm = useFirm();
   const me = useViewer("site");
@@ -194,6 +229,7 @@ export function SiteTasks() {
     return (
       <div className="site-screen">
         <StaffBoard place="Tasks" headline="No tasks yet" />
+        <YourWork person={me.id} projectId={projectId} />
       </div>
     );
   }
@@ -221,6 +257,8 @@ export function SiteTasks() {
   return (
     <div className="site-screen">
       <StaffBoard place="Tasks" headline={stage.short} state={milestoneLine(stage)} />
+
+      <YourWork person={me.id} projectId={projectId} />
 
       <Segmented
         label="Show"

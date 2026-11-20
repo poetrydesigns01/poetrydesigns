@@ -17,6 +17,7 @@ import { getDemoSnapshot, useDemo, useFirm, useViewer } from "@/lib/demo-store";
 import type { PersonId } from "@/lib/firm-data";
 import { addDays, formatShortDate, formatStampShort, inr } from "@/lib/format";
 import type { PaymentStageView } from "@/lib/portal";
+import { FeeRows, feesToHandle } from "./fee-rows";
 import { focusReturn } from "./focus-return";
 import { isOverdue, weekLanes, weekShort } from "./instalment-weeks";
 import { ProjectLink, usePanel, type Panel } from "./rows";
@@ -70,6 +71,13 @@ export function MoneyIn() {
     .slice()
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, 6);
+  // Fees for architect time the client approved: invoice, then the money.
+  const fees = feesToHandle(firm.clientRequests, scope);
+  // Fees paid this month stay in view under "Received this month".
+  const feesIn = firm.clientRequests
+    .filter((r) => r.fee?.state === "paid" && (r.fee.receivedOn ?? r.fee.receivedAt ?? "").startsWith(month))
+    .filter((r) => scope === "all" || r.projectId === scope)
+    .sort((a, b) => (b.fee?.receivedAt ?? "").localeCompare(a.fee?.receivedAt ?? ""));
   const trackProjects = firm.projects
     .filter((p) => (scope === "all" ? p.phase !== "draft" : p.id === scope))
     .map((p) => p.id);
@@ -195,7 +203,28 @@ export function MoneyIn() {
           ))}
         </Block>
 
-        <Block id="received" title="Received this month" count={received.length} empty="Nothing in yet">
+        <Block id="fees" title="Architect fees" count={fees.length} empty="None to bill">
+          <FeeRows rows={fees} finance={finance} person={me.id} />
+        </Block>
+
+        <Block id="received" title="Received this month" count={received.length + feesIn.length} empty="Nothing in yet">
+          {feesIn.map((r) => (
+            <li key={r.id} className={`glass-row ${ROW}`}>
+              <span className="grid min-w-0">
+                <ProjectLink id={r.projectId} name={firm.project(r.projectId)?.name ?? r.projectId} className="flex items-center justify-self-start text-15 font-semibold max-md:min-h-11" />
+                <span className="truncate text-13 text-ink-soft">
+                  {[`Architect fee, ${r.title.toLowerCase()}`, r.fee?.invoiceNo].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+              <span className="figure min-w-24 text-right text-15">{inr(r.fee?.total ?? 0)}</span>
+              <span className="col-span-2 flex flex-wrap items-center gap-2">
+                <StatusChip tone="done">Received</StatusChip>
+                <span className="text-13 text-ink-soft">
+                  {[r.fee?.receivedOn ? formatShortDate(r.fee.receivedOn) : "", r.fee?.reference].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+            </li>
+          ))}
           {received.map((s) => (
             <StageRow
               key={`${s.projectId}:${s.n}`}

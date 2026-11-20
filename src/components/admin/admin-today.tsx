@@ -8,51 +8,23 @@ import { useState, type ReactNode } from "react";
 import { useScope } from "@/components/register/project-switch";
 import { StaffBoard } from "@/components/register/staff-board";
 import { StatusChip } from "@/components/register/status-chip";
+import { taskActionFor } from "@/components/shared/task-action";
 import { TODAY } from "@/lib/demo-data";
-import { useDemo, useFirm } from "@/lib/demo-store";
-import type { Firm, ProjectView, TurnItem } from "@/lib/firm";
-import { formatShortDate, percent, weekdayDate } from "@/lib/format";
+import { useFirm } from "@/lib/demo-store";
+import type { Firm, ProjectView } from "@/lib/firm";
+import { percent, weekdayDate } from "@/lib/format";
+import type { PaymentStageView } from "@/lib/portal";
+import { todayItems } from "@/lib/today-count";
 import { milestoneStage } from "@/lib/workflow-template";
-import type { PaymentStageView, Tone } from "@/lib/portal";
-import { exceptionRow } from "./admin-data";
-import { Count, GlassTable, Icon, inrShort, Panel, Segments, StatCard, StatRow, WaitChip } from "./glass-kit";
+import { GlassTable, Icon, inrShort, Panel, Segments, StatCard, StatRow } from "./glass-kit";
 import { healthOf, portfolio } from "./portfolio";
+import { ProjectsAttention, WaitingPanel } from "./today-desk";
 
 // Shalini's Today: the portfolio in five figures, what needs her, and every project with
 // its code, the milestone in hand, the next instalment's week, margin and cash, a loss in
 // brick. Each row opens the project's programme.
 
 type Sort = "listed" | "margin" | "cash"; // "listed" is A to Z by name
-
-/** A short label for an exception, by its kind. */
-function exceptionWords(item: TurnItem): { words: string; tone: Tone } {
-  const [, kind, sub] = item.id.split(":");
-  if (kind === "cash") return { words: "Short of cash", tone: "late" };
-  if (kind === "margin") return { words: "Losing money", tone: "late" };
-  if (kind === "letter") return { words: "Payment overdue", tone: "late" };
-  if (kind === "unseen") return { words: "Request not seen", tone: "waiting" };
-  if (kind === "client" && sub === "pay") return { words: "Payment with client", tone: "waiting" };
-  if (kind === "client" && sub === "rev") return { words: "Held price passed", tone: "waiting" };
-  if (kind === "client") return { words: "Design with client", tone: "waiting" };
-  if (kind === "split") return { words: "Split asked", tone: "waiting" };
-  return { words: "Look", tone: "progress" };
-}
-
-/**
- * An overdue-letter exception read against the payment stage as it stands now: the client
- * may already have marked it paid, so the chip and the spoken title follow the stage.
- */
-function letterStage(item: TurnItem, firm: Firm): PaymentStageView | undefined {
-  const [, kind, projectId, n] = item.id.split(":");
-  if (kind !== "letter" || !projectId) return undefined;
-  return firm.payments(projectId as ProjectView["id"]).find((s) => String(s.n) === n);
-}
-
-function letterTitle(name: string, s: PaymentStageView): string {
-  if (s.state === "client-paid")
-    return `${name}, ${s.instalmentLabel}: payment made${s.clientPaidAt ? ` ${formatShortDate(s.clientPaidAt)}` : ""}, to confirm in the bank.`;
-  return `${name}, ${s.instalmentLabel}: ${s.status.toLowerCase()}.`;
-}
 
 function sorted(rows: ProjectView[], sort: Sort) {
   if (sort === "listed") return [...rows].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -61,19 +33,18 @@ function sorted(rows: ProjectView[], sort: Sort) {
 }
 
 export function AdminToday() {
-  const demo = useDemo();
   const firm = useFirm();
   const scope = useScope("admin");
   const [sort, setSort] = useState<Sort>("listed");
 
   const live = firm.projects.filter((p) => p.phase !== "draft" && (scope === "all" || p.id === scope));
   const sum = portfolio(live, firm);
-  const exceptions = firm.exceptions.filter((item) => scope === "all" || item.projectId === scope);
   const month = weekdayDate(TODAY).split(" ").pop() ?? "";
   const onboarded = firm.onboardedIn(TODAY.slice(0, 7)).filter((p) => scope === "all" || p.id === scope);
-  // An opened project with no plan yet: the admin's turn to generate one.
-  const noPlan = live.filter((p) => firm.plan(p.id) === null);
-  const n = noPlan.length + exceptions.length;
+  // "Generate the plan" for an opened project with none yet, then the exceptions and anything
+  // else on her register, urgent first: the rows the rail's Today figure counts.
+  const waiting = todayItems(firm, "admin", "shalini", scope);
+  const n = waiting.length;
 
   return (
     <>
@@ -104,69 +75,12 @@ export function AdminToday() {
         </div>
 
         <div className="order-1 grid items-start gap-5 sm:order-none xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <Panel title="Needs you" aside={<Count n={n} tone={n > 0 ? "late" : undefined} />} strong>
-            {n === 0 ? (
-              <p className="px-1 py-3 text-15 text-ink-soft">Nothing today.</p>
-            ) : (
-              <ul className="grid gap-1">
-                {noPlan.map((p) => (
-                  <li key={`no-plan:${p.id}`}>
-                    <Link
-                      href={`/staff/projects/${p.id}/programme`}
-                      className="glass-row grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5"
-                      title={`${p.name}: no plan yet`}
-                    >
-                      <span className="grid min-w-0">
-                        <span className="truncate text-15 font-semibold">{p.name}</span>
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <StatusChip tone="waiting">No plan</StatusChip>
-                        </span>
-                      </span>
-                      <Icon name="arrow" className="size-4 text-ink-soft" />
-                      <span className="sr-only">{p.name}: no plan yet, generate it</span>
-                    </Link>
-                  </li>
-                ))}
-                {exceptions.slice(0, 8).map((item) => {
-                  const row = exceptionRow(item, firm);
-                  const p = item.projectId ? firm.project(item.projectId) : undefined;
-                  const letter = letterStage(item, firm);
-                  const { words, tone } = letter ? { words: letter.status, tone: letter.tone } : exceptionWords(item);
-                  const title = letter ? letterTitle(p?.name ?? "Project", letter) : item.title;
-                  return (
-                    <li key={item.id}>
-                      <Link
-                        href={row.href}
-                        onClick={() => {
-                          if (row.focus) demo.setFocusRow({ href: row.href, id: row.focus });
-                        }}
-                        className="glass-row grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5"
-                        title={title}
-                      >
-                        <span className="grid min-w-0">
-                          <span className="truncate text-15 font-semibold">{p?.name ?? "Firm"}</span>
-                          <span className="flex flex-wrap items-center gap-1.5">
-                            <StatusChip tone={tone}>{words}</StatusChip>
-                            {letter ? (
-                              letter.state === "client-paid" &&
-                              letter.clientPaidAt && <span className="glass-chip">Paid {formatShortDate(letter.clientPaidAt)}</span>
-                            ) : item.id.startsWith("ex:cash:") && item.figure ? (
-                              // Short of cash: the shortfall, not the age of the letter behind it.
-                              <span className="glass-chip figure">{item.figure}</span>
-                            ) : (
-                              item.days > 0 && <WaitChip days={item.days} />
-                            )}
-                          </span>
-                        </span>
-                        <Icon name="arrow" className="size-4 text-ink-soft" />
-                        <span className="sr-only">{title}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Panel>
+          <WaitingPanel
+            items={waiting}
+            title="Needs you"
+            empty="Nothing today"
+            action={(item) => taskActionFor(firm, item.id, "shalini")}
+          />
 
           <Panel title="Queues">
             <div className="grid grid-cols-2 gap-2">
@@ -176,6 +90,10 @@ export function AdminToday() {
               <Queue label={`Onboarded, ${month.slice(0, 3)}`} n={onboarded.length} icon="users" />
             </div>
           </Panel>
+        </div>
+
+        <div className="order-3 sm:order-none">
+          <ProjectsAttention person="shalini" scope={scope} />
         </div>
 
         {/* One section pattern on the page: the title, and its sort, inside the panel. */}

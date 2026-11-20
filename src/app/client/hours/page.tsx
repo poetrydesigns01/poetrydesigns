@@ -7,22 +7,33 @@ import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { CLIENT_PAGE, PageHead } from "@/components/client-home/page-frame";
 import { ClockIcon, PlusIcon } from "@/components/craft/glass-icons";
+import {
+  CLIENT_PROJECT,
+  DesignChangeAsk,
+  RequestRows,
+  clientStatus,
+  useHeadWords,
+} from "@/components/hours/client-requests";
 import { h, HoursMeter } from "@/components/hours/hours-meter";
 import { useOnHidden, usePause } from "@/components/register/recording-pause";
 import { StatusChip } from "@/components/register/status-chip";
-import { useDemo, useProjection } from "@/lib/demo-store";
+import { useDemo, useFirm, useProjection } from "@/lib/demo-store";
+import type { PersonId } from "@/lib/firm-data";
 import { personName } from "@/lib/projection";
 import { formatDate, formatShortDate, formatStampShort } from "@/lib/format";
 
 // Advisory hours: 12 before construction and 8 during it. A meter for each, the sessions
-// that used them as a compact table, and one way to ask for more.
+// that used them as a compact table, and one way to ask for more. A request for hours or a
+// design change goes to the Project Head; once approved, its cost comes back here to approve.
 
 const ASKS = [2, 5, 10];
 const SESSION_GRID = "md:grid-cols-[7rem_minmax(0,1fr)_9.5rem_4rem] md:gap-x-4";
 
 export default function HoursPage() {
   const demo = useDemo();
+  const firm = useFirm();
   const projection = useProjection();
+  const head = useHeadWords();
   const pause = usePause();
   const [asking, setAsking] = useState(false);
   const [ask, setAsk] = useState(5);
@@ -35,7 +46,12 @@ export default function HoursPage() {
   // A half-made request does not wait on a screen she has left.
   useOnHidden(() => setAsking(false));
 
-  const { before, during, left, requested, added, sessions } = projection.credits;
+  const { before, during, left, added, sessions } = projection.credits;
+  const requests = firm.requestsFor(CLIENT_PROJECT);
+  // The hours request still in hand, if any: one at a time.
+  const asked = requests.find((r) => r.type === "hours" && r.open);
+  const askedStatus = asked ? clientStatus(asked, (id) => firm.person(id as PersonId)?.name ?? id) : null;
+  const toApprove = requests.filter((r) => r.status === "fee-with-client" && !r.escalation?.open).length;
   const beforeLeft = Math.max(before.granted - before.used, 0);
   const over = Math.max(during.used - during.granted, 0);
 
@@ -57,7 +73,7 @@ export default function HoursPage() {
       what,
       origin: sendRef.current,
       commit: () => {
-        flushSync(() => demo.requestCredits(amount));
+        flushSync(() => demo.raiseClientRequest(CLIENT_PROJECT, "hours", { hours: amount }, "meera"));
         setAsking(false);
       },
     });
@@ -103,11 +119,21 @@ export default function HoursPage() {
           </dl>
 
           <div aria-live="polite">
-            {requested ? (
-              <p className="flex flex-wrap items-center gap-2">
-                <span className="glass-chip chip-waiting">{h(requested.hours)} requested</span>
-                <span className="text-13 text-lime/75">{formatStampShort(requested.at)}</span>
-              </p>
+            {asked && askedStatus ? (
+              <div className="grid justify-items-start gap-2">
+                <p className="flex flex-wrap items-center gap-2">
+                  <span className="glass-chip chip-waiting">
+                    {h(asked.hours ?? 0)} · {askedStatus.words}
+                  </span>
+                  <span className="text-13 text-lime/75">{formatStampShort(asked.raisedAt)}</span>
+                </p>
+                {asked.status === "with-head" && !asked.escalation?.open && <p className="text-15 text-lime/80">Sent to {head}</p>}
+                {asked.status === "fee-with-client" && !asked.escalation?.open && (
+                  <a href="#requests" className="btn btn-primary min-h-11 px-5 text-15">
+                    Review cost
+                  </a>
+                )}
+              </div>
             ) : asking ? (
               <div role="group" aria-label="Request hours" className="glass-inner enter-row grid gap-3 p-3">
                 <p className="lettering text-lime/75">How many?</p>
@@ -145,7 +171,7 @@ export default function HoursPage() {
             ) : (
               <button ref={askRef} type="button" className="btn btn-primary min-h-11 gap-1.5 px-5 text-15" onClick={openAsk}>
                 <PlusIcon size={17} />
-                Request hours
+                Request more hours
               </button>
             )}
           </div>
@@ -197,6 +223,21 @@ export default function HoursPage() {
           )}
         </section>
       </div>
+
+      <section id="requests" aria-labelledby="hours-requests" className="glass scroll-mt-24 p-2 sm:p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3 pb-2 pt-2">
+          <h2 id="hours-requests" className="flex items-center gap-2 text-17 font-semibold text-ink">
+            Your requests
+            {toApprove > 0 && <StatusChip tone="waiting">{toApprove} to approve</StatusChip>}
+          </h2>
+          <DesignChangeAsk />
+        </div>
+        {requests.length === 0 ? (
+          <p className="px-3 pb-3 text-15 text-ink-soft">None yet</p>
+        ) : (
+          <RequestRows requests={requests} label="Your requests" />
+        )}
+      </section>
 
       <section aria-labelledby="hours-sessions" className="glass-strong p-2 sm:p-3">
         <div className="flex items-center justify-between gap-3 px-3 pb-1 pt-2">

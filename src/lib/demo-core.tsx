@@ -143,6 +143,8 @@ function applyEvent(state: DemoState, event: NewEvent, at: string): DemoState {
   const next = append(state, event, at);
   if (event.kind === "payment.approved" && event.projectId === "iyer" && event.n === SEED_DUE) next.paymentApproved = true;
   if (event.kind === "credits.requested" && event.projectId === "iyer") next.creditsRequested = true;
+  if (event.kind === "client-request.raised" && event.request.type === "hours" && event.request.projectId === "iyer")
+    next.creditsRequested = true;
   return next;
 }
 
@@ -224,13 +226,27 @@ export function useDemo() {
             ),
       );
     },
-    /** Older screens call this with no number; five hours is the usual ask. */
+    /**
+     * Older screens call this with no number; five hours is the usual ask. It is a client
+     * request now (fees.ts): it goes to the Project Head, whose approval works out the fee.
+     */
     requestCredits: (hours?: unknown) => {
       const now = read();
+      const asked = typeof hours === "number" && hours > 0 ? hours : 5;
       write(
         append(
           { ...now, creditsRequested: true },
-          { kind: "credits.requested", projectId: "iyer", hours: typeof hours === "number" ? hours : 5, by: "meera" },
+          {
+            kind: "client-request.raised",
+            request: {
+              id: `req-iyer-e${now.events.length + 1}`,
+              projectId: "iyer",
+              type: "hours",
+              hours: asked,
+              title: `${asked} more advisory hours`,
+            },
+            by: "meera",
+          },
           stampNow(),
         ),
       );

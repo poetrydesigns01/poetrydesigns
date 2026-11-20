@@ -89,3 +89,20 @@ export function phaseChip(p: ProjectView): { tone: Tone; words: string } {
   if (p.phase === "invited") return { tone: "waiting", words: "Invited" };
   return { tone: "locked", words: "Draft" };
 }
+
+/** A budget as BD says it: "₹75 L", "₹1.2 Cr". */
+export function budgetWords(amount: number): string {
+  if (!(amount > 0)) return "—";
+  if (amount >= 1e7) return `₹${trimZero(amount / 1e7)} Cr`;
+  if (amount >= 1e5) return `₹${trimZero(amount / 1e5)} L`;
+  return `₹${Math.round(amount).toLocaleString("en-IN")}`;
+}
+
+function trimZero(n: number): string {
+  return (Math.round(n * 100) / 100).toString();
+}
+
+/** "12 d" at a level, "Today" when it moved today. */
+export function idleWords(days: number): string {
+  return days <= 0 ? "Today" : `${days} d`;
+}

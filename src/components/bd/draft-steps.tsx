@@ -16,7 +16,7 @@ import type { CategoryId, PersonId, Template } from "@/lib/firm-data";
 import { formatDate, formatStampShort, inr } from "@/lib/format";
 import { customerInitials, layoutCode, plotNumber, projectCode } from "@/lib/workflow-plan";
 import { StatusChip } from "@/components/register/status-chip";
-import { coordinateWords, draftName, parseMaps } from "./bd-words";
+import { budgetWords, coordinateWords, draftName, parseMaps } from "./bd-words";
 
 // The four steps of opening a client's workspace, each a glass form saved after the pause.
 // A step counts as done once it holds what the workspace needs: the client and site, the
@@ -210,7 +210,10 @@ function NumberInput({
 export function StepClient({ draft, locked, onSaved, primary }: StepProps) {
   const saved = draft.step1 as Step1Saved | undefined;
   const ids = useId();
-  const [name, setName] = useState(draft.step1?.name ?? (draft.id === "kulkarni" ? "Kulkarni Eco Home" : ""));
+  // A prospect's sign-up starts with the name the header shows ("Kumar home").
+  const [name, setName] = useState(
+    draft.step1?.name ?? (draft.id === "kulkarni" ? "Kulkarni Eco Home" : draft.fromProspect ? draftName(draft) : ""),
+  );
   const [owners, setOwners] = useState<[string, string]>([saved?.clients[0] ?? "", saved?.clients[1] ?? ""]);
   const [email, setEmail] = useState(saved?.email ?? "");
   const [phone, setPhone] = useState(saved?.phone ?? "");
@@ -435,11 +438,13 @@ export function StepEstimate({ draft, locked, onSaved, primary }: StepProps) {
   const ids = useId();
   const { templates } = useFirm();
   const templateOf = (id: CategoryId) => templateIn(templates, id);
-  const [category, setCategory] = useState<CategoryId>(saved?.category ?? "city-villa");
+  // A converted prospect's enquiry says which category to start from.
+  const startCategory: CategoryId = saved?.category ?? draft.fromProspect?.category ?? "city-villa";
+  const [category, setCategory] = useState<CategoryId>(startCategory);
   const [area, setArea] = useState(saved?.area ?? 0);
-  const [rate, setRate] = useState(saved?.rate ?? templateOf(saved?.category ?? "city-villa").ratePerSqFt);
+  const [rate, setRate] = useState(saved?.rate ?? templateOf(startCategory).ratePerSqFt);
   const [addOns, setAddOns] = useState(saved?.addOns ?? []);
-  const [partB, setPartB] = useState<PartBRow[]>(() => partBRows(templateOf(saved?.category ?? "city-villa"), saved));
+  const [partB, setPartB] = useState<PartBRow[]>(() => partBRows(templateOf(startCategory), saved));
   const perimeter = draft.step1?.plotPerimeter ?? 0;
   const template = templateOf(category);
 
@@ -477,7 +482,14 @@ export function StepEstimate({ draft, locked, onSaved, primary }: StepProps) {
         ))}
       </ChipGroup>
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Built-up area">
+        <Field
+          label="Built-up area"
+          hint={
+            draft.fromProspect
+              ? `Enquiry: plot ${draft.fromProspect.plotArea.toLocaleString("en-IN")} sq ft · ${draft.fromProspect.bedrooms} BHK · ${budgetWords(draft.fromProspect.budget)}`
+              : undefined
+          }
+        >
           <NumberInput value={area} onChange={setArea} unit="sq ft" step={50} />
         </Field>
         <Field label="Rate before GST" hint={`Template ${inr(template.ratePerSqFt)}`}>
@@ -707,7 +719,8 @@ export function StepTeam({ draft, locked, onSaved, primary }: StepProps) {
   // accountant sits in the team but records money; she does not raise POs).
   const buyers = staff("finance").filter((p) => p.teams.includes("Procurement") && !p.access.includes("finance"));
 
-  const [poc, setPoc] = useState<PersonId | "">(saved?.poc ?? seedTeam?.poc ?? "");
+  // One BD person per client: a prospect's sign-up keeps the advisor who held the enquiry.
+  const [poc, setPoc] = useState<PersonId | "">(saved?.poc ?? seedTeam?.poc ?? (draft.fromProspect ? draft.by : ""));
   const [head, setHead] = useState<PersonId | "">(saved?.head ?? seedTeam?.head ?? "");
   const [architects, setArchitects] = useState<PersonId[]>(saved?.architects ?? seedTeam?.architects ?? []);
   const [engineer, setEngineer] = useState<PersonId | "">(saved?.engineers?.[0] ?? seedTeam?.engineers[0] ?? "");

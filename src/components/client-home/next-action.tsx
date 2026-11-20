@@ -12,6 +12,7 @@ import { ArrowIcon } from "./icons";
 const KINDS: [string, string, string][] = [
   ["pay", "payment", "payments"],
   ["design", "design", "designs"],
+  ["fee", "cost", "costs"],
   ["change", "change", "changes"],
   ["letter", "letter", "letters"],
 ];

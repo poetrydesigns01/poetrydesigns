@@ -4,13 +4,15 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { usePause } from "@/components/register/recording-pause";
 import { useDemo } from "@/lib/demo-store";
 import { CheckIcon, PencilIcon, QuoteIcon } from "./icons";
 import { proofStamp, type ItemView } from "./items";
 
 // Approve or Modify, the same in a table row and in the viewer. Approve asks once more;
-// Modify opens a comment box, the only place she types. Each decision is recorded with the
-// date and time and stays on screen as the proof.
+// Modify opens a comment box, the only place she types. Either waits five seconds before it is
+// recorded (Cancel undoes it); then it is kept with the date and time and stays on screen as
+// the proof.
 //
 // Focus follows the step: into the confirm or the comment box when it opens, back to the
 // button that opened it on Cancel, and onto the proof once decided.
@@ -20,6 +22,7 @@ export type DecisionMode = "idle" | "approve" | "modify";
 /** `onDecided` runs once she approves or sends a change here (the designs table keeps the group open). */
 export function useDecision(item: ItemView, onDecided?: () => void) {
   const demo = useDemo();
+  const pause = usePause();
   const [mode, setMode] = useState<DecisionMode>("idle");
   const [comment, setComment] = useState("");
   /** The button focus returns to after Cancel. */
@@ -27,35 +30,55 @@ export function useDecision(item: ItemView, onDecided?: () => void) {
   /** Set when she decides here, so the proof takes focus as it appears. */
   const [decided, setDecided] = useState(false);
 
+  const pending = pause.pending !== null;
+  const { decideDesign } = demo;
+
   return {
     mode,
     comment,
     setComment,
     returnTo,
     decided,
+    /** A decision is waiting out its five seconds. */
+    pending,
     open: (next: Exclude<DecisionMode, "idle">) => {
       setReturnTo(null);
       setMode(next);
     },
     cancel: () => {
+      if (pending) pause.cancel();
       setReturnTo(mode === "modify" ? "modify" : "approve");
       setMode("idle");
     },
-    approve: () => {
-      demo.decideDesign(item.id, "approved");
-      setDecided(true);
-      onDecided?.();
-      setMode("idle");
+    approve: (origin?: HTMLElement | null) => {
+      if (pending) return;
+      pause.start({
+        what: `Your approval of ${item.title} v${item.version}`,
+        origin,
+        commit: () => {
+          decideDesign(item.id, "approved");
+          setDecided(true);
+          onDecided?.();
+          setMode("idle");
+        },
+      });
     },
-    /** Sends the comment; false when there is nothing to send. */
-    send: (): boolean => {
+    /** Sends the comment after the pause; false when there is nothing to send. */
+    send: (origin?: HTMLElement | null): boolean => {
       const text = comment.trim();
       if (!text) return false;
-      demo.decideDesign(item.id, "changes-requested", text);
-      setComment("");
-      setDecided(true);
-      onDecided?.();
-      setMode("idle");
+      if (pending) return true;
+      pause.start({
+        what: `Your changes to ${item.title} v${item.version}`,
+        origin,
+        commit: () => {
+          decideDesign(item.id, "changes-requested", text);
+          setComment("");
+          setDecided(true);
+          onDecided?.();
+          setMode("idle");
+        },
+      });
       return true;
     },
   };
@@ -85,7 +108,13 @@ export function DecisionStep({ item, decision, dark = false }: { item: ItemView;
           <p className={`text-13 ${soft}`}>Logged with date and time</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button autoFocus type="button" className="btn btn-primary gap-2" onClick={decision.approve}>
+          <button
+            autoFocus
+            type="button"
+            className="btn btn-primary gap-2"
+            aria-disabled={decision.pending || undefined}
+            onClick={(event) => decision.approve(event.currentTarget)}
+          >
             <CheckIcon className="size-5" />
             Approve
           </button>
@@ -105,7 +134,7 @@ export function DecisionStep({ item, decision, dark = false }: { item: ItemView;
         className="grid gap-3"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!decision.send()) textRef.current?.focus();
+          if (!decision.send((event.nativeEvent as SubmitEvent).submitter)) textRef.current?.focus();
         }}
       >
         <label htmlFor={labelId} className="text-17 font-semibold">
@@ -121,7 +150,7 @@ export function DecisionStep({ item, decision, dark = false }: { item: ItemView;
           className={`glass-field w-full resize-y px-3 py-2.5 text-17 text-ink ${dark ? "bg-paper focus:bg-paper" : ""}`}
         />
         <div className="flex flex-wrap gap-2">
-          <button type="submit" className="btn btn-primary" aria-disabled={empty || undefined}>
+          <button type="submit" className="btn btn-primary" aria-disabled={empty || decision.pending || undefined}>
             Send
           </button>
           <button type="button" className="btn btn-glass" onClick={decision.cancel}>

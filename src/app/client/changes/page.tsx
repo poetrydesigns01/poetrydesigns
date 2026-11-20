@@ -7,16 +7,20 @@ import { useState } from "react";
 import { ChangeRow, CHANGE_GRID, type RowMode } from "@/components/changes/change-row";
 import { ContractHero } from "@/components/changes/contract-hero";
 import { CLIENT_PAGE, PageHead } from "@/components/client-home/page-frame";
+import { CLIENT_PROJECT, DesignChangeAsk, RequestRows } from "@/components/hours/client-requests";
 import { StatusChip } from "@/components/register/status-chip";
-import { useDemo, useProjection } from "@/lib/demo-store";
+import { useDemo, useFirm, useProjection } from "@/lib/demo-store";
 
 // Changes: what the architect recommends beyond the agreement, as a table. Each row has its
 // cost, the days it adds in bold brick, its status and the two answers. The hero above holds
-// the running contract value, which follows a previewed change.
+// the running contract value, which follows a previewed change. Below, the design changes she
+// asked for herself: each goes to the Project Head, and its cost comes back for her yes.
 
 export default function ChangesPage() {
   const demo = useDemo();
+  const firm = useFirm();
   const projection = useProjection();
+  const asked = firm.requestsFor(CLIENT_PROJECT).filter((r) => r.type === "design-change");
   const [open, setOpen] = useState<{ id: string; mode: RowMode } | null>(null);
 
   const pending = projection.changes.filter((change) => change.status === "pending");
@@ -67,6 +71,20 @@ export default function ChangesPage() {
               );
             })}
           </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="changes-asked" className="glass p-2 sm:p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3 pb-2 pt-2">
+          <h2 id="changes-asked" className="lettering text-ink-soft">
+            Asked by you
+          </h2>
+          <DesignChangeAsk />
+        </div>
+        {asked.length === 0 ? (
+          <p className="px-3 pb-3 text-15 text-ink-soft">None yet</p>
+        ) : (
+          <RequestRows requests={asked} label="Design changes you asked for" />
         )}
       </section>
     </div>

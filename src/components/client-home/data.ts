@@ -4,7 +4,8 @@
 "use client";
 
 import { useFirm } from "@/lib/demo-store";
-import { dayCount, formatShortDate } from "@/lib/format";
+import type { ClientRequestView } from "@/lib/fees";
+import { dayCount, formatShortDate, inr } from "@/lib/format";
 import { WORKFLOW_TEMPLATE } from "@/lib/workflow-template";
 import type { DesignItemView, PaymentStageView, SiteStageView, TimelineStage, TimelineView, Tone } from "@/lib/portal";
 
@@ -90,10 +91,25 @@ function unlockWords(p: PaymentStageView): string {
   return p.unlocks ? `Unlocks milestone ${p.unlocks}` : p.name;
 }
 
+/** Costs of architect time (more hours, a design change) the Project Head approved, for her yes. */
+function feeActions(requests: ClientRequestView[]): NextAction[] {
+  return requests
+    .filter((r) => r.status === "fee-with-client" && r.fee && !r.escalation?.open)
+    .map((r) => ({
+      key: `fee:${r.id}`,
+      title: "Approve cost",
+      subject: r.title,
+      chip: { tone: "waiting", words: inr(r.fee?.total ?? 0) },
+      href: "/client/hours#requests",
+      cta: "Review cost",
+    }));
+}
+
 export function nextActions(
   payments: PaymentStageView[],
   items: DesignItemView[],
   timeline: TimelineView | null,
+  requests: ClientRequestView[] = [],
 ): NextAction[] {
   const due = payments
     .filter((p) => p.canMarkPaid)
@@ -126,7 +142,7 @@ export function nextActions(
       href: "/client/payments",
       cta: "Open payments",
     }));
-  return [...overdue, ...onTime, ...designActions(items), ...changes, ...letters];
+  return [...overdue, ...onTime, ...designActions(items), ...feeActions(requests), ...changes, ...letters];
 }
 
 /** The construction milestones on the plan, in order. */
@@ -201,7 +217,7 @@ export function useClientHome() {
   const items = designStages.flatMap((s) => (s.locked ? [] : s.items));
 
   const progress = progressOf(timeline, site);
-  const actions = nextActions(payments, items, timeline);
+  const actions = nextActions(payments, items, timeline, firm.requestsFor(PROJECT));
   const paid = payments.reduce((total, p) => total + p.received, 0);
   const billable = payments.reduce((total, p) => total + p.total, 0);
   const nextPayment = payments.find((p) => p.state !== "paid") ?? null;
